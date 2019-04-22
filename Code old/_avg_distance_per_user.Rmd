@@ -1,0 +1,147 @@
+---
+title: "User consistency: average distance per user"
+author: "Laura Symul"
+date: "12/10/2018"
+output: html_document
+---
+
+
+
+```{r user_consistency librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+
+```{r user_consistency setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+##  USER CONSISTENCY
+
+We compute the user consistency as the average distance between the user's cycles.
+
+
+```{r user_consistency average distance, cache = FALSE}
+
+output_folder = paste0(IO$tmp_Rdata,"avg_dist_per_user/")
+dir.create(output_folder)
+input_folder = paste0(IO$input_data,"days/")
+days_files = list.files(input_folder)
+days_files = days_files
+N = length(days_files)
+
+registerDoParallel(par$n_cores)
+tic()
+foreach(n = 1:N)%dopar%{
+  output_file = paste0(output_folder, "d_",n,".Rdata")
+  if(!file.exists(output_file)){
+    load(paste0(input_folder,days_files[n]), verbose = TRUE)
+    #impute and transform all cycles to wide format, including cycles without TB logs
+    user_ids = unique(days$user_id[days$type == "tender_breasts"])
+    days = days[days$user_id %in% user_ids,]
+    d = reshape_and_impute(days)
+    save(d, file = output_file)
+  }
+}
+toc()
+stopImplicitCluster()
+
+
+
+source("Scripts/00_functions_jaccard_like_distance.R")
+
+registerDoParallel(par$n_cores)
+tic()
+foreach(n = 1:N)%dopar%{
+  output_file = paste0(output_folder,"users_with_avg_distance_",n,".Rdata")
+  if(!file.exists(output_file)){
+    load(file = paste0(output_folder, "d_",n,".Rdata"), verbose = TRUE)
+    # compute average distance
+    users_with_avg_distance = foreach(u = unique(d$user_id), .combine = rbind) %do% {
+      dist_summary = compute_average_distance(d = d[d$user_id == u,])
+      return(data.frame(user_id = u, avg_d = dist_summary$mean, median_d = dist_summary$median, sd_d = dist_summary$sd, file = n))
+    }
+    save(users_with_avg_distance, file = output_file)
+  }
+}
+toc()
+stopImplicitCluster()
+
+
+registerDoParallel(par$n_cores)
+tic()
+avg_dist_per_user = foreach(n = 1:N,.combine = rbind)%dopar%{
+  load(file = paste0(output_folder,"users_with_avg_distance_",n,".Rdata"), verbose = TRUE)
+  return(users_with_avg_distance)
+}
+toc()
+stopImplicitCluster()
+
+save(avg_dist_per_user, file = paste0(IO$tmp_Rdata,"avg_dist_per_user.Rdata"))
+
+
+```
+
+```{r user_consistency test viz, eval = FALSE}
+
+
+
+load(file = paste0(output_folder, "d_",n,".Rdata"))
+
+avg_dist_per_user[which(avg_dist_per_user$user_id %in% unique(d$user_id)),]
+d = melt(d)
+d$cycleday_m_D = as.numeric(gsub("\\.","-",gsub("n\\.","",d$variable)))
+d$cycle_nb_m = unlist(strsplit(as.character(d$cycle_id_m), "_"))[(1:nrow(d))*2]
+d$tender_breasts = d$value
+
+g = ggplot_imputed_TB(sel_d = d, facet_grid = "user_id", cycle_id = FALSE)
+g
+
+
+
+```
+
+
+```{r dist_viz, cache = FALSE}
+
+load(file = paste0(IO$tmp_Rdata,"avg_dist_per_user.Rdata"), verbose=  TRUE)
+load(paste0(IO$tmp_Rdata, "users.Rdata"), verbose=  TRUE)
+
+
+m = match(users$user_id, avg_dist_per_user$user_id)
+users$avg_d = avg_dist_per_user$avg_d[m]
+users$median_d = avg_dist_per_user$median_d[m]
+users$sd_d = avg_dist_per_user$sd_d[m]
+
+
+
+ggplot(users, aes(x = median_d, fill = factor(most_preval_clust))) +
+  geom_histogram(position = "identity", col = NA) + 
+  facet_grid(most_preval_clust ~ ., scale = "free_y")+
+  scale_fill_manual(values = cols$clusters_6)
+
+
+
+ggplot(users, aes(x = median_d, fill = factor(most_preval_clust))) +
+  geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
+  facet_grid(most_preval_clust ~ ., scale = "free_y")+
+  scale_fill_manual(values = cols$clusters_6)
+
+
+ggplot(users, aes(x = avg_d, fill = factor(most_preval_clust))) +
+  geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
+  facet_grid(most_preval_clust ~ ., scale = "free_y")+
+  scale_fill_manual(values = cols$clusters_6)
+
+
+
+ggplot(users, aes(x = sd_d, fill = factor(most_preval_clust))) +
+  geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
+  facet_grid(most_preval_clust ~ ., scale = "free_y")+
+  scale_fill_manual(values = cols$clusters_6)
+
+```
+
+

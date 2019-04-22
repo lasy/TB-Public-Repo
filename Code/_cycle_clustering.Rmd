@@ -1,0 +1,39 @@
+---
+title: "Clustering cycles"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+# Cycle clustering
+
+
+```{r child = '_cycle_clust_formating_cycles.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_cycle_clust_imputing_logs.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_cycle_clust_metric.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_cycle_clust_optimal_cluster_number.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_cycle_clust_clustering.Rmd', cache=TRUE}
+```
+
+

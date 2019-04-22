@@ -1,0 +1,10 @@
+---
+title: "Synthetic data generator"
+author: "Laura Symul"
+date: "4/16/2019"
+output: html_document
+---
+
+
+
+

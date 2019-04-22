@@ -1,0 +1,256 @@
+---
+title: "Test optimization distance calculations"
+author: "Laura Symul"
+date: "12/20/2018"
+output: html_document
+---
+
+
+
+
+```{r distance_computing_time_optimizations setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+
+```{r distance_computing_time_optimizations librairies and stuff, include = FALSE, eval = TRUE}
+rm(list=ls())
+source("00_variables.R")
+source("00_libraries.R")
+source("00_functions.R")
+source("00_setup.R")
+source("00_functions_jaccard_like_distances.R")
+source("00_functions_jaccard_like_distance.R")
+```
+
+
+
+```{r distance_computing_time_optimizations weight for distance evaluation and r, eval = TRUE, fig.height=3, fig.width=7}
+
+sigmoid = function(x, ix, s){ 1/(1+exp(-(x-ix)*s))}
+
+w  = 0.5 + (sigmoid(-18:7,ix = -12,s = 0.5) - sigmoid(-18:7, ix = 8, s = 0.6))/2
+ww = data.frame(cycleday_m_D = -18:7, w = w)
+
+ggplot(ww, aes(x = cycleday_m_D, y = w)) + geom_point() + geom_line() + scale_x_continuous(breaks = par$x.axis)+ ylim(c(0,1))
+
+r = 0.6
+```
+
+
+
+
+
+```{r distance_computing_time_optimizations loading d_wide, eval = TRUE, fig.height=3, fig.width=7}
+load(file = paste0(IO$Rdata,"d_wide_imputed.Rdata"), verbose = TRUE)
+```
+
+
+
+```{r distance_computing_time_optimizations optimization and runtime of computing distance matrix, eval = TRUE}
+
+tic()
+j_dist_mat_loop = new_jaccard_loop(d_wide[1:10,-1], r = r, w = w)
+toc()
+
+
+tic()
+j_dist_mat = new_jaccard_no_Rcpp(d_wide[1:10,-1], r = r, w = w)
+toc_time = toc()$toc
+
+all(j_dist_mat_loop == j_dist_mat)
+
+runtimes = c()
+ns = round(2^(2:10))
+for(n in ns){
+tic()
+j_dist_mat = new_jaccard_no_Rcpp(d_wide[1:n,-1], r = r, w = w)
+toctoc = toc()
+runtimes = c(runtimes, as.numeric(toctoc$toc - toctoc$tic))
+}
+runtimesV = runtimes
+#runtimesV = runtimes$runtimes
+
+factor_runtime = 28000
+runtimes = data.frame(n = ns, runtime = runtimesV, th_runtime = (ns^2)/factor_runtime)
+ggplot(runtimes, aes(x = ns, y = runtime))+ geom_point()+geom_line() + geom_line(aes(y = th_runtime), col = "blue")
+ggplot(runtimes, aes(x = ns^2, y = runtime))+ geom_point()+geom_line() 
+
+
+runtimes_new_jaccard = runtimes
+
+print(paste("estimated runtime for d_wide: (nrow(d_wide)^2) /",factor_runtime,")/60/60 = ",round((nrow(d_wide)^2) / factor_runtime/60/60)," hours"))
+
+rm(runtimesV, factor_runtime, runtimes)
+
+```
+
+That's way too long!
+
+
+Let's try to write the distance funtion  with Rcpp
+
+
+```{r distance_computing_time_optimizations optimization and runtime of computing distance matrix Rcpp for dist vec function, eval = TRUE}
+
+tic()
+j_dist_mat_no_Rcpp = new_jaccard_no_Rcpp(d_wide[1:10,-1], r = r, w = w)
+toc_time = toc()$toc
+
+
+tic()
+j_dist_mat = new_jaccard_with_vecs_Rcpp(d_wide[1:10,-1], r = r, w = w)
+toc_time = toc()$toc
+
+all(round(j_dist_mat_no_Rcpp, digits = 5) == round(j_dist_mat, digits = 5))
+
+
+
+runtimes = c()
+ns = round(2^(2:10))
+for(n in ns){
+tic()
+j_dist_mat = new_jaccard_with_vecs_Rcpp(d_wide[1:n,-1], r = r, w = w)
+toctoc = toc()
+runtimes = c(runtimes, as.numeric(toctoc$toc - toctoc$tic))
+}
+runtimesV = runtimes
+#runtimesV = runtimes$runtimes
+
+factor_runtime = ns[length(ns)]^2/runtimesV[length(ns)]
+runtimes = data.frame(n = ns, runtime = runtimesV, th_runtime = (ns^2)/factor_runtime)
+ggplot(runtimes, aes(x = ns, y = runtime))+ geom_point()+geom_line() + geom_line(aes(y = th_runtime), col = "blue")
+ggplot(runtimes, aes(x = ns^2, y = runtime))+ geom_point()+geom_line() 
+
+
+runtimes_new_jaccard = runtimes
+
+print(paste("estimated runtime for d_wide: (nrow(d_wide)^2) /",factor_runtime,")/60/60 = ",round((nrow(d_wide)^2) / factor_runtime/60/60)," hours"))
+
+rm(runtimesV, factor_runtime, runtimes)
+
+```
+
+
+
+We can maybe still improve that by rewriting the whole distance function in C++ (not even using apply)
+
+```{r distance_computing_time_optimizations optimization and runtime of computing distance matrix Rcpp, eval = TRUE}
+
+tic()
+j_dist_mat_with_vecs_Rcpp = new_jaccard_with_vecs_Rcpp(d_wide[1:100,-1], r = r, w = w)
+toc_time = toc()$toc
+
+
+tic()
+j_dist_mat = new_jaccard(d_wide[1:100,-1], r = r, w = w)
+toc_time = toc()$toc
+
+
+all(round(j_dist_mat_with_vecs_Rcpp, digits = 3) == round(j_dist_mat, digits = 3))
+
+
+
+runtimes = c()
+ns = round(2^(2:12))
+for(n in ns){
+tic()
+j_dist_mat = new_jaccard(d_wide[1:n,-1], r = r, w = w)
+toctoc = toc()
+runtimes = c(runtimes, as.numeric(toctoc$toc - toctoc$tic))
+}
+runtimesV = runtimes
+#runtimesV = runtimes$runtimes
+
+factor_runtime = (ns[length(ns)]^2)/runtimesV[length(ns)]
+runtimes = data.frame(n = ns, runtime = runtimesV, th_runtime = (ns^2)/factor_runtime)
+ggplot(runtimes, aes(x = ns, y = runtime))+ geom_point()+geom_line() + geom_line(aes(y = th_runtime), col = "blue")
+ggplot(runtimes, aes(x = ns^2, y = runtime))+ geom_point()+geom_line() 
+
+
+runtimes_new_jaccard = runtimes
+
+print(paste("estimated runtime for d_wide: (nrow(d_wide)^2) /",factor_runtime,")/60/60 = ",round((nrow(d_wide)^2) / factor_runtime/60/60)," hours"))
+
+rm(runtimesV, factor_runtime, runtimes)
+
+```
+
+Let's compare it with the native euclidian distance R function `dist`
+
+
+```{r distance_computing_time_optimizations runtime of computing euclidian distance matrix, eval = TRUE}
+
+runtimes = c()
+ns = round(2^(2:12))
+for(n in ns){
+  tic()
+  j_dist_mat = dist(d_wide[1:n,-1])
+  toctoc = toc()
+  runtimes = c(runtimes, as.numeric(toctoc$toc - toctoc$tic))
+}
+runtimesV = runtimes
+#runtimesV = runtimes$runtimes
+
+factor_runtime = ns[length(ns)]^2/runtimesV[length(ns)]
+runtimes = data.frame(n = ns, runtime = runtimesV, runtime_new_jaccard = runtimes_new_jaccard$runtime, th_runtime_dist = (ns^2)/factor_runtime)
+ggplot(runtimes, aes(x = ns, y = runtime))+ geom_point()+geom_line() + geom_line(aes(y = th_runtime_dist), col = "blue")
+ggplot(runtimes, aes(x = ns^2, y = runtime))+ geom_point()+geom_line()
+ggplot(runtimes, aes(x = ns, y = runtime))+ geom_point()+geom_line() + geom_line(aes(y = runtime_new_jaccard), col = "blue")
+
+print(paste("estimated runtime for d_wide: (nrow(d_wide)^2) /",factor_runtime,")/60/60 = ",round((nrow(d_wide)^2) / factor_runtime/60/60)," hours"))
+
+```
+
+
+The dist function is still O(n^2) but has been heavily optimized!
+
+
+
+```{r distance_computing_time_optimizations optimization and runtime of computing distance matrix Rcpp, eval = TRUE}
+
+tic()
+j_dist_mat_loop = new_jaccard_loop(d_wide[1:4,-1], r = r, w = w)
+toc_time = toc()$toc
+
+
+tic()
+j_dist_mat = new_jaccard(d_wide[1:4,-1], r = r, w = w)
+toc_time = toc()$toc
+
+
+all(round(j_dist_mat_loop, digits = 3) == round(j_dist_mat, digits = 3))
+
+
+
+runtimes = c()
+ns = round(2^(2:10))
+for(n in ns){
+  tic()
+  j_dist_mat = new_jaccard(d_wide[1:n,-1], r = r, w = w)
+  toctoc = toc()
+  runtimes = c(runtimes, as.numeric(toctoc$toc - toctoc$tic))
+}
+runtimesV = runtimes
+#runtimesV = runtimes$runtimes
+
+factor_runtime = (ns[length(ns)]^2)/runtimesV[length(ns)]
+runtimes = data.frame(n = ns, runtime = runtimesV, th_runtime = (ns^2)/factor_runtime)
+ggplot(runtimes, aes(x = ns, y = runtime))+ geom_point()+geom_line() + geom_line(aes(y = th_runtime), col = "blue")
+ggplot(runtimes, aes(x = ns^2, y = runtime))+ geom_point()+geom_line() 
+
+
+runtimes_new_jaccard = runtimes
+
+print(paste("estimated runtime for d_wide: (nrow(d_wide)^2) /",factor_runtime,")/60/60 = ",round((nrow(d_wide)^2) / factor_runtime/60/60)," hours"))
+
+
+print(paste("estimated runtime for 5% of d_wide: ((nrow(d_wide)/100*5)^2) /",factor_runtime,")/60/60 = ",round(((nrow(d_wide)/100*5)^2) / factor_runtime/60/60, digits = 2)," hours"))
+
+rm(runtimesV, factor_runtime, runtimes)
+
+```
+
+
+

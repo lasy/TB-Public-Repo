@@ -1,0 +1,303 @@
+---
+title: "Cycle clustering with categorical data for potentially missing data"
+author: "Laura Symul"
+date: "12/10/2018"
+output: html_document
+---
+
+
+
+
+```{r cycle_clustering_cat_data setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+
+```{r cycle_clustering_cat_data librairies and stuff, include = FALSE, eval = TRUE}
+rm(list=ls())
+source("00_variables.R")
+source("00_libraries.R")
+source("00_functions.R")
+source("00_setup.R")
+```
+
+
+
+##  CYCLES CLUSTERING CAT DATA
+
+Instead of just using 1 and 0s for the TB logs, we can create 3 categories:
+- 1 for TB has been logged
+- 0 for when TB has not been logged BUT other things were logged
+- M for when TB has not been logged AND nothing else was logged (missing data)
+
+### Selecting cycles with at least 1 logged tender breasts (same as Vanilla)
+
+
+```{r cycle_clustering_cat_data load days_TB_only, eval = TRUE}
+load(file = paste0(IO$Rdata,"days_TB_only.Rdata"), verbose = TRUE)
+days_TB = days
+rm(days)
+cycle_ids = unique(days_TB$cycle_id_m)
+```
+
+We also need to have the n_logs for these cycles
+
+
+```{r cycle_clustering_cat_data keeping n_logs from the cycles with at least 1 TB, eval = FALSE}
+days_filenames = list.files(paste0(IO$Rdata, "days/"))
+
+registerDoParallel(par$n_cores)
+
+tic()
+days_n_logs = foreach(days_filename = days_filenames, .combine = rbind)%dopar%{
+  load(paste0(IO$Rdata,"days/",days_filename), verbose = TRUE)
+  row_keep = ((days$cycle_id_m %in% cycle_ids)&(days$type == "n_logs")) 
+  col_keep = c("type","number","user_id",
+               "cycle_nb","cycle_id","cycleday",
+               "cycle_nb_m","cycle_id_m","cycleday_m","cycleday_m_D",
+               "cycle_nb_mb","cycle_id_mb","cycleday_mb","cycleday_mb_D")
+  days = days[row_keep,col_keep]
+  return(days)
+}
+toc()
+stopImplicitCluster()
+
+save(days_n_logs, file = paste0(IO$Rdata,"days_TB_only_n_logs.Rdata"))
+```
+
+
+
+```{r cycle_clustering_cat_data load n_logs for those cycles, eval = FALSE, cache.lazy=FALSE}
+load(file = paste0(IO$Rdata,"days_TB_only_n_logs.Rdata"), verbose = TRUE)
+```
+
+```{r cycle_clustering_cat_data clean workspace}
+rm(cycle_ids)
+```
+
+
+### Formatting days for clustering
+
+First, we take the same as for the vanilla method
+
+```{r cycle_clustering_cat_data loading d_wide_vanilla, eval = TRUE}
+load( file = paste0(IO$Rdata,"d_wide_vanilla.Rdata"), verbose = TRUE)
+d_wide$cycle_id_m = as.character(d_wide$cycle_id_m)
+d_wide_vanilla = d_wide
+```
+
+
+Then we need to format the days_n_logs the same way.
+
+```{r cycle_clustering_cat_data formatting days_n_logs, eval = FALSE}
+k = which((!is.na(days_n_logs$cycleday_m_D)) & (!is.na(match(days_n_logs$cycle_id_m, d_wide$cycle_id_m))))
+d = days_n_logs[k,]
+d$n_logs = d$number
+
+d_wide_n_logs = reshape(d[,c("cycle_id_m","cycleday_m_D","n_logs")],
+                        idvar = "cycle_id_m",timevar = "cycleday_m_D",
+                        direction = "wide")
+d_wide_n_logs[is.na(d_wide_n_logs)] = 0
+
+# re-order the columns by cycleday_m_D
+o = order(as.numeric(sapply(strsplit(colnames(d_wide_n_logs)[2:ncol(d_wide_n_logs)],"\\."), "[[", 2)))
+d_wide_n_logs = data.frame(cycle_id_m = d_wide_n_logs$cycle_id_m, d_wide_n_logs[,o+1] )
+
+# re-order the rows so that they match d_wide (with the TB logs)
+m = match(d_wide$cycle_id_m, d_wide_n_logs$cycle_id_m)
+d_wide_n_logs = d_wide_n_logs[m,]
+rm(o, k, m, d)
+
+head(d_wide_n_logs)
+save(d_wide_n_logs, file = paste0(IO$Rdata,"d_wide_n_logs.Rdata") )
+```
+
+
+
+```{r cycle_clustering_cat_data loading formatted days_n_logs, eval = TRUE}
+load(file = paste0(IO$Rdata,"d_wide_n_logs.Rdata"), verbose = TRUE )
+d_wide_n_logs$cycle_id_m = as.character(d_wide_n_logs$cycle_id_m)
+```
+
+
+
+And now, we need to change the **0** to **-1** in d_wide where d_wide_n_logs is also 0.
+
+(later, we might want to change them to "M", but now, let's keep numerical values)
+
+```{r cycle_clustering_cat_data changing 0 to M in d_wide}
+d_wide[(d_wide == 0) & (d_wide_n_logs == 0)] = -1
+
+image(t(as.matrix(head(d_wide_vanilla[,-1],30) == 0)), col = c("deeppink","gray90"))
+image(t(as.matrix(head(d_wide_n_logs[,-1],30) == 0)), col = c("deeppink","gray90"))
+image(t(as.matrix(head(d_wide[,-1],30))), col = c("white","gray90","deeppink"), breaks = -2:1+0.5)
+
+save(d_wide, file = paste0(IO$Rdata,"d_wide_cat.Rdata"))
+
+```
+
+
+```{r cycle_clustering_cat_data example d_wide with categorical data}
+
+head_d_wide = d_wide[1:20,]
+colnames(head_d_wide) = gsub("tender_breasts..","-",colnames(head_d_wide), fixed = TRUE)
+colnames(head_d_wide) = gsub("tender_breasts.","",colnames(head_d_wide), fixed = TRUE)
+head_d_wide
+
+write.table(head_d_wide, file = "data/example_day_values_for_cycle_clustering_cat_data.txt", col.names = TRUE, row.names = FALSE, sep = "\t",quote = FALSE)
+```
+
+
+### Using K-means (standard method, with Euclidian distance)
+
+```{r cycle_clustering_cat_data kmeans prep}
+d = days_TB[!is.na(days_TB$cycleday_m_D),]
+d$tender_breasts = 1
+```
+
+
+```{r cycle_clustering_cat_data cycle clusters - exploring number of clusters with kmeans}
+cycle_ids = unique(d$cycle_id_m)
+n_centers = 2:7
+tic()
+for(n_center in n_centers){
+  cat(n_center,"\n")
+  kmeans_type = kmeans(d_wide[,-1], centers = n_center, nstart = 20)
+  if(n_center == 2){WSS_k_tot.withinss = kmeans_type$totss}
+  WSS_k_tot.withinss = c(WSS_k_tot.withinss, kmeans_type$tot.withinss )
+  
+  d$kmean_group = kmeans_type$cluster[match(d$cycle_id_m, d_wide$cycle_id_m)]
+  
+  d = d[order(d$kmean_group),]
+  d$cycle_id_m_factors_kmeans = factor(d$cycle_id_m, levels = unique(d$cycle_id_m))
+  
+  #### plots
+  # first showing some examples
+  set.seed(6)
+  d_subset = d[d$cycle_id_m %in% cycle_ids[sample(1:length(cycle_ids),50)],]
+  # black dots
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m)) + geom_point() )
+  # colored dots
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(kmean_group))) + geom_point()+ guides(col = FALSE))
+  # ordered colored dots
+  d_subset = d_subset[order(d_subset$kmean_group),]
+  d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(kmean_group))) + geom_point()+ guides(col = FALSE))
+  
+  # then showing the profiles for the clusters
+  agg = aggregate(tender_breasts ~ cycleday_m_D + kmean_group, d, sum)
+  print(ggplot(agg, aes(x = cycleday_m_D, y =tender_breasts, col = factor(kmean_group))) + geom_line() + facet_grid(kmean_group ~.))
+}
+toc()
+df = data.frame(n_clust = c(1,n_centers), WSS = WSS_k_tot.withinss)
+ggplot(df, aes(x =n_clust, y = WSS)) + geom_bar(stat = "identity", fill = "steelblue2")
+
+rm(df,cycle_ids, kmeans_type, d_subset, agg, n_center, n_centers, WSS_k_tot.withinss)
+```
+
+The clusters are a little bit different but still quite similar to what we get when using the raw data (only 1 or 0).
+
+
+
+### K-modes from KlaR package
+
+
+
+```{r cycle_clustering_cat_data kmodes test }
+subset_i = sample(1:nrow(d_wide), round(nrow(d_wide)/20))
+tic()
+kmodes_TB = kmodes(data = d_wide[subset_i,-1], modes = 2)
+matplot(-18:7,t(kmodes_TB$modes), type = "b")
+barplot(table(kmodes_TB$cluster))
+toc()
+
+tic()
+kmodes_TB = kmodes(data = d_wide[subset_i,-1], modes = 5)
+matplot(-18:7,t(kmodes_TB$modes), type = "b")
+barplot(table(kmodes_TB$cluster), col = 1:5)
+toc()
+
+
+tic()
+kmodes_TB = kmodes(data = d_wide[subset_i,-1], modes = 10)
+modes = kmodes_TB$modes
+matplot(-18:7,t(kmodes_TB$modes), type = "b")
+barplot(table(kmodes_TB$cluster), col = 1:10)
+toc()
+
+```
+
+
+
+```{r cycle_clustering_cat_data cycle clustering using k-modes - exploring the ideal number of clusters}
+
+subset_i = sample(1:nrow(d_wide), round(nrow(d_wide)/100))
+
+
+cycle_ids = unique(d$cycle_id_m)
+n_centers = 2:7
+tic()
+for(n_center in n_centers){
+  cat(n_center,"\n")
+  kmodes_TB = kmodes(data = d_wide[subset_i,-1], modes = n_center)
+
+  if(n_center == 2){WSS_k_tot.withinss = c()}
+  WSS_k_tot.withinss = c(WSS_k_tot.withinss, sum(kmodes_TB$withindiff) )
+  
+  d$kmodes_group = kmodes_TB$cluster[match(d$cycle_id_m, d_wide$cycle_id_m)]
+  
+  d = d[order(d$kmodes_group),]
+  d$cycle_id_m_factors_kmodes = factor(d$cycle_id_m, levels = unique(d$cycle_id_m))
+  
+  #### plots
+  # first showing some examples
+  set.seed(6)
+  cycle_ids = unique(d$cycle_id_m[!is.na(d$kmodes_group)])
+  d_subset = d[(d$cycle_id_m %in% cycle_ids[sample(1:length(cycle_ids),50)]),]
+  # ordered colored dots
+  d_subset = d_subset[order(d_subset$kmodes_group),]
+  d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(kmodes_group))) + geom_point()+ guides(col = FALSE))
+  
+  # then showing the profiles for the clusters
+  agg = aggregate(tender_breasts ~ cycleday_m_D + kmodes_group, d, sum)
+  print(ggplot(agg, aes(x = cycleday_m_D, y =tender_breasts, col = factor(kmodes_group))) + geom_line() + facet_grid(kmodes_group ~.))
+  
+  # show the modes
+  modes = kmodes_TB$modes
+  modes$kmodes_group = 1:n_center
+  modes = reshape(modes, idvar = "kmodes_group", varying = list(1:(ncol(modes)-1)), direction = "long")
+  modes$cycleday_m_D = rep(-18:7,each = n_center)
+  modes$tender_breasts = modes$tender_breasts..18
+  print(ggplot(modes, aes(x = cycleday_m_D, y = tender_breasts, col = factor(kmodes_group))) + geom_line()+ facet_grid(kmodes_group ~.) + ylim(c(-1,1)))
+  
+  # show the size of the clusters
+  
+  size = data.frame(kmodes_group = 1:n_center, size = as.vector(kmodes_TB$size))
+  print(ggplot(size, aes(x = kmodes_group, y = size, fill = factor(kmodes_group))) + geom_bar(stat = "identity"))
+
+  rm(modes, size)
+}
+toc()
+df = data.frame(n_clust = c(n_centers), WSS = WSS_k_tot.withinss)
+ggplot(df, aes(x =n_clust, y = WSS)) + geom_bar(stat = "identity", fill = "steelblue2")
+
+rm(df,cycle_ids, kmeans_type, d_subset, agg, n_center, n_centers, WSS_k_tot.withinss)
+
+
+```
+
+
+Now, clusters look very different and rather capture the tracking behavior than the symptoms timing.
+
+
+
+
+
+
+
+### Cycle clusters by age and birth control
+
+> TO DO?
+

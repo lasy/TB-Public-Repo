@@ -1,0 +1,199 @@
+---
+title: "Augmenting the cycles table with users info and aggregates from the days table to build cycle summaries"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r data_prep_cycles_agg librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r data_prep_cycles_agg setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Augmenting the cycles table
+
+
+
+```{r data_prep_cycles_agg loading users}
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+```
+
+
+
+```{r data_prep_cycles_agg loading cycles}
+file.copy(paste0(IO$output_data, "cycles.Rdata"), paste0(IO$tmp_data, "cycles_before_cycles_agg.Rdata"), overwrite = TRUE)
+load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+```
+
+
+```{r data_prep_cycles_agg adding users info on the cycles table}
+cycles$birth_control_CLUE = users$birth_control[match(cycles$user_id, users$user_id )]
+```
+
+
+```{r data_prep_cycles_agg aggregates from days}
+
+days_folder = paste0(IO$output_data,"days/")
+
+filenames = list.files(days_folder)
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+cycles_aggregate = foreach(filename = filenames, .combine = rbind, .packages = c('plyr','dplyr')) %dopar% 
+{
+  cat(filename,"\n")
+  load(paste0(days_folder, filename), verbose = TRUE)
+  #days = days[(days$user_id %in% unique(days$user_id)[1:2]) & (days$cycle_nb %in% 1:3),]
+  
+  days$cycleday_m_D_lut_D = days$cycleday_m_D
+  j = which(!(days$cycleday_m_D_lut_D %in% c(-par$D : -1)))
+  days$cycleday_m_D_lut_D[j] = NA
+  
+  days$cycleday_m_D_lut_7 = days$cycleday_m_D
+  j = which(!(days$cycleday_m_D_lut_7 %in% c(-7 : -1)))
+  days$cycleday_m_D_lut_7[j] = NA
+  
+  days$cycleday_m_D_foll_Df = days$cycleday_m_D
+  j = which(!(days$cycleday_m_D_foll_Df %in% c(0:par$Df)))
+  days$cycleday_m_D_foll_Df[j] = NA
+ 
+  cycles_agg = ddply(days, .(cycle_id), .parallel=TRUE ,  .fun = summarize,
+                     n_days_obs = lu(date),
+                     last_obs_day = max(cycleday),
+                     n_obs = sum(number * (type == "n_logs"), na.rm = TRUE),
+                     n_days_obs_lut_D = lu(cycleday_m_D_lut_D[!is.na(cycleday_m_D_lut_D)]),
+                     n_days_obs_lut_7 = lu(cycleday_m_D_lut_7[!is.na(cycleday_m_D_lut_7)]),
+                     n_days_obs_foll_Df = lu(cycleday_m_D_foll_Df[!is.na(cycleday_m_D_foll_Df)]),
+                     n_pill = sum(category == "pill_hbc"),
+                     n_other_BC = sum(category %in% c("patch_hbc","ring_hbc","injection_hbc","iud")) ,
+                     n_tot_sex = sum(type %in% c("withdrawal_sex","protected_sex","unprotected_sex")),
+                     n_prot_sex = sum(type == "protected_sex"),
+                     n_unprot_sex =  sum(type == "unprotected_sex"),
+                     n_withdrawal =  sum(type == "withdrawal_sex"),
+                     n_TB = sum(type == TB),
+                     n_egg_white_fluid = sum(type %in% c("egg_white")),
+                     n_BBT = sum((category == "bbt") & (!is.na(number)))
+  )
+  return(cycles_agg)
+}
+
+stopCluster(cl)
+
+save(cycles_aggregate, file = paste0(IO$tmp_data, "cycles_aggregate_data_prep.Rdata"))
+
+```
+
+
+```{r data_prep_cycles_agg checking cycles and cycles_aggregate before merge}
+
+load(paste0(IO$tmp_data, "cycles_aggregate_data_prep.Rdata"), verbose = TRUE)
+
+dim(cycles)
+dim(cycles_aggregate)
+
+head(cycles)
+head(cycles_aggregate)
+```
+
+
+
+
+```{r data_prep_cycles_agg augmenting cycles table with aggregates from days}
+cycles = merge(cycles, cycles_aggregate, by = c("cycle_id"), all.x = TRUE)
+
+dim(cycles)
+
+head(cycles)
+
+```
+
+
+```{r data_prep_cycles_agg removing NAs}
+
+
+column_names = c("n_days_obs","last_obs_day",
+                 "n_obs","n_days_obs_lut_D","n_days_obs_lut_7","n_days_obs_foll_Df",
+                 "n_pill","n_other_BC",
+                 "n_tot_sex","n_prot_sex","n_unprot_sex","n_withdrawal",
+                 "n_TB", "n_egg_white_fluid", "n_BBT")
+for(column_name in column_names){
+  eval(parse(text = paste0("cycles$",column_name,"[is.na(cycles$",column_name,")] = 0")))
+}
+
+```
+
+
+```{r augmenting cycles table with aggregates from days}
+cycles = merge(cycles, cycles_aggregate, by = c("cycle_id"), all.x = TRUE)
+
+dim(cycles)
+
+head(cycles)
+
+```
+
+
+
+We will still augment the cycles table with some measure of local regularity.
+We compute the local regularity as 
+- the difference with a moving median over 3 cycles
+- the sd in cycle length over 3 cycles
+
+
+
+```{r data_prep_cycles_agg average and median cycle length and local regularity}
+
+cycles_agg = ddply(cycles, .(user_id), summarize,
+                   mean_cycle_length = mean(cycle_length),
+                   median_cycle_length = median(cycle_length),
+                   sd_cycle_length = sd(cycle_length)
+)
+
+cycles$CL_diff_with_overall_median = cycles$cycle_length - cycles_agg$median_cycle_length[match(cycles$user_id, cycles_agg$user_id)]
+
+# local regularity
+
+## fist computing the moving median
+cy = cycles
+
+cy$cycle_id_prev = paste0(cy$user_id,"_",cy$cycle_nb-1)
+cy$cycle_id_prev2 = paste0(cy$user_id,"_",cy$cycle_nb-2)
+cy$cycle_id_next = paste0(cy$user_id,"_",cy$cycle_nb+1)
+cy$cycle_id_next2 = paste0(cy$user_id,"_",cy$cycle_nb+2)
+
+cy$cycle_length_next = cy$cycle_length[match( cy$cycle_id_next, cy$cycle_id)]
+cy$cycle_length_next2 = cy$cycle_length[match( cy$cycle_id_next2, cy$cycle_id)]
+
+cycles$cl_median_3c = apply(cy[,grep("cycle_length",colnames(cy))], 1, median, na.rm = TRUE)
+cycles$cl_sd_3c = apply(cy[,grep("cycle_length",colnames(cy))], 1, sd, na.rm = TRUE)
+cycles$cl_sd_3c = replace_NAs_with_latest_value(cycles$cl_sd_3c)
+
+## then the difference with the moving median
+cycles$diff_cl_median_3c = cycles$cycle_length - cycles$cl_median_3c
+```
+
+
+
+
+```{r data_prep_cycles_agg saving cycles}
+save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
+```
+
+

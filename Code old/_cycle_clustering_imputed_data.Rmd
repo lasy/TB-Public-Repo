@@ -1,0 +1,342 @@
+---
+title: "Cycle clustering with imputed data and new Jaccard-like distance"
+author: "Laura Symul"
+date: "12/10/2018"
+output: html_document
+---
+
+
+
+```{r cycle_clustering_imputed_data setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+
+```{r cycle_clustering_imputed_data librairies and stuff, include = FALSE, eval = TRUE}
+rm(list=ls())
+source("00_variables.R")
+source("00_libraries.R")
+source("00_functions.R")
+source("00_setup.R")
+source("00_functions_jaccard_like_distance.R")
+```
+
+
+
+
+
+
+
+##  CYCLES CLUSTERING WITH IMPUTED DATA AND JACCARD-LIKE DISTANCE
+
+Here, we want to build on the idea that absence of TB log is not the same when other features were logged or not, **but also take into account that missing days in the middle of a logged sequence are not the same as missing days at the beginning or end of sequences**.
+
+
+### Loading data (from cat_data)
+
+
+```{r cycle_clustering_imputed_data load d_wide_cat, eval = FALSE}
+load(file = paste0(IO$Rdata,"d_wide_cat.Rdata"), verbose = TRUE)
+d_wide_cat = d_wide 
+```
+
+### Imputing data
+
+```{r cycle_clustering_imputed_data imputing data, eval = FALSE}
+
+d_wide_imputed =  t(apply(d_wide[,-1], 1, impute))
+d_wide_imputed_df = data.frame(cycle_id_m = d_wide$cycle_id_m, d_wide_imputed)
+colnames(d_wide_imputed_df) = colnames(d_wide)
+d_wide = d_wide_imputed_df
+
+save(d_wide, file = paste0(IO$Rdata,"d_wide_imputed.Rdata"))
+rm(d_wide_imputed, d_wide_imputed_df, d_wide_cat)
+```
+
+
+```{r cycle_clustering_imputed_data load imputed data, eval = TRUE}
+load(file = paste0(IO$Rdata,"d_wide_imputed.Rdata"), verbose = TRUE)
+```
+
+
+
+
+```{r cycle_clustering_imputed_data example d_wide with imputed data}
+
+head_d_wide = d_wide[1:20,]
+colnames(head_d_wide) = gsub("tender_breasts..","-",colnames(head_d_wide), fixed = TRUE)
+colnames(head_d_wide) = gsub("tender_breasts.","",colnames(head_d_wide), fixed = TRUE)
+head_d_wide
+
+write.table(head_d_wide, file = "data/example_day_values_for_cycle_clustering_imputed_data.txt", col.names = TRUE, row.names = FALSE, sep = "\t",quote = FALSE)
+
+rm(head_d_wide)
+```
+
+
+### Computing the distance matrix with the new Jaccard-like distance
+
+
+
+```{r cycle_clustering_imputed_data weight for distance evaluation and r, eval = TRUE, fig.height=3, fig.width=7}
+
+sigmoid = function(x, ix, s){ 1/(1+exp(-(x-ix)*s))}
+
+w  = 0.5 + (sigmoid(-18:7,ix = -12,s = 0.5) - sigmoid(-18:7, ix = 8, s = 0.6))/2
+ww = data.frame(cycleday_m_D = -18:7, w = w)
+
+ggplot(ww, aes(x = cycleday_m_D, y = w)) + geom_point() + geom_line() + scale_x_continuous(breaks = par$x.axis)+ ylim(c(0,1))
+
+r = 0.6
+```
+
+
+
+
+
+```{r cycle_clustering_imputed_data computing distance matrix, eval = FALSE}
+
+tic()
+j_dist_mat = new_jaccard(d_wide[sample(1:nrow(d_wide),round(nrow(d_wide)/20)),-1], r = r, w = w)
+toc()
+
+save(j_dist_mat, file = paste0(IO$Rdata,"j_dist_mat.Rdata"))
+```
+
+```{r cycle_clustering_imputed_data loading distance matrix, eval = TRUE}
+
+load(file = paste0(IO$Rdata,"j_dist_mat.Rdata"), verbose = TRUE)
+
+```
+
+
+
+
+### Clustering with PAM
+
+
+>>> STOPPED HERE
+
+
+```{r cycle_clustering_imputed_data kmeans prep}
+d = days_TB[!is.na(days_TB$cycleday_m_D),]
+d$tender_breasts = 1
+```
+
+
+```{r cycle_clustering_imputed_data cycle clusters - exploring number of clusters with pam}
+
+#cycle_ids = unique(d$cycle_id_m)
+n_centers = 2:7
+tic()
+for(n_center in n_centers){
+  cat(n_center,"\n")
+  tic()
+  pam_n = pam(j_dist_mat[1:1000,1:1000], k = n_center, diss = TRUE, cluster.only = TRUE)  
+  toc()
+  
+  #if(n_center == 2){WSS_k_tot.withinss = kmeans_type$totss}
+  #WSS_k_tot.withinss = c(WSS_k_tot.withinss, kmeans_type$tot.withinss )
+  
+  d$kmean_group = kmeans_type$cluster[match(d$cycle_id_m, d_wide$cycle_id_m)]
+  
+  d = d[order(d$kmean_group),]
+  d$cycle_id_m_factors_kmeans = factor(d$cycle_id_m, levels = unique(d$cycle_id_m))
+  
+  #### plots
+  # first showing some examples
+  set.seed(6)
+  d_subset = d[d$cycle_id_m %in% cycle_ids[sample(1:length(cycle_ids),50)],]
+  # black dots
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m)) + geom_point() )
+  # colored dots
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(kmean_group))) + geom_point()+ guides(col = FALSE))
+  # ordered colored dots
+  d_subset = d_subset[order(d_subset$kmean_group),]
+  d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(kmean_group))) + geom_point()+ guides(col = FALSE))
+  
+  # then showing the profiles for the clusters
+  agg = aggregate(tender_breasts ~ cycleday_m_D + kmean_group, d, sum)
+  print(ggplot(agg, aes(x = cycleday_m_D, y =tender_breasts, col = factor(kmean_group))) + geom_line() + facet_grid(kmean_group ~.))
+}
+toc()
+df = data.frame(n_clust = c(1,n_centers), WSS = WSS_k_tot.withinss)
+ggplot(df, aes(x =n_clust, y = WSS)) + geom_bar(stat = "identity", fill = "steelblue2")
+
+rm(df,cycle_ids, kmeans_type, d_subset, agg, n_center, n_centers, WSS_k_tot.withinss)
+```
+
+The clusters are a little bit different but still quite similar to what we get when using the raw data (only 1 or 0).
+
+
+
+### K-modes from KlaR package
+
+
+
+```{r cycle_clustering_imputed_data kmodes test }
+subset_i = sample(1:nrow(d_wide), round(nrow(d_wide)/20))
+tic()
+kmodes_TB = kmodes(data = d_wide[subset_i,-1], modes = 2)
+matplot(-18:7,t(kmodes_TB$modes), type = "b")
+barplot(table(kmodes_TB$cluster))
+toc()
+
+tic()
+kmodes_TB = kmodes(data = d_wide[subset_i,-1], modes = 5)
+matplot(-18:7,t(kmodes_TB$modes), type = "b")
+barplot(table(kmodes_TB$cluster), col = 1:5)
+toc()
+
+
+tic()
+kmodes_TB = kmodes(data = d_wide[subset_i,-1], modes = 10)
+modes = kmodes_TB$modes
+matplot(-18:7,t(kmodes_TB$modes), type = "b")
+barplot(table(kmodes_TB$cluster), col = 1:10)
+toc()
+
+```
+
+
+
+```{r cycle_clustering_imputed_data cycle clustering using k-modes - exploring the ideal number of clusters}
+
+subset_i = sample(1:nrow(d_wide), round(nrow(d_wide)/100))
+
+
+cycle_ids = unique(d$cycle_id_m)
+n_centers = 2:7
+tic()
+for(n_center in n_centers){
+  cat(n_center,"\n")
+  kmodes_TB = kmodes(data = d_wide[subset_i,-1], modes = n_center)
+
+  if(n_center == 2){WSS_k_tot.withinss = c()}
+  WSS_k_tot.withinss = c(WSS_k_tot.withinss, sum(kmodes_TB$withindiff) )
+  
+  d$kmodes_group = kmodes_TB$cluster[match(d$cycle_id_m, d_wide$cycle_id_m)]
+  
+  d = d[order(d$kmodes_group),]
+  d$cycle_id_m_factors_kmodes = factor(d$cycle_id_m, levels = unique(d$cycle_id_m))
+  
+  #### plots
+  # first showing some examples
+  set.seed(6)
+  cycle_ids = unique(d$cycle_id_m[!is.na(d$kmodes_group)])
+  d_subset = d[(d$cycle_id_m %in% cycle_ids[sample(1:length(cycle_ids),50)]),]
+  # ordered colored dots
+  d_subset = d_subset[order(d_subset$kmodes_group),]
+  d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(kmodes_group))) + geom_point()+ guides(col = FALSE))
+  
+  # then showing the profiles for the clusters
+  agg = aggregate(tender_breasts ~ cycleday_m_D + kmodes_group, d, sum)
+  print(ggplot(agg, aes(x = cycleday_m_D, y =tender_breasts, col = factor(kmodes_group))) + geom_line() + facet_grid(kmodes_group ~.))
+  
+  # show the modes
+  modes = kmodes_TB$modes
+  modes$kmodes_group = 1:n_center
+  modes = reshape(modes, idvar = "kmodes_group", varying = list(1:(ncol(modes)-1)), direction = "long")
+  modes$cycleday_m_D = rep(-18:7,each = n_center)
+  modes$tender_breasts = modes$tender_breasts..18
+  print(ggplot(modes, aes(x = cycleday_m_D, y = tender_breasts, col = factor(kmodes_group))) + geom_line()+ facet_grid(kmodes_group ~.) + ylim(c(-1,1)))
+  
+  # show the size of the clusters
+  
+  size = data.frame(kmodes_group = 1:n_center, size = as.vector(kmodes_TB$size))
+  print(ggplot(size, aes(x = kmodes_group, y = size, fill = factor(kmodes_group))) + geom_bar(stat = "identity"))
+
+  rm(modes, size)
+}
+toc()
+df = data.frame(n_clust = c(n_centers), WSS = WSS_k_tot.withinss)
+ggplot(df, aes(x =n_clust, y = WSS)) + geom_bar(stat = "identity", fill = "steelblue2")
+
+rm(df,cycle_ids, kmeans_type, d_subset, agg, n_center, n_centers, WSS_k_tot.withinss)
+
+
+```
+
+
+Now, clusters look very different and rather capture the tracking behavior than the symptoms timing.
+
+
+
+
+
+### Exploring distances on fake data
+
+```{r loading fake data}
+
+df = read.csv("fake_data_for_distance_exploration.csv", header = FALSE)
+M = as.matrix(df)
+colnames(df) = 1:ncol(df)
+df$cycle_id = paste0("c",1:nrow(df))
+df = melt(df)
+colnames(df)[which(colnames(df) == "variable")] = "day"
+df$logs = factor(df$value, levels = c(-1,0,1))
+df$cycle_id = factor(df$cycle_id, levels = sort(unique(df$cycle_id),decreasing = TRUE))
+
+ggplot(df, aes(x = day, y = cycle_id, fill = logs)) + geom_tile(colour = "white") + scale_fill_manual(values = c("white","gray","deeppink"))
+
+
+```
+
+
+```{r distances}
+
+jaccard = function(M){
+  margin = 1
+  N = nrow(M)
+  J = matrix(0, nrow = N, ncol =N)
+  for(i in 1:(N-1)){
+    #cat(i,"\n")
+    for(j in min((i+1),N):N){
+      #cat("\t",j,"\n")
+      J[i,j] = 1 - sum((M[i,] == 1) & (M[j,] == 1))/sum((M[i,] == 1) | (M[j,] == 1))
+      J[j,i] = J[i,j]
+    }
+  }
+  return(J)
+}
+
+
+format.dist.mat = function(dist_mat){
+  dist_mat[lower.tri(dist_mat)] = 0
+  df_dist = as.data.frame(dist_mat)
+  colnames(df_dist) = paste0("c",1:nrow(df_dist))
+  df_dist$cycle_id = paste0("c",1:nrow(df_dist))
+  df_dist = melt(df_dist)
+  colnames(df_dist)[which(colnames(df_dist) == "variable")] = "cycle_id_y"
+  df_dist$cycle_id = factor(df_dist$cycle_id, levels = sort(unique(df_dist$cycle_id),decreasing = FALSE))
+  df_dist$cycle_id_y = factor(df_dist$cycle_id_y, levels = sort(unique(df_dist$cycle_id_y),decreasing = TRUE))
+  return(df_dist)
+}
+
+
+euclidian.dist = format.dist.mat(as.matrix(dist(M, method = "euclidian")))
+binary.dist = format.dist.mat(as.matrix(dist(M, method = "binary")))
+jaccard.dist = format.dist.mat(jaccard(M))
+
+g1 = ggplot(df, aes(x = day, y = cycle_id, fill = logs)) + geom_tile(colour = "white") + scale_fill_manual(values = c("white","gray","deeppink")) + guides(fill = FALSE)
+g2 = ggplot(euclidian.dist, aes(x = cycle_id, y = cycle_id_y, fill = value))+ ggtitle("euclidian") + geom_tile(colour = "gray80") + scale_fill_gradient(low = "white", high = "tomato") + guides(fill = FALSE)
+g3 = ggplot(binary.dist, aes(x = cycle_id, y = cycle_id_y, fill = value))+ ggtitle("binary") + geom_tile(colour = "gray80") + scale_fill_gradient(low = "white", high = "tomato") + guides(fill = FALSE)
+g4 = ggplot(jaccard.dist, aes(x = cycle_id, y = cycle_id_y, fill = value))+ ggtitle("jaccard") + geom_tile(colour = "gray80") + scale_fill_gradient(low = "white", high = "tomato") + guides(fill = FALSE)
+
+grid.arrange(g1, g2, g3, g4, ncol=4, widths = c(2,1,1,1) )
+
+```
+
+Jaccard distance is probably doing best what we want to do.
+The problem is that a missing data in the middle of a logged sequence should not be treated the same as a missing data at the beginning or the end of a sequence.
+
+
+
+
+
+
+### Cycle clusters by age and birth control
+

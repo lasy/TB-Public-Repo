@@ -1,0 +1,130 @@
+---
+title: "Formating data for the clustering (1 line per cycle)"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r cycle_clust_formating_cycles librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r cycle_clust_formating_cycles setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Formating tracking data for the clustering
+
+We want:
+
+- 1 line per cycle
+- values (1,0,-1) for (TB log, no TB log but other logs, no logs at all)
+- menstruation-centered cycles
+
+We can make everything fit in one table (no need to split the files anymore)
+
+```{r cycle_clust_formating_cycles filtering days}
+
+days_folder = paste0(IO$output_data,"days/")
+
+tmp_output_d_wide_no_TB = paste0(IO$tmp_data,"d_wide_no_TB/")
+dir.create(tmp_output_d_wide_no_TB)
+
+filenames = list.files(days_folder)
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+d_wide = foreach(filename = filenames, .combine = rbind) %dopar%
+{
+  cat(filename,"\n")
+  load(paste0(days_folder, filename), verbose = TRUE)
+  
+  # first only taking cycledays that are within the limits we are interested in
+  d = days[!is.na(days$cycleday_m_D),]
+  
+  # d_wide for TB
+  d_TB = d[d$type == TB,]
+  d_TB$tender_breasts = 1
+  
+  d_wide_TB = reshape(d_TB[,c("cycle_id_m","cycleday_m_D","tender_breasts")],
+                        idvar = "cycle_id_m",timevar = "cycleday_m_D",
+                        direction = "wide")
+  
+  d_wide_TB[is.na(d_wide_TB)] = 0
+  
+  # re-order the columns by cycleday_m_D
+  o = order(as.numeric(sapply(strsplit(colnames(d_wide_TB)[2:ncol(d_wide_TB)],"\\."), "[[", 2)))
+  d_wide_TB = data.frame(cycle_id_m = d_wide_TB$cycle_id_m, d_wide_TB[,o+1] )
+  rm(o)
+  colnames(d_wide_TB) = gsub("tender_breasts\\.\\.","day_m", colnames(d_wide_TB))
+  colnames(d_wide_TB) = gsub("tender_breasts\\.","day_", colnames(d_wide_TB))
+  
+  # d_wide for n_logs
+  d_n_logs = d[d$type == "n_logs",]
+  d_n_logs$n_logs = 1
+  
+  d_wide_n_logs = reshape(d_n_logs[,c("cycle_id_m","cycleday_m_D","n_logs")],
+                        idvar = "cycle_id_m",timevar = "cycleday_m_D",
+                        direction = "wide")
+  
+  d_wide_n_logs[is.na(d_wide_n_logs)] = 0
+  d_wide_n_logs[,-1] = d_wide_n_logs[,-1] - 1
+  
+  # re-order the columns by cycleday_m_D
+  o = order(as.numeric(sapply(strsplit(colnames(d_wide_n_logs)[2:ncol(d_wide_n_logs)],"\\."), "[[", 2)))
+  d_wide_n_logs = data.frame(cycle_id_m = d_wide_n_logs$cycle_id_m, d_wide_n_logs[,o+1] )
+  rm(o)
+  colnames(d_wide_n_logs) = gsub("n_logs\\.\\.","day_m", colnames(d_wide_n_logs))
+  colnames(d_wide_n_logs) = gsub("n_logs\\.","day_", colnames(d_wide_n_logs))
+
+  # putting the two together
+  
+  d_wide_TB$cycle_id_m = as.character(d_wide_TB$cycle_id_m)
+  d_wide_n_logs$cycle_id_m = as.character(d_wide_n_logs$cycle_id_m)
+  
+  j = which(d_wide_n_logs$cycle_id_m %in% d_wide_TB$cycle_id_m)
+  m = match(d_wide_TB$cycle_id_m, d_wide_n_logs$cycle_id_m)
+  
+  # image(t(as.matrix(head(d_wide_TB[,-1]))))
+  # image(t(as.matrix(head(d_wide_n_logs[m,-1]))))
+  # image(t(as.matrix(head(d_wide_TB[,-1] + d_wide_n_logs[m,-1] ))))
+ 
+  d_wide_combined_values = d_wide_TB[,-1] + d_wide_n_logs[m,-1] 
+  
+  d_wide = data.frame(cycle_id_m = d_wide_TB$cycle_id_m)
+  d_wide = cbind(d_wide, d_wide_combined_values )
+  
+  #d_wide$n_TB = apply(d_wide[,-1],1,function(x) sum(x == 1))
+  
+  d_wide_no_TB = d_wide_n_logs[-j,]
+  
+  save(d_wide_no_TB, file = paste0(tmp_output_d_wide_no_TB,"d_wide_no_TB_",gsub("days_","",filename)))
+
+  return(d_wide)
+}
+
+stopImplicitCluster()
+
+dim(d_wide)
+head(d_wide)
+
+save(d_wide, file = paste0(IO$tmp_data,"d_wide.Rdata"))
+
+```
+
+
+

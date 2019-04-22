@@ -1,0 +1,60 @@
+---
+title: "Removing users with any other form of BC than the pill or condoms"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r data_prep_BC_user_pre_filtering librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r data_prep_BC_user_pre_filtering setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Removing users with any other form of BC than the pill or condoms
+
+
+```{r data_prep_BC_user_pre_filtering loading users}
+file.copy(paste0(IO$output_data, "users.Rdata"), paste0(IO$tmp_data, "user_before_BC_pre_filtering.Rdata"))
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+```
+
+
+```{r data_prep_BC_user_pre_filtering loading cycles}
+file.copy(paste0(IO$output_data, "cycles.Rdata"), paste0(IO$tmp_data, "cycles_before_BC_pre_filtering.Rdata"))
+load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+```
+
+
+```{r data_prep_BC_user_pre_filtering filtering}
+
+j = which(cycles$n_other_BC > 0)
+users_to_rm = unique(cycles$user_id[j])
+if(length(users)>0){
+  k = which(cycles$user_id %in% users_to_rm); if(length(k)>0){cycles = cycles[-k,]}
+  k = which(users$user_id %in% users_to_rm); if(length(k)>0){users = users[-k,]}
+}
+
+save(cycles, file = paste0(IO$output_data, "cycles.Rdata") )
+save(users, file = paste0(IO$output_data, "users.Rdata") )
+```
+
+
+
+
+

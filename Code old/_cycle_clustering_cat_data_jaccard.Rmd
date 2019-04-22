@@ -1,0 +1,114 @@
+---
+title: "Cycle clustering with categorical data and jaccard distance"
+author: "Laura Symul"
+date: "12/10/2018"
+output: html_document
+---
+
+
+
+
+```{r cycle_clustering_cat_data_jaccard setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+
+```{r cycle_clustering_cat_data_jaccard librairies and stuff, include = FALSE, eval = TRUE}
+rm(list=ls())
+source("00_variables.R")
+source("00_libraries.R")
+source("00_functions.R")
+source("00_setup.R")
+```
+
+
+
+##  CYCLES CLUSTERING CAT DATA AND JACCARD DISTANCE
+
+
+### Loading (cat) data
+
+
+```{r cycle_clustering_cat_data_jaccard load days_TB_only, eval = TRUE}
+load(file = paste0(IO$Rdata,"days_TB_only.Rdata"), verbose = TRUE)
+days_TB = days
+rm(days)
+```
+
+```{r cycle_clustering_cat_data_jaccard loading d_wide with cat data, eval = TRUE}
+
+load(file = paste0(IO$Rdata,"d_wide_cat.Rdata"), verbose = TRUE)
+
+```
+
+### Using clara with JACCARD distance
+
+```{r cycle_clustering_cat_data_jaccard prep}
+d = days_TB[!is.na(days_TB$cycleday_m_D),]
+d$tender_breasts = 1
+```
+
+
+```{r cycle_clustering_cat_data_jaccard cycle clusters - exploring number of clusters with clara}
+cycle_ids = unique(d$cycle_id_m)
+n_centers = 1:7
+WSS = c()
+tic()
+for(n_center in n_centers){
+  cat(n_center,"\n")
+  clara_n = clara(d_wide[,-1], k = n_center, metric = "jaccard")
+  
+  WSS = c(WSS, mean(clara_n$clusinfo[,3]) )
+  
+  d$cluster_num = clara_n$clustering[match(d$cycle_id_m, d_wide$cycle_id_m)]
+  
+  d = d[order(d$cluster_num),]
+  d$cycle_id_m_factors_cluster = factor(d$cycle_id_m, levels = unique(d$cycle_id_m))
+  
+  #### plots
+  # first showing some examples
+  set.seed(6)
+  d_subset = d[d$cycle_id_m %in% cycle_ids[sample(1:length(cycle_ids),50)],]
+  # black dots
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m)) + geom_point() )
+  # colored dots
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(cluster_num))) + geom_point()+ guides(col = FALSE))
+  # ordered colored dots
+  d_subset = d_subset[order(d_subset$cluster_num),]
+  d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(cluster_num))) + geom_point()+ guides(col = FALSE))
+  
+  # then showing the profiles for the clusters
+  agg = aggregate(tender_breasts ~ cycleday_m_D + cluster_num, d, sum)
+  print(ggplot(agg, aes(x = cycleday_m_D, y =tender_breasts, col = factor(cluster_num))) + geom_line() + facet_grid(cluster_num ~.))
+  
+  # and showing the medoids
+  medoids = as.data.frame(clara_n$medoids)
+  colnames(medoids) = paste0("tender_breasts.",(-18:7)+18)
+  medoids$cluster_num = 1:n_center
+  
+  medoids = reshape(medoids, idvar = "cluster_num", varying = 1:(ncol(medoids)-1), direction = "long")
+  medoids$cycleday_m_D = medoids$time-18
+  
+  print(ggplot(medoids, aes(x = cycleday_m_D, y = tender_breasts, col =  factor(cluster_num)))+geom_hline(yintercept = 0) + geom_line(size = 1.5)+ facet_grid(cluster_num ~.))
+  
+  # plus showing the number of cycles in each cluster
+  print(ggplot(data.frame(as.data.frame(clara_n$clusinfo),cluster_num = 1:n_center), aes(x = cluster_num, y = size, fill = factor(cluster_num))) + geom_bar(stat = "identity")+ guides(fill = FALSE))
+}
+toc()
+df = data.frame(n_clust = n_centers, WSS = WSS)
+ggplot(df, aes(x =n_clust, y = WSS)) + geom_bar(stat = "identity", fill = "steelblue2")
+
+rm(df,cycle_ids, kmeans_type, d_subset, agg, n_center, n_centers, WSS_k_tot.withinss)
+```
+
+
+
+
+
+
+### Cycle clusters by age and birth control
+
+> TO DO?
+

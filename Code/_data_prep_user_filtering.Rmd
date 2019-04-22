@@ -1,0 +1,172 @@
+---
+title: "Filtering users"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r user_filt librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r user_filt setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Users filtering based on birth control
+
+Clue's setting allow users to declare themselves as on one of these birth control (BC) methods:
+
+```{r user_filt loading users, echo = FALSE}
+load(file = paste0(IO$input_data,"users_filtered.Rdata"), verbose = TRUE)
+dim(users)
+```
+
+
+```{r user_filt possible BCs, echo = FALSE}
+unique(users$birth_control)
+```
+
+
+```{r user_filt nb of users per BC, echo = FALSE}
+agg = aggregate(user_id ~ birth_control, users, uniqueN)
+agg$birth_control = factor(agg$birth_control, levels = agg$birth_control[order(agg$user_id)])
+ggplot(agg, aes(x = birth_control, y = user_id, fill = birth_control)) + geom_bar(stat = "identity")
+```
+
+
+For the purpose of this analysis, we will only keep users that have indicated `pill`, `none`, `condoms` or `did not enter`.
+We will later re-classify cycles into the following BC: `pill`, `none / condoms`, `unclear` and use the only 1st two categories for the rest of the analysis.
+
+
+```{r user_filt renaming the BC columns, echo = FALSE}
+users$birth_control_o = users$birth_control
+users$birth_control[users$birth_control %in% c("none","condoms")] = "none / condoms"
+```
+
+
+### Filtering users
+
+```{r user_filt filtering users}
+j = which(users$birth_control_o %in% c("pill","none","condoms","did not enter"))
+users = users[j,]
+
+save(users, file = paste0(IO$output_data,"users.Rdata"))
+```
+
+
+### Filtering cycles
+
+```{r user_filt loading cycles}
+load(file = paste0(IO$input_data,"cycles_filtered.Rdata"), verbose = TRUE)
+```
+
+```{r user_filt filtering cycles}
+j = which(cycles$user_id %in% users$user_id)
+cycles = cycles[j,]
+
+save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
+```
+
+
+### Filtering tracking tables.
+
+As there are many reccords, the tracking table has been split into small files.
+As we are filtering users, we will also make sure that the way the tracking tables are organized is suited to keep all reccords of a user in a single table.
+
+So, we will define a `batch` number for each user and store that user's records in the file with the appropriate batch.
+
+We want a maximum of 5000 users per batch.
+
+```{r user_filt defining a batch number for each user}
+N = 5000
+users$batch = rep(c(1:ceiling(nrow(users)/N)),each = N)[1:nrow(users)]
+rm(N)
+save(users, file = paste0(IO$output_data,"users.Rdata"))
+```
+
+
+
+```{r user_filt create tmp tracking dir}
+
+raw_batches_folder = paste0(IO$tmp_data,"tracking_raw_batches/")
+dir.create(raw_batches_folder)
+
+days_output = paste0(IO$output_data,"days/")
+dir.create(days_output)
+
+```
+
+
+```{r user_filt filtering days}
+
+file.copy(paste0(IO$output_data,"users.Rdata"), paste0(IO$tmp_data,"users_before_filtering_days.Rdata"), overwrite = TRUE)
+
+tracking_folder = paste0(IO$input_data,"tracking_filtered/")
+filenames = list.files(tracking_folder)
+
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+users_original_files = foreach(filename = filenames, .combine = rbind) %dopar% 
+{
+  load(paste0(tracking_folder, filename), verbose = TRUE)
+  original_file_id = substr(filename,25,26)
+  j = which(tracking$user_id %in% users$user_id)
+  tracking = tracking[j,]
+  tracking$batch =  users$batch[match(tracking$user_id, users$user_id)]
+  for(b in unique(tracking$batch)){
+    days = tracking[which(tracking$batch == b),]
+    save(days, file = paste0(raw_batches_folder,"days_", original_file_id,"_batch_",b,".Rdata"))
+  }
+  users_original_file = data.frame(user_id = unique(tracking$user_id), original_file_id = original_file_id)
+  return(users_original_file)
+}
+
+
+users_o_f = aggregate(original_file_id ~ user_id ,users_original_files, paste0, collapse = ",")
+users$original_files = users_o_f$original_file_id[match(users$user_id, users_o_f$user_id)]
+
+save(users, file = paste0(IO$output_data,"users.Rdata"))
+
+```
+
+
+```{r user_filt re-assembling batches}
+
+filenames = list.files(raw_batches_folder)
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+foreach(b = unique(users$batch)) %dopar% {
+  cat(b,"\n")
+  j = grep(paste0("_batch_",b,".Rdata"), filenames)
+  DAYS = data.frame()
+  for(i in j){
+    cat("\t",i,"\n")
+    load(paste0(raw_batches_folder,filenames[i]), verbose = TRUE)
+    DAYS = rbind(DAYS, days)
+  }
+  days = DAYS
+  rm(DAYS)
+  save(days, file = paste0(days_output, "days_",b,".Rdata"))
+}
+```
+
+
+

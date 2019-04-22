@@ -1,0 +1,122 @@
+---
+title: "Determining the optimal number of clusters"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r cycle_clust_optimal_number librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r cycle_clust_optimal_number setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Optimal number of cluster
+
+To find the optimal number of clusters, we will use the silhouette method and compute the average silhouette score as a function of the number of clusters; we will also explore the impact of varying the ratio between the symptoms and the tracking distances (`par$r`).
+
+
+```{r cycle_clust_optimal_number loading d_wide}
+
+load(paste0(IO$tmp_data,"d_wide_imputed.Rdata"), verbose = TRUE)
+load(paste0(IO$tmp_data,"d_imputed.Rdata"), verbose = TRUE)
+
+```
+
+
+```{r cycle_clust_optimal_number exploring number of clusters with clara, fig.width= 10, fig.height= 4, cache = FALSE, eval = TRUE}
+#cycle_ids = unique(d$cycle_id_m)
+
+#sample_size= 100000
+#if(nrow(d_wide)>sample_size){d_wide_sample = d_wide[sample(1:nrow(d_wide),sample_size),]}else{d_wide_sample = d_wide}
+
+
+n_centers = 2:15
+df = data.frame()
+tic()
+    for(r in c(0,1/2,2/3,0.75,5/6,1)){
+      cat(r,"\n")
+      for(n_center in n_centers){
+        cat("\t",n_center,"\n")
+        
+        clara_n = clara(d_wide[,-1], k = n_center, 
+                        metric = "custom_jaccard", 
+                        w = par$w, cjratio = r, 
+                        samples = par$clara$samples, sampsize = par$clara$sampsize)
+        
+        cat("\t\t",clara_n$silinfo$avg.width,"\n")
+        df = rbind(df,data.frame(n_clust = n_center, r = r, avg_silhouette_score = clara_n$silinfo$avg.width))
+        
+        silh = as.data.frame(clara_n$silinfo$widths)
+        silh$x = 1:nrow(silh)
+        silh$rows = as.numeric(rownames(silh))
+        
+        d$cluster_num = clara_n$clustering[match(d$cycle_id_m, d_wide$cycle_id_m)]
+        
+        # show the samples chosen by clara FOR SILHOUETTE
+        m = match(silh$rows, rownames(d_wide))
+        cycle_ids_silh = as.character(d_wide$cycle_id_m[m])
+        m = which(!is.na(match( d$cycle_id_m, cycle_ids_silh)))
+        d_subset = d[m,]
+        d_subset = d_subset[order(d_subset$cluster_num),]
+        d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = rev(cycle_ids_silh))
+        g_samples = ggplot_imputed_TB(d_subset, facet_grid = NULL)+scale_size(range = c(2,2)) + ggtitle(paste0("r = ",r))
+        
+        g_silh = ggplot(silh, aes(fill = factor(cluster),x = factor(x, levels =rev(x)), y = sil_width)) + coord_flip()+
+          geom_bar(stat = "identity")+
+          geom_point(aes( col = factor(neighbor),y = pmax(0,sil_width) + 0.025), size = 3)+
+          #ylim(c(-1,1))+
+          geom_hline(yintercept = clara_n$silinfo$avg.width, linetype = 2)+ 
+          ggtitle(paste0("avg. silh score = ",round(clara_n$silinfo$avg.width,digits = 3)))+
+          guides(fill = FALSE, color = FALSE)+
+          xlab("")+ylab("silh width")+ theme(axis.text.y = element_blank())
+        
+        
+        mds = data.frame(cmdscale(d = clara_n$diss, k = 2))
+        colnames(mds) = c("x","y")
+        mds$cluster_num = as.factor(clara_n$clustering[match(rownames(mds), names(clara_n$clustering))])
+        m = match( silh$rows, rownames(mds))
+        mds = mds[m,]
+        mds$num = 1:nrow(mds)
+        g_mds = ggplot(mds, aes(x = x, y = y, col = cluster_num)) + coord_fixed()+
+          geom_point(size = 4, alpha = 0.5) + 
+          geom_text(label = 1:nrow(mds))+
+          guides(color = FALSE)+ggtitle("MDS")+xlab("")+ylab("")
+        
+        grid.arrange(g_samples, g_silh, g_mds, nrow = 1, widths = c(2,1,2.2))
+      }
+    }
+toc()
+
+save(df, file = paste0(IO$tmp_Rdata,"silhouette_score_summary.Rdata"))
+
+rm(d_subset, n_center, n_centers)
+```
+
+### Average silhouette score per number of clusters
+
+```{r cycle_clust_optimal_number silhouette summary, cache = FALSE, eval = TRUE}
+
+df$n_clusters = factor(df$n_clust)
+ggplot(df, aes(x = n_clusters, y = avg_silhouette_score, fill = avg_silhouette_score)) + geom_bar(stat = "identity")+ facet_grid(r ~ .)
+
+```
+
+
+
+

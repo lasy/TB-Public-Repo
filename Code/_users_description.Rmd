@@ -1,0 +1,31 @@
+---
+title: "Users description in terms of symptoms occurence, consistenty and evolution"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+# Users description in terms of symptoms occurence, consistenty and evolution
+
+
+```{r child = '_users_descr_cluster_info.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_users_descr_cluster_info.Rmd', cache=TRUE}
+```
+
+
+#####
+
+```{r child = '_users_descr_selecting_user_examples.Rmd', cache=TRUE}
+```

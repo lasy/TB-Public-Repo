@@ -1,0 +1,113 @@
+---
+title: "Creating a new cycles_m table"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r _data_prep_BC_cycles_m librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r _data_prep_BC_cycles_m setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Creating a new table cycles_m
+
+With users and BC attributes.
+
+### loading data
+
+
+```{r _data_prep_BC_cycles_m Loading reclassified cycles}
+load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+```
+
+
+### Days
+
+```{r _data_prep_BC_cycles_m creating the cycle_m tables from days}
+
+days_folder = paste0(IO$output_data,"days/")
+filenames = list.files(days_folder)
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+cycles_m = foreach(filename = filenames, .combine = rbind, .packages = c('plyr','dplyr')) %dopar%
+{
+  cat(filename,"\n")
+  load(paste0(days_folder, filename), verbose = TRUE)
+  
+  days$cycleday_m_D_lut_D = days$cycleday_m_D
+  j = which(!(days$cycleday_m_D_lut_D %in% c(-par$D : -1)))
+  days$cycleday_m_D_lut_D[j] = NA
+  
+  days$cycleday_m_D_lut_7 = days$cycleday_m_D
+  j = which(!(days$cycleday_m_D_lut_7 %in% c(-7 : -1)))
+  days$cycleday_m_D_lut_7[j] = NA
+  
+  days$cycleday_m_D_foll_Df = days$cycleday_m_D
+  j = which(!(days$cycleday_m_D_foll_Df %in% c(0:par$Df)))
+  days$cycleday_m_D_foll_Df[j] = NA
+  
+  
+  this_cycles_m = ddply(days[which(!is.na(days$cycleday_m_D)),], .(cycle_id_m), 
+                        .parallel=TRUE ,  
+                        .fun = summarize,
+                        BC_o = paste0(unique(BC), collapse = ","),
+                        n_obs = sum(number * (type == "n_logs"), na.rm = TRUE),
+                        n_days_obs_lut_D = lu(cycleday_m_D_lut_D[!is.na(cycleday_m_D_lut_D)]),
+                        n_days_obs_lut_7 = lu(cycleday_m_D_lut_7[!is.na(cycleday_m_D_lut_7)]),
+                        n_days_obs_foll_Df = lu(cycleday_m_D_foll_Df[!is.na(cycleday_m_D_foll_Df)])
+  )
+  return(this_cycles_m)
+
+}
+stopImplicitCluster()
+
+```
+
+
+```{r _data_prep_BC_cycles_m add columns}
+
+
+m = match(cycles_m$cycle_id_m, cycles$cycle_id)
+cycles_m$user_id = cycles$user_id[m]
+m = match(cycles_m$user_id, users$user_id)
+cycles_m$age = users$age[m]
+cycles_m$country = users$country[m]
+cycles_m$height = users$height[m]
+cycles_m$weight = users$weight[m]
+
+
+cycles_m$BC = par$cycles_m$BC_dict$new_value[match(cycles_m$BC_o, par$cycles_m$BC_dict$value)]
+j = which(colnames(cycles_m) == "BC_o")
+if(length(j)>0){ cycles_m = cycles_m[, -j]}
+
+
+
+```
+
+
+```{r _data_prep_BC_cycles_m save}
+
+save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
+file.copy(from = paste0(IO$output_data, "cycles_m.Rdata"), to = paste0(IO$tmp_data, "cycles_m_first_version.Rdata"), overwrite = TRUE)
+```
+

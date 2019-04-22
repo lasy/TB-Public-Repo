@@ -1,0 +1,189 @@
+---
+title: "Keeping users and cycles from re-classified cycles"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r data_prep_BC_user_post_filtering librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r data_prep_BC_user_post_filtering setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Filtering users, cycles and days to only keep properly re-classified cycles
+
+
+### Loading re-classified cycles
+
+
+
+```{r data_prep_BC_user_post_filtering Loading reclassified cycles}
+
+load(file = paste0(IO$tmp_data,"cycles_BC_re_classification_final.Rdata"), verbose = TRUE)
+cycles_BC = cycles
+rm(cycles) # to avoid confusion
+
+cycle_ids = cycles_BC$cycle_id[which(cycles_BC$BC %in% par$BC_dict$name)]
+length(cycle_ids)/nrow(cycles_BC)
+
+user_ids = unique(cycles_BC$user_id[which(cycles_BC$BC %in% par$BC_dict$name)])
+length(user_ids)
+
+```
+
+### users
+
+```{r data_prep_BC_user_post_filtering loading and filtering users}
+file.copy(paste0(IO$output_data, "users.Rdata"), paste0(IO$tmp_data, "users_before_BC_post_filtering.Rdata"))
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+
+dim(users)
+
+users = users[users$user_id %in% user_ids,]
+dim(users)
+
+```
+
+```{r data_prep_BC_user_post_filtering adding BC to users}
+
+user_BC_agg = ddply(cycles_BC, c("user_id"), summarise,
+                    BC_rle = paste0(rle(BC)$values, collapse = " - "))
+
+tmp_rle = rle(sort(user_BC_agg$BC_rle))
+df = data.frame(categories = tmp_rle$values, n = tmp_rle$lengths)
+rm(tmp_rle)
+df$categories = factor(df$categories, levels = df$categories[order(df$n)])
+ggplot(df, aes(x = categories, y = n)) + geom_bar(stat = "identity") + coord_flip() + geom_text(aes(label = n))
+rm(df)
+
+user_BC_agg$BC = user_BC_agg$BC_rle 
+user_BC_agg$BC[grep("none / condoms - pill",user_BC_agg$BC_rle)] = "on pill"
+user_BC_agg$BC[grep("pill - none / condoms",user_BC_agg$BC_rle)] = "off pill"
+user_BC_agg$BC[grep("pill - none / condoms - pill",user_BC_agg$BC_rle)] = "off-on pill"
+user_BC_agg$BC[grep("none / condoms - pill - none / condoms",user_BC_agg$BC_rle)] = "on-off pill"
+user_BC_agg$BC[nchar(user_BC_agg$BC_rle) > 38 ] = "mult. trans."
+
+m = match(users$user_id, user_BC_agg$user_id)
+users$BC = user_BC_agg$BC[m]
+
+table(users$BC,users$birth_control)
+rm(m,user_BC_agg)
+```
+
+```{r data_prep_BC_user_post_filtering save users}
+
+save(users, file = paste0(IO$tmp_data, "users_after_BC_post_filtering.Rdata"))
+save(users, file = paste0(IO$output_data, "users.Rdata"))
+
+```
+
+
+
+### cycles
+
+```{r data_prep_BC_user_post_filtering loading and filtering cycles}
+file.copy(paste0(IO$output_data, "cycles.Rdata"), paste0(IO$tmp_data, "cycles_before_BC_post_filtering.Rdata"))
+load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+
+
+dim(cycles)
+
+cycles= cycles[cycles$cycle_id %in% cycle_ids,]
+
+dim(cycles)
+
+cycles$BC = cycles_BC$BC[match(cycles$cycle_id, cycles_BC$cycle_id)]
+
+table(cycles$BC, cycles$birth_control_CLUE)
+
+
+```
+
+```{r data_prep_BC_user_post_filtering save cycles}
+
+save(cycles, file = paste0(IO$tmp_data, "cycles_after_BC_post_filtering.Rdata"))
+save(cycles, file = paste0(IO$output_data, "cycles.Rdata"))
+
+```
+
+
+
+### Days
+
+```{r data_prep_BC_user_post_filtering filtering days}
+
+days_folder = paste0(IO$output_data,"days/")
+
+tmp_days_folder = paste0(IO$tmp_data,"days_before_BC_post_filtering/")
+file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
+
+tmp_days_folder = paste0(IO$tmp_data,"days_after_BC_post_filtering/")
+dir.create(tmp_days_folder)
+
+
+days_folder_full_tracking = paste0(IO$output_data,"days_full_tracking/")
+dir.create(days_folder_full_tracking)
+
+tmp_days_folder_full_tracking = paste0(IO$tmp_data,"days_full_tracking_after_BC_filtering/")
+dir.create(tmp_days_folder_full_tracking)
+
+
+
+filenames = list.files(days_folder)
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+foreach(filename = filenames) %dopar%
+{
+  cat(filename,"\n")
+  load(paste0(days_folder, filename), verbose = TRUE)
+
+  #filtering on BC  
+  days = days[days$cycle_id %in% cycle_ids,]
+  
+  # augmenting days with users and cycles characteristics
+  days$BC = cycles$BC[match(days$cycle_id, cycles$cycle_id)]
+  m = match(days$user_id, users$user_id)
+  days$age = users$age[m]
+  days$country = users$country[m]
+  days$height = users$height[m]
+  days$weight = users$weight[m]
+  
+  # saving full tracking days
+  save(days, file = paste0(days_folder_full_tracking, filename))
+  file.copy( from = paste0(days_folder_full_tracking, filename), to = paste0(tmp_days_folder_full_tracking, filename))
+
+  # only keep pill, TB, period and n_logs
+  j = which(days$category %in% c("pill_hbc","n_logs","period","pain"))
+  length(j)/nrow(days)
+  days = days[j,]
+
+  #save days table
+  save(days, file = paste0(days_folder, filename))
+  file.copy( from = paste0(days_folder, filename), to = paste0(tmp_days_folder, filename))
+
+}
+
+
+```
+
+
+

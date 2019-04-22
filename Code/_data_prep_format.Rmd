@@ -1,0 +1,136 @@
+---
+title: "Formating data"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r data_prep_format librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r data_prep_format setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Formating data
+
+We need to do some cleaning and make sure that the variables are in the right format (dates, etc.)
+
+### Users
+
+```{r data_prep_format loading users, echo = FALSE}
+load(file = paste0(IO$output_data,"users.Rdata"), verbose = TRUE)
+save(users, file = paste0(IO$tmp_data,"users_before_data_prep_format.Rdata"))
+dim(users)
+```
+
+
+```{r data_prep_format cleaning users}
+
+weight.na = which(users$weight == -999)
+users$weight[weight.na] = NA
+rm(weight.na)
+height.na = which((users$height == -999) | (users$height > 230) | (users$height<=100))
+users$height[height.na] = NA
+
+summary(users)
+
+```
+
+
+```{r data_prep_format saving users}
+save(users, file = paste0(IO$output_data,"users.Rdata"))
+```
+
+
+### Cycles
+
+
+```{r data_prep_format loading cycles, echo = FALSE}
+load(file = paste0(IO$output_data,"cycles.Rdata"), verbose = TRUE)
+save(cycles, file = paste0(IO$tmp_data,"cycles_before_data_prep_format.Rdata"))
+dim(cycles)
+```
+
+```{r data_prep_format cleaning cycles}
+
+colnames(cycles)[which(colnames(cycles) == 'cycle_id')] = 'cycle_nb'
+
+
+cycle_start_date = as.Date(cycles$cycle_start)
+cycles$cycle_start = cycle_start_date
+rm(cycle_start_date)
+
+summary(cycles)
+
+```
+
+
+
+```{r data_prep_format saving cycles}
+save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
+```
+
+
+
+### Days tables
+
+
+```{r data_prep_format formating days}
+
+days_folder = paste0(IO$output_data,"days/")
+
+tmp_days_folder = paste0(IO$tmp_data,"days_before_data_prep/")
+file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
+
+
+filenames = list.files(days_folder)
+
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+
+foreach(filename = filenames) %dopar%{
+  cat(filename,"\n")
+  load(paste0(days_folder, filename), verbose = TRUE)
+  
+  #cleaning temperature ? I'm tempted to leave them as is given that I do not need them for this project. If I need later I'll clean them later or compute relative changes per cycle first.
+  
+  # cleaning weight? I'm also not using the weight variations at the moment >> might leave that for later!
+  
+  # dates
+  
+  date = as.Date(days$date)
+  days$date = date
+  rm(date)
+  
+  save(days, file =paste0(days_folder, filename))
+}
+
+```
+
+```{r data_prep_format checking formating days}
+
+
+load(file =paste0(days_folder, filenames[1]), verbose = TRUE)
+summary(days)
+
+
+```
+

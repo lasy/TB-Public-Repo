@@ -1,0 +1,827 @@
+---
+title: "Symptom description at the user level"
+author: "Laura Symul"
+date: "12/10/2018"
+output: html_document
+---
+
+
+
+```{r users_clustering librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+
+```{r users_clustering setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+##  SYMPTOMS EVOLUTION 
+
+### Preparing data
+
+
+```{r users_clustering loading data, cache = FALSE, eval = FALSE}
+
+load(file = paste0(IO$input_data, "users.Rdata"), verbose = TRUE)
+load(file = paste0(IO$input_data, "cycles.Rdata"), verbose = TRUE)
+load(file = paste0(IO$tmp_Rdata, "cycles_clusters.Rdata"), verbose = TRUE)
+
+```
+
+
+```{r users_clustering creating cycles_m.Rdata, eval = FALSE}
+
+cycles_m = cycles[,c("user_id","cycle_nb","cycle_id","cycle_length","n_days_obs","tracking_freq","cycle_start","age", "height","weight","country","birth_control")]
+
+cycles_m$cycle_id_m = cycles_m$cycle_id
+cycles_m$cycle_nb_m = cycles_m$cycle_nb
+cycles_m$cycle_nb_prev = cycles_m$cycle_nb - 1
+cycles_m$cycle_id_prev = paste0(cycles_m$user_id,"_",cycles_m$cycle_nb_prev)
+
+colnames(cycles_m)[which(colnames(cycles_m) == "cycle_id")] = "cycle_id_new"
+colnames(cycles_m)[which(colnames(cycles_m) == "cycle_nb")] = "cycle_nb_new"
+colnames(cycles_m)[which(colnames(cycles_m) == "n_days_obs")] = "n_days_obs_new"
+colnames(cycles_m)[which(colnames(cycles_m) == "tracking_freq")] = "tracking_freq_new"
+colnames(cycles_m)[which(colnames(cycles_m) == "cycle_length")] = "cycle_length_new"
+colnames(cycles_m)[which(colnames(cycles_m) == "cycle_start")] = "period_start"
+
+
+cycles_m$cycle_length_prev = cycles_m$cycle_length_new[match(cycles_m$cycle_id_prev, cycles_m$cycle_id_new)]
+cycles_m$n_days_obs_prev = cycles_m$n_days_obs_new[match(cycles_m$cycle_id_prev, cycles_m$cycle_id_new)]
+cycles_m$n_days_obs_m = apply(cycles_m[,c("n_days_obs_new","n_days_obs_prev")], 1 , mean)
+cycles_m$tracking_freq_prev = cycles_m$tracking_freq_new[match(cycles_m$cycle_id_prev, cycles_m$cycle_id_new)]
+cycles_m$tracking_freq_m = apply(cycles_m[,c("tracking_freq_new","tracking_freq_prev")], 1 , mean)
+
+
+cycles_m = cycles_m[,c("user_id","cycle_id_m","cycle_nb_m","cycle_id_prev","cycle_id_new","cycle_nb_prev","cycle_nb_new","cycle_length_prev","cycle_length_new",
+                       "n_days_obs_new","n_days_obs_prev","n_days_obs_m","tracking_freq_new","tracking_freq_prev","tracking_freq_m",
+                       "period_start","age", "height","weight","country","birth_control")]
+
+cycles_m = cycles_m[-which(is.na(cycles_m$cycle_length_prev)),]
+
+save(cycles_m, file = paste0(IO$tmp_Rdata,"cycles_m.R"))
+```
+
+
+```{r users_clustering adding cluster info to cycles_m.Rdata, eval = FALSE}
+
+cycles_m = merge(cycles_m, cycles_cluster[,c("cycle_id_m","cluster_num", "n_log","n_TB","TB_timing")], all = TRUE)
+cycles_m$n_TB[which(is.na(cycles_m$n_TB))] = 0
+
+
+# clusters on tracking behavior for cycles without TB
+
+ggplot(cycles_m, aes(x = n_days_obs_m, fill = factor(cluster_num))) + geom_density(bw = 1, col = NA, alpha = 0.5) + xlim(c(0,50))
+
+ggplot(cycles_m[1:10000,], aes(x = n_days_obs_prev, y = n_days_obs_new, col = factor(cluster_num))) + geom_density_2d() + xlim(c(0,50)) + ylim(c(0,50)) + 
+  facet_wrap(cluster_num ~ . ) + geom_abline()
+
+
+ggplot(cycles_m, aes(x = tracking_freq_m, fill = factor(cluster_num))) + geom_density(bw = 0.05, col = NA, alpha = 0.5) + geom_vline(xintercept = 2/3)
+
+ggplot(cycles_m[1:10000,], aes(x = tracking_freq_prev, y = tracking_freq_new, col = factor(cluster_num))) + geom_density_2d() + 
+  facet_wrap(cluster_num ~ . ) + geom_abline()
+
+cycles_m$frequent = (cycles_m$tracking_freq_m >= 2/3)
+
+
+cycles_m$cluster_num[which(is.na(cycles_m$cluster_num))] = -1*cycles_m$frequent[which(is.na(cycles_m$cluster_num))]
+
+
+save(cycles_m, file = paste0(IO$tmp_Rdata,"cycles_m_with_clusters.R"))
+```
+
+
+
+
+
+```{r users_clustering most prevalent cluster per user, eval = FALSE}
+cycles_m$cluster_num_f = factor(cycles_m$cluster_num, levels = sort(unique(cycles_m$cluster_num)))
+
+# most prevalent cluster for each user
+agg = aggregate( cluster_num_f ~ user_id, cycles_m, function(x) (which.max(table(x))-2) )
+colnames(agg) = c("user_id","most_preval_clust")
+
+users = merge(users, agg, all.x = TRUE)
+
+save(users, file = paste0(IO$tmp_Rdata, "users.Rdata"))
+```
+
+
+```{r users_clustering frequency of each cluster per users}
+
+br = (min(cycles_m$cluster_num, na.rm = TRUE)-0.5):(max(cycles_m$cluster_num, na.rm = TRUE)+0.5)
+
+# most prevalent cluster for each user
+agg = aggregate( cluster_num ~ user_id, cycles_m, function(x){hist(x, breaks = br, plot = FALSE)$counts} )
+agg2 = cbind(data.frame(user_id = agg$user_id), as.data.frame(agg$cluster_num))
+colnames(agg2) = c("user_id",paste0("n_cl_",c(11,0:4)))
+
+users = merge(users, agg2, all.x = TRUE)
+
+
+users$n_cycles_with_TB = users$n_cl_1 + users$n_cl_2 + users$n_cl_3 + users$n_cl_4
+users$perc_cycles_with_TB = users$n_cycles_with_TB / users$n_cycles
+
+```
+
+
+
+```{r users_clustering number of cluster per user, eval = FALSE}
+
+# number of cluster for each user
+agg = aggregate( cluster_num_f ~ user_id, cycles_m, lu )
+colnames(agg) = c("user_id","n_clust")
+
+users = merge(users, agg, all.x = TRUE)
+
+save(users, file = paste0(IO$tmp_Rdata, "users.Rdata"))
+```
+
+
+```{r users_clustering sd cluster per user, eval = FALSE}
+
+most_prevalent_cluster = users$most_preval_clust[match(cycles_m$user_id, users$user_id)]
+is_most_prevalent_cluster = (cycles_m$cluster_num == most_prevalent_cluster)
+
+# most prevalent cluster for each user
+agg = aggregate( is_most_prevalent_cluster, by = list(user_id = cycles_m$user_id), sum)
+agg2 = aggregate( cycle_id_m ~ user_id, cycles_m, lu)
+agg = merge(agg, agg2, all = TRUE)
+agg$n_cycles = agg$cycle_id_m
+agg$perc_main_cluster = agg$x / agg$cycle_id_m
+agg = agg[,c("user_id","n_cycles","perc_main_cluster")]
+
+users = merge(users, agg, all.x = TRUE)
+
+save(users, file = paste0(IO$tmp_Rdata, "users.Rdata"))
+```
+
+
+Number of symptoms 
+
+
+```{r users_clustering avg and sd of n_TB per user, eval = FALSE}
+tic()
+agg <- ddply(cycles_m, c("user_id"), summarise,
+               avg_TB = mean(n_TB),
+               median_TB = median(n_TB),
+               sd_TB = sd(n_TB)
+)
+toc()
+
+users = merge(users, agg, all.x = TRUE)
+
+save(users, file = paste0(IO$tmp_Rdata, "users.Rdata"))
+```
+
+
+```{r users_clustering norm sd of n_TB per user, eval = FALSE}
+tic()
+agg <- ddply(cycles_m, c("user_id"), summarise,
+               sd_TB_n = sd(log(1+n_TB))
+)
+toc()
+
+users = merge(users, agg, all.x = TRUE)
+
+save(users, file = paste0(IO$tmp_Rdata, "users.Rdata"))
+```
+
+
+
+Timing of symptoms
+
+```{r users_clustering avg and sd of TB_timing per user, eval = FALSE}
+tic()
+agg <- ddply(cycles_m, c("user_id"), summarise,
+               avg_TB_timing = mean(TB_timing, na.rm = TRUE),
+               sd_TB_timing = sd(TB_timing,na.rm = TRUE)
+)
+toc()
+
+users = merge(users, agg, all.x = TRUE)
+
+save(users, file = paste0(IO$tmp_Rdata, "users.Rdata"))
+```
+
+
+Average distance between cycles per users 
+(not implemented! [time consuming (~30 min) as of now + would need to add cycles without TB logs])
+> update: implemented :: made me realize that my distance is not ideal >> re-defined a distance
+
+> Now need to update CLARA and redo the clustering again!
+
+
+```{r users_clustering average distance between cycles, eval = FALSE}
+
+load(file = paste0(IO$tmp_Rdata,"d_wide_imputed.Rdata"), verbose = TRUE)
+source("Scripts/00_functions_jaccard_like_distance.R")
+
+d_wide$user_id = cycles_m$user_id[match(d_wide$cycle_id_m, cycles_m$cycle_id_m)]
+
+
+avg_cust_jaccard_dist = function(d_wide, r, w, id){
+  j = which(d_wide$user_id == id)
+  d = new_jaccard(d_wide[j,grep(TB, colnames(d_wide))], r = r, w = w)
+  df = data.frame(user_id = user_id, d = mean(d[upper.tri(d)]))
+  return(df)
+}
+
+
+user_ids = unique(d_wide$user_id)[1:1000]
+
+tic()
+df = data.frame()
+for(user_id in user_ids){
+  j = which(d_wide$user_id == user_id)
+  d = new_jaccard(d_wide[j,grep(TB, colnames(d_wide))], r = 0.75, w = par$w)
+  df = rbind(df, data.frame(user_id = user_id, d = mean(d[upper.tri(d)])))
+}
+toc()
+ggplot(df, aes(x = d)) + geom_histogram() + xlim(c(0,1))
+
+
+#tic()
+#df = foreach(user_id = user_ids, .combine = rbind) %do% avg_cust_jaccard_dist(d_wide = d_wide, r = 0.75, w = par$w, id = user_id)
+#toc()
+
+#ggplot(df, aes(x = d)) + geom_histogram() + xlim(c(0,1))
+
+
+av_dist = df$d[match( users$user_id, df$user_id)]
+
+ggplot(data.frame(users, av_dist = av_dist), aes(x = av_dist, y = perc_main_cluster, col = factor(most_preval_clust))) +
+  geom_point()+scale_color_manual(values = cols$clusters_6) + facet_wrap(most_preval_clust ~ .)
+
+#save(users, file = paste0(IO$tmp_Rdata, "users.Rdata"))
+```
+
+
+
+### Loading prepared data
+
+
+```{r users_clustering loading prepared data, eval = TRUE, cache = FALSE}
+
+load(file = paste0(IO$tmp_Rdata, "users.Rdata"), verbose = TRUE)
+load(file = paste0(IO$tmp_Rdata, "cycles_m_with_clusters.Rdata"), verbose = TRUE)
+#load(file = paste0(IO$input_data, "cycles.Rdata"), verbose = TRUE)
+
+CL = sort(unique(cycles_m$cluster_num))
+
+```
+
+
+
+### Co-occurence of clusters
+
+```{r users_clustering co-occurence of clusters}
+
+o = order(cycles_m$user_id, cycles_m$cycle_nb_m)
+cycles_m = cycles_m[o,]
+
+n_u = as.numeric(factor(cycles_m$user_id, levels = unique(cycles_m$user_id))) # n_u = numeric user_id
+n_c = users$n_cycles[match(cycles_m$user_id, users$user_id)] # n_c = number of cycles of that user matched onto cycles_m
+
+freq = data.frame()
+CL = sort(unique(cycles_m$cluster_num))
+
+for(cl in CL){
+  j = which((cycles_m$cluster_num == cl) & (c(diff(n_u),1) == 0) & (n_c >= 10))
+  freq = rbind(freq, table(cycles_m$cluster_num[j+1]))
+}
+
+colnames(freq) = CL
+rownames(freq) = CL
+
+freq$clust_from = CL
+freq = reshape(freq, idvar = "clust_from",varying = list(1:length(CL)), direction = "long")
+freq$clust_to = freq$time - 1 +min(CL)
+freq$freq = freq[,which(colnames(freq) == CL[1])]
+freq = freq[,c("clust_from","clust_to","freq")]
+
+
+rel_freq = freq/apply(freq,1,sum)
+
+rel_freq$clust_from = CL
+rel_freq = reshape(rel_freq, idvar = "clust_from",varying = list(1:length(CL)), direction = "long")
+rel_freq$clust_to = rel_freq$time - 1 +min(CL)
+rel_freq$rel_freq = rel_freq[,which(colnames(rel_freq) == CL[1])]
+rel_freq = rel_freq[,c("clust_from","clust_to","rel_freq")]
+
+save(rel_freq, file = paste0(IO$out_Rdata,"cluster_transition_frequencies.Rdata"))
+save(freq, file = paste0(IO$out_Rdata,"cluster_transition_counts.Rdata"))
+
+
+ggplot(rel_freq, aes(x = factor(clust_to), y = factor(clust_from, levels = rev(CL)), col = rel_freq)) + 
+  coord_fixed()+
+  geom_point(size = 20) + #, size = rel_freq + scale_size(range = c(0,30), limits = c(0,1)) + 
+  geom_text(aes(label = round(100*rel_freq)),size = 5, col = "black") + 
+  scale_color_gradient(low = "white", high = "turquoise4", limits = c(0,1)) + 
+  xlab("cluster : TO")+ ylab("cluster : FROM")+ ggtitle("Cluster transition frequencies")+
+  guides(size = FALSE, col = FALSE)
+
+
+
+ggplot(rel_freq, aes(x = factor(clust_to), y = factor(clust_from, levels = rev(CL)), col = factor(clust_to), size = rel_freq)) + 
+  coord_fixed()+
+  geom_point(aes(alpha = rel_freq))+ scale_size(range = c(0,25), limits = c(0,1)) + scale_alpha(range = c(0.3,1), limits = c(0,0.8))+ #, size = rel_freq  + 
+  geom_text(aes(label = round(100*rel_freq)),size = 5, col = "black") + 
+  scale_color_manual(values = cols$clusters_6) + 
+  xlab("cluster : TO")+ ylab("cluster : FROM")+ ggtitle("Cluster transition frequencies")+
+  guides(size = FALSE, col = FALSE, alpha = FALSE)
+
+
+
+
+```
+
+```{r users_clustering viz cluster transitions alluvium}
+
+is_alluvia_form(rel_freq, axes = 1:2, silent = TRUE)
+
+ggplot(rel_freq,
+       aes(y = rel_freq, axis1 = factor(clust_from), axis2 = factor(clust_to), fill = factor(clust_from))) +
+  geom_alluvium(width = 1/12) +
+  scale_fill_manual(values = cols$clusters_6)+
+  geom_stratum(width = 1/12, fill = "black", color = "grey")
+
+
+
+ggplot(freq,
+       aes(y = freq, axis1 = factor(clust_from), axis2 = factor(clust_to), fill = factor(clust_from))) +
+  geom_alluvium(width = 1/12) +
+  scale_fill_manual(values = cols$clusters_6)+
+  geom_stratum( fill =  rep(rev(cols$clusters_6),2), width = 1/12, color = NA)
+
+
+```
+
+
+# Defining consistent vs inconsistent users
+
+```{r users_clustering consistent vs inconsistent}
+
+
+ggplot(users, aes(x = sd_TB, fill = factor(most_preval_clust))) + 
+  geom_density(alpha = 0.5, col = NA) +  scale_fill_manual(values = cols$clusters_6)
+
+
+ggplot(users, aes(x = sd_TB_n, fill = factor(most_preval_clust))) + 
+  geom_density(alpha = 0.5, col = NA) +  scale_fill_manual(values = cols$clusters_6)
+
+
+
+ggplot(users[users$n_cycles >= 10,], aes(x = perc_main_cluster, fill = factor(most_preval_clust))) + 
+  geom_density(alpha = 0.5, col = NA) +  scale_fill_manual(values = cols$clusters_6)+ facet_grid(most_preval_clust ~ . )
+
+
+
+ggplot(users[users$n_cycles >= 10,], aes(x = sd_TB_n, y = 1 - perc_main_cluster, col = factor(most_preval_clust))) + 
+  geom_density2d() +  scale_color_manual(values = cols$clusters_6) + facet_wrap(most_preval_clust ~ . ) +
+  geom_vline(xintercept = 2/3) + geom_hline(yintercept = 0.75)
+
+users$is_consistent = (users$sd_TB_n + 1 - users$perc_main_cluster <= 1)
+
+ggplot(users, aes(x = sd_TB_n, fill = factor(most_preval_clust))) + 
+  geom_density(alpha = 0.5, col = NA) +  scale_fill_manual(values = cols$clusters_6) + facet_grid( is_consistent ~ .)
+
+
+ggplot(users[users$n_cycles >= 10,], aes(x = perc_main_cluster, fill = factor(most_preval_clust))) + 
+  geom_density(alpha = 0.5, col = NA) +  scale_fill_manual(values = cols$clusters_6)+ facet_grid( is_consistent ~ most_preval_clust)
+
+
+ggplot(users[users$n_cycles >= 10,], aes(x = sd_TB_n, y = 1 - perc_main_cluster, col = factor(is_consistent))) + 
+  geom_point(size = 0.5, alpha = 0.1) +  facet_wrap(most_preval_clust ~ . )
+
+
+
+```
+
+
+```{r users_clustering consistency among users with at least 1 TB}
+
+ggplot(users[(users$n_tender_breasts >= 1),], aes(x = perc_main_cluster, fill = factor(most_preval_clust)))+
+  geom_histogram( binwidth = 0.05) + facet_grid( most_preval_clust ~ . ) + scale_fill_manual(values = cols$clusters_6)
+
+ggplot(users[(users$n_tender_breasts >= 2) & (users$n_cycles >= 10),], aes(x = perc_main_cluster, fill = factor(most_preval_clust)))+
+  geom_histogram( binwidth = 0.05) + facet_grid( most_preval_clust ~ . ) + scale_fill_manual(values = cols$clusters_6)
+
+
+ggplot(users[(users$n_tender_breasts >= 2) & (users$n_cycles >= 10),], aes(x = perc_main_cluster, fill = factor(most_preval_clust)))+
+  geom_histogram( binwidth = 0.05) + facet_grid( most_preval_clust ~ . , scale = "free_y") + scale_fill_manual(values = cols$clusters_6) +  expand_limits(x = 0)
+
+
+
+ggplot(users[(users$n_tender_breasts >= 2) & (users$n_cycles >= 10),], aes(x = perc_main_cluster, fill = factor(most_preval_clust)))+
+  geom_histogram( binwidth = 0.1) + facet_grid( most_preval_clust ~ . , scale = "free_y") + scale_fill_manual(values = cols$clusters_6) + expand_limits(x = 0)
+
+
+ggplot(users[(users$n_tender_breasts >= 2),], aes(x = perc_main_cluster, fill = factor(most_preval_clust)))+
+  geom_histogram( binwidth = 0.1) + facet_grid( most_preval_clust ~ . , scale = "free_y") + scale_fill_manual(values = cols$clusters_6) + expand_limits(x = 0)
+
+
+s_users =  users[(users$n_tender_breasts >= 2),]
+s_users$perc_main_cluster_r = 100*round(s_users$perc_main_cluster, digits = 1)
+
+agg = ddply(s_users, c("most_preval_clust","perc_main_cluster_r"), summarize, n_users = lu(user_id))
+agg$perc_users = 100*agg$n_users/sum(!is.na(s_users$perc_main_cluster))
+
+ggplot(users[(users$n_tender_breasts >= 2),], aes(x = perc_main_cluster, fill = factor(most_preval_clust)))+
+  geom_histogram( binwidth = 0.1) + facet_grid( most_preval_clust ~ . , scale = "free_y") + scale_fill_manual(values = cols$clusters_6) + expand_limits(x = 0)
+
+ggplot(agg, aes(x = perc_main_cluster_r, y = perc_users, fill = factor(most_preval_clust)))+
+  geom_bar(stat = "identity", width = 10) + facet_grid( most_preval_clust ~ . , scale = "free_y" ) + 
+  scale_fill_manual(values = cols$clusters_6) + expand_limits(x = 0)
+
+
+save(agg, file = paste0(IO$out_Rdata, "distribution_perc_main_cluster.Rdata"))
+
+rm(s_users)
+
+```
+
+
+
+
+
+
+```{r users_clustering histograms of other clusters}
+
+i = which(users$n_tender_breasts >= 2)
+j = which(colnames(users) %in% c("n_cycles" , "n_cl_11" , "n_cl_0" , "n_cl_1" , "n_cl_2" , "n_cl_3" , "n_cl_4"))
+
+agg = aggregate(users[i,j], by = list(most_preval_clust = users$most_preval_clust[i]), FUN = sum)
+
+agg = reshape(agg, direction = "long", 
+              idvar = c("most_preval_clust","n_cycles"), 
+              varying = list(grep("n_cl_",colnames(agg))))
+agg$cluster = agg$time - 1 - min(CL)
+agg$n_cycles_tot = agg$n_cycles
+agg$n_cycles = agg$n_cl_11
+rownames(agg) = 1:nrow(agg)
+agg = agg[, c("most_preval_clust","cluster","n_cycles_tot","n_cycles")]
+agg$perc_cycles = 100*agg$n_cycles/agg$n_cycles_tot
+
+
+g = ggplot(agg, aes(x = factor(most_preval_clust), y = perc_cycles, fill = factor(cluster),  group = factor(cluster))) +
+  geom_bar(stat = "identity", position = "stack")+
+  geom_text(aes(label = round(perc_cycles), col = (perc_cycles>=6)), position = "stack", vjust = 1.5)+
+  scale_fill_manual(values = cols$clusters_6)+ scale_color_manual(values = c("transparent","white"))+
+  guides(fill = FALSE, col = FALSE)
+g
+
+
+save(agg, file = paste0(IO$out_Rdata,"frequency_of_other_clusters.Rdata"))
+
+```
+
+
+
+
+
+
+
+
+```{r users_clustering histograms of other clusters with all users}
+
+
+agg2 = aggregate(user_id ~ most_preval_clust + is_consistent ,users, lu)
+colnames(agg2) = c("most_preval_clust","is_consistent", "n_users")
+
+
+g = ggplot(agg2, aes(x = factor(most_preval_clust), y = n_users, fill = factor(most_preval_clust))) +
+  geom_bar(stat = "identity", position = "stack")+
+  scale_fill_manual(values = cols$clusters_6)+
+  guides(fill = FALSE)+
+  facet_grid( . ~ is_consistent)
+g
+  
+save(agg2, file = paste0(IO$out_Rdata,"n_users_by_most_prevalent_cluster_consistent_vs_inconsistent.Rdata"))
+
+
+  
+agg = aggregate(users[, c("n_cycles" , "n_cl_11" , "n_cl_0" , "n_cl_1" , "n_cl_2" , "n_cl_3" , "n_cl_4")], by = list(most_preval_clust = users$most_preval_clust, is_consistent = users$is_consistent), FUN = sum)
+
+agg = reshape(agg, direction = "long", 
+              idvar = c("most_preval_clust","n_cycles","is_consistent"), 
+              varying = list(grep("n_cl_",colnames(agg))))
+agg$cluster = agg$time - 1 - min(CL)
+agg$n_cycles_tot = agg$n_cycles
+agg$n_cycles = agg$n_cl_11
+rownames(agg) = 1:nrow(agg)
+agg = agg[, c("is_consistent","most_preval_clust","cluster","n_cycles_tot","n_cycles")]
+agg$perc_cycles = agg$n_cycles/agg$n_cycles_tot
+
+
+g = ggplot(agg, aes(x = factor(most_preval_clust), y = perc_cycles, fill = factor(cluster))) +
+  geom_bar(stat = "identity", position = "stack")+
+  scale_fill_manual(values = cols$clusters_6)+
+  guides(fill = FALSE)+
+  facet_grid( . ~ is_consistent)
+g
+
+save(agg, file = paste0(IO$out_Rdata,"frequency_of_other_clusters_consistent_vs_inconsistent.Rdata"))
+
+
+
+
+```
+
+
+
+
+###
+
+
+```{r users_clustering viz}
+
+ggplot(users, aes(x = perc_main_cluster, fill = factor(most_preval_clust))) + geom_histogram(binwidth = 0.1) + facet_grid(most_preval_clust ~ ., scale = 'free_y') + expand_limits(x = 0)+ scale_fill_manual(values = cols$clusters_6)
+
+ggplot(users, aes(x = n_clust, fill = factor(most_preval_clust))) + geom_histogram(binwidth = 0.1) + facet_grid(most_preval_clust ~ ., scale = 'free_y') + scale_fill_manual(values = cols$clusters_6)
+
+ggplot(users, aes(x = avg_TB, fill = factor(most_preval_clust))) + geom_histogram(binwidth = 0.5) + facet_grid(most_preval_clust ~ ., scale = 'free_y') + scale_fill_manual(values = cols$clusters_6)
+
+ggplot(users, aes(x = median_TB, fill = factor(most_preval_clust))) + geom_histogram(binwidth = 1) + facet_grid(most_preval_clust ~ ., scale = 'free_y') + scale_fill_manual(values = cols$clusters_6)
+
+ggplot(users, aes(x = sd_TB, fill = factor(most_preval_clust))) + geom_histogram(binwidth = 0.5) + facet_grid(most_preval_clust ~ ., scale = 'free_y') + scale_fill_manual(values = cols$clusters_6)
+
+ggplot(users, aes(x = avg_TB_timing, fill = factor(most_preval_clust))) + geom_histogram(binwidth = 1) + facet_grid(most_preval_clust ~ ., scale = 'free_y') + scale_fill_manual(values = cols$clusters_6)
+
+ggplot(users, aes(x = sd_TB_timing, fill = factor(most_preval_clust))) + geom_histogram(binwidth = 0.5) + facet_grid(most_preval_clust ~ ., scale = 'free_y') + scale_fill_manual(values = cols$clusters_6)
+
+
+```
+
+
+
+```{r users_clustering fraction of cycles in each cluster evolution in time}
+
+cycles_m$cluster_num_f = factor(cycles_m$cluster_num, levels = CL)
+
+ggplot(cycles_m, aes(x = cycle_nb_m, fill = cluster_num_f)) + geom_bar() + scale_fill_manual(values = cols$clusters_6)
+ggplot(cycles_m, aes(x = cycle_nb_m, fill = cluster_num_f)) + geom_bar(position = "fill") + xlim(c(0,40))+ scale_fill_manual(values = cols$clusters_6)
+
+
+ggplot(data = subset(cycles_m, !is.na(birth_control)), aes(x = cycle_nb_m, fill = cluster_num_f)) + geom_bar()+facet_grid( birth_control ~., scale = "free_y")+ scale_fill_manual(values = cols$clusters_6)
+ggplot(data = subset(cycles_m, !is.na(birth_control)), aes(x = cycle_nb_m, fill = cluster_num_f)) + geom_bar(position = "fill") + xlim(c(0,30)) + facet_grid(. ~ birth_control) + guides(col = FALSE)+ scale_fill_manual(values = cols$clusters_6)
+
+
+```
+
+
+
+
+```{r users_clustering fraction of #TB/#days_logged}
+
+#cycles_m$fraction_TB = cycles_m$n_TB / cycles_m$n_days_obs_m
+cycles_m$most_preval_clust = factor(users$most_preval_clust[match(cycles_m$user_id, users$user_id)], levels = CL)
+
+fraction_TB = ddply(cycles_m[cycles_m$cycle_nb_m <= 20,], 
+                    c("most_preval_clust", "cycle_nb_m", "birth_control"), 
+                    summarise,
+                    n_cycles = uniqueN(cycle_id_m),
+                    avg_n_TB = mean(n_TB, na.rm = TRUE),
+                    median_n_TB = median(n_TB, na.rm = TRUE),
+                    sd_n_TB = sd(n_TB, na.rm = TRUE),
+                    q_05_n_TB = quantile(n_TB, probs = 0.05, na.rm = TRUE),
+                    q_25_n_TB = quantile(n_TB, probs = 0.25, na.rm = TRUE),
+                    q_75_n_TB = quantile(n_TB, probs = 0.75, na.rm = TRUE),
+                    q_95_n_TB = quantile(n_TB, probs = 0.95, na.rm = TRUE),
+                    #avg_fraction_TB = mean(fraction_TB, na.rm = TRUE),
+                    #sd_fraction_TB = sd(fraction_TB, na.rm = TRUE),
+                    #q_05_fraction_TB = quantile(fraction_TB, probs = 0.05, na.rm = TRUE),
+                    #q_25_fraction_TB = quantile(fraction_TB, probs = 0.25, na.rm = TRUE),
+                    #q_75_fraction_TB = quantile(fraction_TB, probs = 0.75, na.rm = TRUE),
+                    #q_95_fraction_TB = quantile(fraction_TB, probs = 0.95, na.rm = TRUE)
+                    )
+
+min_n_cycles = aggregate(n_cycles ~ birth_control + most_preval_clust , fraction_TB, min)
+colnames(min_n_cycles)[which(colnames(min_n_cycles) == "n_cycles" )] = "min_n_cycles"
+
+fraction_TB = fraction_TB[(!is.na(fraction_TB$most_preval_clust)) & (!is.na(fraction_TB$birth_control)),]
+fraction_TB = merge(fraction_TB, min_n_cycles, all = TRUE)
+fraction_TB = fraction_TB[,- which(colnames(fraction_TB) == "n_cycles")]
+
+save(fraction_TB, file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time.Rdata"))
+save(min_n_cycles, file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time_min_n_cycles.Rdata"))
+
+ggplot(fraction_TB, aes(x = cycle_nb_m, y = median_n_TB, col = most_preval_clust, fill = most_preval_clust)) + 
+  geom_line() + 
+  geom_line(aes(y = avg_n_TB), linetype = 3) + 
+  geom_ribbon(aes(ymin = q_05_n_TB , ymax = q_95_n_TB), alpha = 0.2, col = NA)+
+  geom_ribbon(aes(ymin = q_25_n_TB , ymax = q_75_n_TB), alpha = 0.2, col = NA)+
+  geom_text(data = min_n_cycles, aes(label = paste0("min # = ",min_n_cycles)), x = 5, y = 0.95*max(fraction_TB$q_95_n_TB), size = 3, vjust = 0, hjust = 0)+
+  facet_grid(birth_control  ~ most_preval_clust)+
+  scale_color_manual(values = cols$clusters_6) + scale_fill_manual(values = cols$clusters_6)+ 
+  guides(col = FALSE, fill = FALSE) +
+  xlab("Cycle number") + ylab("# of reported TB")
+
+# ggplot(fraction_TB, aes(x = cycle_nb_m, y = avg_fraction_TB, col = most_preval_clust, fill = most_preval_clust)) + 
+#   geom_line() + 
+#   geom_ribbon(aes(ymin = q_05_fraction_TB, ymax = q_95_fraction_TB), alpha = 0.2, col = NA)+
+#   geom_ribbon(aes(ymin = q_25_fraction_TB, ymax = q_75_fraction_TB), alpha = 0.2, col = NA)+
+#   facet_grid(birth_control ~ most_preval_clust)+
+#   scale_color_manual(values = cols$clusters_6) + scale_fill_manual(values = cols$clusters_6)+ 
+#   xlim(c(0,20))
+```
+
+
+
+
+
+
+
+#### Selecting users that have all their cycles in the same cluster
+
+```{r users_clustering load d_imputer_with_clusters}
+
+load(paste0(IO$tmp_Rdata,"d_imputed_with_clusters.Rdata"),verbose = TRUE)
+
+```
+
+
+
+```{r users_clustering selecting users that have all their cycles in the same clusters}
+
+# selecting users with all their cycles in the same cluster and with about N cycles
+N = 12
+j = which((users$most_preval_clust != 0) & (users$n_clust == 1) & (users$n_cycles %in% (N-2):(N+2)))
+
+d_imputed_selected_users = d_imputed[d_imputed$user_id %in% users$user_id[j],]
+
+# plot profiles for selected users
+for(ci in 1:n_center){
+  cat(ci,"\n")
+  j = which(d_imputed_selected_users$cluster_num == ci)
+  us = unique(d_imputed_selected_users$user_id[j])
+  us = us[1:min(length(us),10)]
+  for(u in us){
+    cat("\t",u, "\n")
+    j = which(d_imputed_selected_users$user_id == u)
+    d_this_user = d_imputed_selected_users[j,]
+    
+    d_this_user$alpha = pmax(d_this_user$tender_breasts, 0)
+    d_this_user$stroke = 1*(d_this_user$tender_breasts >=0)
+    
+    g = ggplot(d_this_user, 
+               aes(x = cycleday_m_D, y = as.factor(cycle_nb_m), col = ci,
+                   stroke = stroke/2, alpha = alpha, size = 2))+
+      scale_x_continuous(breaks = par$x.axis)+
+      geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+      geom_point(alpha = 1, fill = NA, shape=21) + geom_point()+ scale_alpha(range = c(0, 1))+ 
+      xlab("cycleday from 1st day of menstruation") + ylab("cycle number")+
+      ggtitle(paste0(u," - cluster ",ci))+
+      guides(col = FALSE, alpha = FALSE, size = FALSE)
+    print(g)
+  }
+}
+
+
+rm(ci, j, g, d_this_user, u, us, agg)
+
+```
+
+
+
+
+
+```{r users_clustering selected users for examples, eval = TRUE}
+
+## previously manually selected clusters
+#cluster_example_users = c("62cad59cde9107f38c751222c7fb2ed53f1c48e9","39cd0f53570b53f5087312212c3d6a60754d2826","302f684cb151f87d182e592142acb4314ee66a5e","3a4aefded4d1713aadcc61fb769c906da95c39d4")
+#cluster_example_users = c("62cad59cde9107f38c751222c7fb2ed53f1c48e9","0c7308d40012a3d72e0a0022f41a959af515abab","1c123812d268ea17ec31eae01755e72439541eab")
+
+cluster_example_users = c("819733c9c57abed8b96f3a5381622decec612d36","bd0ab059c92f816b243c51900c86887cf3dd26ca","302f684cb151f87d182e592142acb4314ee66a5e","7991d4fd52dab6169c989d252a577e742a52da2e")
+
+
+j = which(d_imputed_selected_users$user_id %in% cluster_example_users)
+d_selected_users = d_imputed_selected_users[j,]
+
+save(d_selected_users, file = paste0(IO$out_Rdata, "selected_users_for_clusters_examples.Rdata"))
+
+
+d_selected_users$alpha = pmax(d_selected_users$tender_breasts, 0)
+d_selected_users$stroke = 1*(d_selected_users$tender_breasts >=0)
+
+g = ggplot(d_selected_users, 
+           aes(x = cycleday_m_D, y = as.factor(cycle_nb_m), col = as.factor(cluster_num),
+               stroke = stroke/2, alpha = alpha, size = 1))+
+  facet_grid(cluster_num ~ ., scales = "free_y")+
+  scale_x_continuous(breaks = par$x.axis)+
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_point(alpha = 1, fill = NA, shape=21) + geom_point()+ scale_alpha(range = c(0, 1))+ 
+  xlab("cycleday from 1st day of menstruation") + ylab("cycle number")+
+  guides(col = FALSE, alpha = FALSE, size = FALSE)
+g
+
+rm(g, d_selected_users, d_imputed_selected_users )
+
+```
+
+
+
+
+#### Selecting users that have inconsistent clusters
+
+```{r loading full data from days 1 to be able to see cycles in which no TB was tracked}
+load(paste0(IO$input_data,"days/days_1.Rdata"), verbose = TRUE)
+
+days$tender_breasts = ifelse(days$type == TB, 1,0)
+
+d = days[!is.na(days$cycle_id_m), which(colnames(days) %in% colnames(d_imputed))]
+d = aggregate(tender_breasts ~ user_id + cycle_id_m + cycle_nb_m + cycleday_m_D ,d, max)
+
+#d$cluster_num = d_imputed$cluster_num[match(d$cycle_id_m, d_imputed$cycle_id_m)]
+#d$cluster_num[is.na(d$cluster_num)] = 0
+#d = d[d$cluster_num == 0,]
+
+d$cluster_num = cycles_m$cluster_num[match(d$cycle_id_m, cycles_m$cycle_id_m)]
+d = d[!is.na(d$cluster_num),]
+
+d_full = rbind(d_imputed, d)
+
+```
+
+
+
+```{r users_clustering inconsistent users}
+
+# selecting users with all their cycles in the same cluster and with about N cycles
+N = 12
+j = which((users$most_preval_clust != 0) & (users$n_clust >= 3) & (users$n_cycles %in% (N-2):(N+2)) & (users$user_id %in% d$user_id))
+
+d_imputed_selected_users = d_full[d_full$user_id %in% users$user_id[j],]
+
+# plot profiles for selected users
+
+us = unique(d_imputed_selected_users$user_id)
+us = us[1:min(length(us),10)]
+for(u in us){
+  cat(u, "\n")
+  j = which(d_imputed_selected_users$user_id == u)
+  d_this_user = d_imputed_selected_users[j,]
+  
+  d_this_user$alpha = pmax(d_this_user$tender_breasts, 0)
+  d_this_user$stroke = 1*(d_this_user$tender_breasts >=0)
+  
+  g = ggplot(d_this_user, 
+             aes(x = cycleday_m_D, y = as.factor(cycle_nb_m), col = factor(cluster_num),
+                 stroke = stroke/2, alpha = alpha, size = 2))+
+    scale_x_continuous(breaks = par$x.axis)+
+    geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+    geom_point(alpha = 1, fill = NA, shape=21) + geom_point()+ scale_alpha(range = c(0, 1))+ 
+    xlab("cycleday from 1st day of menstruation") + ylab("cycle number")+
+    ggtitle(paste0(u))+ scale_color_manual(values = cols$clusters_6)+
+    guides(col = FALSE, alpha = FALSE, size = FALSE)
+  print(g)
+}
+
+
+
+rm(ci, j, g, d_this_user, u, us, agg)
+
+```
+
+
+
+
+
+```{r users_clustering selected users for examples, eval = TRUE}
+
+## previously manually selected clusters
+#cluster_example_users = c("62cad59cde9107f38c751222c7fb2ed53f1c48e9","39cd0f53570b53f5087312212c3d6a60754d2826","302f684cb151f87d182e592142acb4314ee66a5e","3a4aefded4d1713aadcc61fb769c906da95c39d4")
+#cluster_example_users = c("62cad59cde9107f38c751222c7fb2ed53f1c48e9","0c7308d40012a3d72e0a0022f41a959af515abab","1c123812d268ea17ec31eae01755e72439541eab")
+
+cluster_example_users = c("0d9c97fd161ef44d66b9d6e66009a13aa6ab1370","0c756837751c999aa759308d894c5f71953602a7","0c7308d40012a3d72e0a0022f41a959af515abab","1a4c8aa3cb2ec52892f15722a6dc211b03287ee2")
+
+
+j = which(d_imputed_selected_users$user_id %in% cluster_example_users)
+d_selected_users = d_imputed_selected_users[j,]
+
+save(d_selected_users, file = paste0(IO$out_Rdata, "inconsistent_users_examples.Rdata"))
+
+
+d_selected_users$alpha = pmax(d_selected_users$tender_breasts, 0)
+d_selected_users$stroke = 1*(d_selected_users$tender_breasts >=0)
+
+g = ggplot(d_selected_users, 
+           aes(x = cycleday_m_D, y = as.factor(cycle_nb_m), col = as.factor(cluster_num),
+               stroke = stroke/2, alpha = alpha, size = 1))+
+  facet_grid(user_id ~ ., scales = "free_y")+
+  scale_x_continuous(breaks = par$x.axis)+
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_point(alpha = 1, fill = NA, shape=21) + geom_point()+ scale_alpha(range = c(0, 1))+ 
+  xlab("cycleday from 1st day of menstruation") + ylab("cycle number")+ scale_color_manual(values = cols$clusters_6)+
+  guides(col = FALSE, alpha = FALSE, size = FALSE)
+g
+
+rm(g, d_selected_users, d_imputed_selected_users )
+
+```
+
+

@@ -1,0 +1,437 @@
+---
+title: "Cycle clustering"
+author: "Laura Symul"
+date: "12/7/2018"
+output: html_document
+---
+
+
+
+```{r cycle_clustering_vanilla setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+
+```{r cycle_clustering_vanilla setup, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+
+
+# Breast tenderness - CLUSTERING - Figure 2
+
+## CYCLES CLUSTERING VANILLA: Clustering at the cycle level without imputing data 
+
+First, we can take a naive approach in which we use the tracking data as is. I.e. we don't care about potentially missing data and we don't account for potential bias coming from the tracking behavior.
+
+### Selecting only tender breast logs
+
+```{r cycle_clustering_vanilla selecting TB only, eval = FALSE}
+
+days_filenames = list.files(paste0(IO$input_data, "days/"))
+
+registerDoParallel(par$n_cores)
+
+tic()
+days = foreach(days_filename = days_filenames, .combine = rbind)%dopar%{
+  load(paste0(IO$input_data,"days/",days_filename), verbose = TRUE)
+  row_keep = (days$type == TB) 
+  col_keep = c("type","user_id",
+               "cycle_nb","cycle_id","cycleday",
+               "cycle_nb_m","cycle_id_m","cycleday_m","cycleday_m_D",
+               "cycle_nb_mb","cycle_id_mb","cycleday_mb","cycleday_mb_D")
+  days = days[row_keep,col_keep]
+  return(days)
+}
+toc()
+stopImplicitCluster()
+
+save(days, file = paste0(IO$tmp_Rdata,"days_TB_only.Rdata"))
+```
+
+```{r load days_TB_only, eval = TRUE}
+load(file = paste0(IO$tmp_Rdata,"days_TB_only.Rdata"))
+```
+
+
+
+
+### Formatting days for clustering
+
+Here, we simply create vectors from D-18 to D7 with 1 and 0s depending on whether the user has logged Breast Tenderness
+
+```{r cycle_clustering_vanilla formatting days for clustering, eval = FALSE}
+k = which(!is.na(days$cycleday_m_D))
+d = days[k,]
+d$tender_breasts = 1
+
+d_wide = reshape(d[,c("cycle_id_m","cycleday_m_D","tender_breasts")],
+                        idvar = "cycle_id_m",timevar = "cycleday_m_D",
+                        direction = "wide")
+d_wide[is.na(d_wide)] = 0
+
+# re-order the columns by cycleday_m_D
+o = order(as.numeric(sapply(strsplit(colnames(d_wide)[2:ncol(d_wide)],"\\."), "[[", 2)))
+d_wide = data.frame(cycle_id_m = d_wide$cycle_id_m, d_wide[,o+1] )
+rm(o, k)
+
+save(d_wide, file = paste0(IO$tmp_Rdata,"d_wide_vanilla.Rdata") )
+```
+
+
+```{r cycle_clustering_vanilla loading d_wide_vanilla, eval = TRUE}
+load(file = paste0(IO$tmp_Rdata,"d_wide_vanilla.Rdata"), verbose = TRUE)
+```
+
+
+```{r cycle_clustering_vanilla example d_wide}
+head_d_wide = d_wide[1:20,]
+colnames(head_d_wide) = gsub("tender_breasts..","-",colnames(head_d_wide), fixed = TRUE)
+colnames(head_d_wide) = gsub("tender_breasts.","",colnames(head_d_wide), fixed = TRUE)
+head_d_wide
+write.table(head_d_wide, file = paste0(IO$out_csv,"example_day_values_for_cycle_clustering.txt"), col.names = TRUE, row.names = FALSE, sep = "\t",quote = FALSE)
+```
+
+
+### Ideal number of clusters ?
+
+```{r cycle_clustering_vanilla cycle clusters - exploring number of clusters}
+
+cycle_ids = unique(d$cycle_id_m)
+WSS_k_tot.withinss = c()
+n_centers = 2:7
+tic()
+for(n_center in n_centers){
+  cat(n_center,"\n")
+  #kmean
+  kmeans_type = kmeans(d_wide[,-1], centers = n_center, nstart = 20)
+  
+  #WSS
+  if(n_center == 2){WSS_k_tot.withinss = kmeans_type$totss}
+  WSS_k_tot.withinss = c(WSS_k_tot.withinss, kmeans_type$tot.withinss )
+  
+  #add kmeans results on d
+  d$kmean_group = kmeans_type$cluster[match(d$cycle_id_m, d_wide$cycle_id_m)]
+  # ordering cycles by clusters
+  d = d[order(d$kmean_group),]
+  d$cycle_id_m_factors_kmeans = factor(d$cycle_id_m, levels = unique(d$cycle_id_m))
+  
+  #### plots
+  # first showing some examples
+  set.seed(6)
+  d_subset = d[d$cycle_id_m %in% cycle_ids[sample(1:length(cycle_ids),50)],]
+  # black dots
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m)) + geom_point() )
+  # colored dots
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(kmean_group))) + geom_point()+ guides(col = FALSE))
+  # ordered colored dots
+  d_subset = d_subset[order(d_subset$kmean_group),]
+  d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(kmean_group))) + geom_point()+ guides(col = FALSE))
+  
+  # then showing the profiles for the clusters
+  agg = aggregate(tender_breasts ~ cycleday_m_D + kmean_group, d, sum)
+  print(ggplot(agg, aes(x = cycleday_m_D, y =tender_breasts, col = factor(kmean_group))) + geom_line() + facet_grid(kmean_group ~.))
+}
+toc()
+
+# plot the WSS to find the ideal number of clusters
+df = data.frame(n_clust = c(1,n_centers), WSS = WSS_k_tot.withinss)
+ggplot(df, aes(x =n_clust, y = WSS)) + geom_bar(stat = "identity", fill = "steelblue2")
+
+rm(df,cycle_ids, kmeans_type, d_subset, agg, n_center, n_centers, WSS_k_tot.withinss)
+```
+
+
+
+
+
+There is not a very clear "elbow", but if any, it is at number of cluster = 2. 
+We see that indeed, the main 2 clusters are
+
+* Menstrual tender-breasts (sharp increase on Day1)
+* Pre-menstrual tender-breasts (soft curve before menstruation)
+
+One could even consider a third group (that appears in the n_clust = 4) with a soft curve within menstruations...
+
+But for now, let's consider 2 clusters.
+
+### 2 clusters
+
+```{r cycle_clustering_vanilla cycle clusters - 2 clusters}
+n_center = 2
+kmeans_type = kmeans(d_wide[,-1], centers = n_center, nstart = 20)
+
+d$kmean_group_num = kmeans_type$cluster[match(d$cycle_id_m, d_wide$cycle_id_m)]
+
+agg_clust = aggregate(tender_breasts ~ cycleday_m_D + kmean_group_num, d, sum)
+# percentage of reported symptoms
+agg =  aggregate(cycle_id ~ kmean_group_num, d, lu)
+colnames(agg) = c("kmean_group_num","n_cycles")
+agg_clust = merge(agg_clust, agg, all = TRUE)
+agg_clust$perc_tender_breasts = agg_clust$tender_breasts/agg_clust$n_cycles
+# renaming the clusters as "menstrual" and "pre-menstrual"
+agg = aggregate(perc_tender_breasts ~ kmean_group_num, agg_clust, max)
+agg_clust$max_perc_tender_breasts = agg$perc_tender_breasts[match(agg_clust$kmean_group_num, agg$kmean_group_num)]
+agg = agg_clust[agg_clust$perc_tender_breasts == agg_clust$max_perc_tender_breasts,]
+agg$kmean_group = c("pre-menstrual","menstrual")[(agg$cycleday_m_D == 0)+1]
+agg$kmean_group = factor(agg$kmean_group, levels = c("menstrual","pre-menstrual"))
+agg_clust$kmean_group = agg$kmean_group[match(agg_clust$kmean_group_num, agg$kmean_group_num)]
+
+d$kmean_group = agg$kmean_group[match(d$kmean_group_num, agg$kmean_group_num)]
+d = d[order(d$kmean_group_num),]
+d$cycle_id_m_factors_kmeans = factor(d$cycle_id_m, levels = unique(d$cycle_id_m))
+
+#### plots
+# first showing some examples
+set.seed(6)
+cycle_ids = unique(d$cycle_id_m)
+d_subset = d[d$cycle_id_m %in% cycle_ids[sample(1:length(cycle_ids),50)],]
+# black dots
+print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m)) + geom_point() )
+# colored dots
+print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = kmean_group)) + geom_point()+ guides(col = FALSE)+ scale_color_manual(values = cols$clusters))
+# ordered colored dots
+d_subset = d_subset[order(d_subset$kmean_group),]
+d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = kmean_group)) + geom_point()+ guides(col = FALSE)+ scale_color_manual(values = cols$clusters))
+
+# then showing the profiles for the clusters
+print(ggplot(agg_clust, aes(x = cycleday_m_D, y =tender_breasts, col = kmean_group)) + geom_line() + facet_grid(kmean_group ~.)+ scale_color_manual(values = cols$clusters))
+print(ggplot(agg_clust, aes(x = cycleday_m_D, y =perc_tender_breasts, col = kmean_group)) + geom_line() + facet_grid(kmean_group ~.)+ scale_color_manual(values = cols$clusters))
+
+
+
+rm(cycle_ids, d_subset, agg, n_center)
+```
+
+```{r cycle_clustering_vanilla save cycle clustering}
+
+cycle_clusters = data.frame(cycle_id_m = d_wide$cycle_id_m, kmean_group_num = kmeans_type$cluster)
+cycle_clusters$kmean_group = unique(agg_clust[order(agg_clust$kmean_group_num),c("kmean_group_num","kmean_group")])[cycle_clusters$kmean_group_num,2]
+
+save(cycle_clusters, file = paste0(IO$tmp_Rdata, "cycles_with_clusters.Rdata"))
+
+rm(kmeans_type)
+
+```
+
+
+
+
+
+
+
+```{r cycle_clustering_vanilla cycle clusters - figure 2A}
+
+g = ggplot(agg_clust, aes(x = cycleday_m_D, y =perc_tender_breasts, col = kmean_group))+ 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5) + 
+  geom_point(size = 0.6)+geom_line() +
+  scale_y_continuous(labels = scales::percent)+ scale_x_continuous(breaks = par$x.axis)+ 
+  scale_color_manual(values = cols$clusters)+
+  xlab("cycleday from 1st day of menstruation") + ylab("% of reported tender breasts")+
+  guides(color = FALSE)
+
+g
+
+ggsave(filename = paste0(IO$panels, "2A_cycle_clusters.pdf"), plot = g, width = viz$full_width/9*2, height = viz$full_width/5)
+
+
+agg = aggregate(n_cycles ~ kmean_group, agg_clust, min)
+agg$perc_cycles = agg$n_cycles/sum(agg$n_cycles)
+agg$kmean_group_short = c("M","Pre-M")[(agg$kmean_group == "pre-menstrual")+1]
+g = ggplot(agg, aes(x = kmean_group_short, y =perc_cycles, fill = kmean_group)) + 
+  geom_bar(stat = "identity") +
+  scale_y_continuous(labels = scales::percent, position = "right")+ 
+  scale_fill_manual(values = cols$clusters)+
+  xlab("") + ylab("")+ ggtitle("% cycles")+
+  guides(fill = FALSE)+ theme(plot.title = element_text(size=10))
+g
+ggsave(filename = paste0(IO$panels, "2A_n_cycles_in_clusters.pdf"), plot = g, width = viz$full_width/9, height = viz$full_width/5)
+
+
+rm(g,  agg, agg_clust)
+```
+
+
+
+
+
+#### Examples
+
+```{r cycle_clustering_vanilla loading users for cycle cluster examples}
+if(!exists("users")){load(paste0(IO$input_data, "users.Rdata"), verbose = TRUE)}
+```
+
+
+
+```{r cycle_clustering_vanilla cycle clusters examples}
+# selecting 3 users: 1 only M, 1 only pre-M, 1 mixed
+agg = aggregate(kmean_group_num ~ user_id, d, lu)
+colnames(agg) = c("user_id","n_cycle_clusters")
+users = merge(users, agg, all = TRUE)
+
+agg = aggregate(kmean_group_num ~ user_id + cycle_id_m + kmean_group, d, min)
+agg$kmean_group_short = c("M","PreM")[(agg$kmean_group == "pre-menstrual")+1]
+agg = aggregate(cycle_id_m ~ user_id + kmean_group_short, agg, lu)
+colnames(agg) = c("user_id","kmean_group","n_cycles")
+agg_w = reshape(agg, timevar = "kmean_group",idvar = "user_id", direction = "wide")
+agg_w[is.na(agg_w)] = 0
+users = merge(users, agg_w, all =  TRUE)
+rm(agg, agg_w)
+
+# pre-menstrual users
+j_prem = which((users$n_cycle_clusters == 1) & (users$n_cycles.PreM == 7) &  (users$n_cycles.M == 0) )[1:10]
+j_m = which((users$n_cycle_clusters == 1) & (users$n_cycles.PreM == 0) &  (users$n_cycles.M == 7) )[1:10]
+j_mix = which((users$n_cycle_clusters == 2) & (users$n_cycles.PreM == 3) &  (users$n_cycles.M == 4) )[1:10]
+j = c(j_prem, j_m, j_mix)
+rm(j_prem, j_m, j_mix)
+for(i in j){
+  cat(users$user_id[i],"\n")
+  u = which(d$user_id == users$user_id[i])
+  d_subset = d[u,]
+  d_subset$cycle_nb_m = factor(d_subset$cycle_nb_m, levels = sort(unique(d_subset$cycle_nb_m), decreasing = TRUE))
+  print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_nb_m, col = kmean_group))+
+          geom_vline(xintercept = 0, col = "gray90", size = 1.5) + 
+          geom_point()+ guides(col = FALSE) + ggtitle(paste(users$user_id[i],"-",users$n_cycles.M[i],"-",users$n_cycles.PreM[i]))+
+          scale_color_manual(values = cols$clusters)+
+          xlab("cycleday from 1st day of menstruation")+ ylab("")+
+          scale_x_continuous(breaks = par$x.axis,limits = range(par$x.axis)) )
+}
+rm(i, j, u)
+```
+
+
+
+```{r cycle_clustering_vanilla cycle clusters examples - figure 2B}
+users_M = c("000becd740780336d082f5f982381ac1adc63427")#,"002974f759b5efd13ecc1740b124ad0f2797ecd5"
+users_preM = c("09137d795acf3561f37457634c8ab67ab1fef4d9")
+users_mix = c("007352b76b20462a8c6d38f17932207308cbc5e6") # "025958bb7d702a73fcbf57606eccd43528229e13","00f25aec0fc7ca2036f65c09087ac94349a9f41c","0034a6c2c80aec6d270bc7f59b79a29935708e6b",
+user_ids = c(users_M,users_preM,users_mix)
+rm(users_M,users_preM,users_mix)
+
+u = which(d$user_id %in% user_ids)
+d_subset = d[u,]
+d_subset$cycle_nb_m = factor(d_subset$cycle_nb_m, levels = sort(unique(d_subset$cycle_nb_m), decreasing = TRUE))
+d_subset$user_id_f = c("user 1","user 2","user 3")[as.numeric(factor(d_subset$user_id, levels = user_ids))]
+
+g = ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_nb_m, col = kmean_group))+
+  facet_grid(user_id_f ~ ., scale = "free_y" )+
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5) + 
+  geom_point(shape = 17)+ guides(col = FALSE) +
+  xlab("cycleday from 1st day of menstruation")+ ylab("cycle #")+
+  scale_x_continuous(breaks = par$x.axis,limits = range(par$x.axis)) + 
+  scale_color_manual(values = cols$clusters)+
+  theme(strip.background = element_rect(fill=rgb(89,155,227,60,max = 255), color = NA))
+g
+
+ggsave(filename = paste0(IO$panels, "2B_cycle_clusters_examples.pdf"), plot = g, width = viz$full_width/3, height = viz$full_width/5)
+
+
+rm(u, g, user_ids)
+```
+
+
+### Cycle clusters by age and birth control
+
+
+```{r cycle_clustering_vanilla user clusters by age and birth control - cycle clusters Fig 2C}
+m = match(d$user_id, users$user_id)
+d$age_cat = users$age_cat[m]
+d$birth_control = users$birth_control[m]
+rm(m)
+
+
+agg = aggregate(tender_breasts ~ cycleday_m_D + birth_control + age_cat + kmean_group , d, sum)
+agg_cycles = aggregate(cycle_id ~ birth_control + age_cat , d, lu)
+colnames(agg_cycles)[colnames(agg_cycles) == "cycle_id"] = "n_cycles"
+agg = merge(agg, agg_cycles, all = TRUE)
+agg$perc_tender_breasts = agg$tender_breasts/agg$n_cycles
+
+
+g = ggplot(agg[(!agg$age_cat %in% par$age_cat_exclude) & !((agg$age_cat == "(35,40]") & (agg$birth_control == "pill")),], 
+           aes(x = cycleday_m_D, y = perc_tender_breasts, col = kmean_group))+
+  geom_line()+facet_grid(age_cat ~ birth_control)+
+  scale_x_continuous(breaks = par$x.axis)+
+  scale_y_continuous(labels = scales::percent)+
+  scale_color_manual(values = cols$clusters)+
+  xlab("cycleday from 1st day of menstruation") + ylab("n tender breasts / n cycles")+
+  guides(col = FALSE)
+g
+
+ggsave(filename = paste0(IO$panels, "2C_cycle_clusters_by_age_and_BC.pdf"), plot = g, width = viz$full_width/3*1.2, height = viz$full_width/4.75*1.2)
+
+
+rm(g, agg, agg2, agg_cycles)
+
+```
+
+
+
+### checking the tracking behavior in these 2 clusters
+
+
+```{r cycle_clustering_vanilla loading cycle clusters, eval = FALSE}
+load(file = paste0(IO$tmp_Rdata,"cycles_with_clusters.Rdata"), verbose = TRUE)
+```
+
+
+
+
+```{r cycle_clustering_vanilla load one days file with tracking behavior}
+rm(days)
+load(paste0(IO$input_data,"days/days_1.Rdata"), verbose = TRUE)
+```
+
+
+
+```{r cycle_clustering_vanilla tracking behavior in the 2 clusters on just one day file}
+
+days$cluster = cycle_clusters$kmean_group[match(days$cycle_id_m, cycle_clusters$cycle_id_m)]
+d = days[!is.na(days$cluster),]
+
+breaks$n_logs = c(0:35+0.5, 100)
+
+agg = aggregate(number ~ cycleday_m_D + cluster, d[d$type == "n_logs",],
+                function(x){h = hist(x, breaks = breaks$n_logs, plot = FALSE); h$counts})
+agg.tmp = as.data.frame(agg$number)
+colnames(agg.tmp) = c(paste0("n_logs_",1:36))
+
+sum_cycleday_cluster = apply(agg.tmp, 1, sum)
+
+n_cycles = aggregate(cycle_id_m ~ cluster, d, lu)
+n_cycles = n_cycles[match(agg$cluster, n_cycles$cluster),]
+
+agg = cbind( data.frame(cluster = agg$cluster, 
+                        cycleday_m_D = agg$cycleday_m_D, 
+                        n_logs_0 = (n_cycles$cycle_id_m - sum_cycleday_cluster)/n_cycles$cycle_id_m), 
+             agg.tmp/n_cycles$cycle_id_m)
+
+
+agg2 = reshape(agg, idvar = c("cluster", "cycleday_m_D"), varying = list(grep("n_logs_",colnames(agg))), direction = "long")
+agg2$time = agg2$time - 1
+colnames(agg2) = c("cluster","cycleday_m_D", "n_logs","perc")
+
+
+ggplot(agg2, aes(x = cycleday_m_D, y = n_logs, col = log(perc))) + geom_point() + facet_grid(. ~ cluster)
+
+ggplot(agg2, aes(x = cycleday_m_D, y = n_logs, col = perc)) + geom_point() + facet_grid(. ~ cluster)
+
+
+ggplot(agg2[agg2$n_logs == 0,], aes(x = cycleday_m_D, y = perc, col = cluster)) + geom_line() 
+ggplot(agg2[agg2$n_logs == 0,], aes(x = cycleday_m_D, y = 1-perc, col = cluster)) + geom_line() 
+
+
+ggplot(agg2[agg2$n_logs %in% 1:3,], aes(x = cycleday_m_D, y = perc, col = cluster)) + geom_line() + facet_grid(n_logs ~. ) 
+
+
+
+
+rm(n_cycles, sum_cycleday_cluster, agg.tmp, agg, d)
+
+
+```
+
+

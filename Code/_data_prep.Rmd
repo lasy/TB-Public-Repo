@@ -1,0 +1,50 @@
+---
+title: "Data preparation"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+# Data preparation
+
+
+```{r child = '_data_prep_user_filtering.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_data_prep_format.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_data_prep_n_logs.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_data_prep_cycle_id.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_data_prep_cycles_agg.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_data_prep_BC_user_pre_filtering.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_data_prep_BC_re_classification.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_data_prep_BC_user_post_filtering.Rmd', cache=TRUE}
+```
+

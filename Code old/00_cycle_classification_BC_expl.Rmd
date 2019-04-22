@@ -1,0 +1,1411 @@
+---
+title: "Birth-control re-classification of cycles"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+
+```{r cycle_classification_BC librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+
+```{r cycle_classification_BC setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+#  BIRTH CONTROL: RE-CLASSIFICATION OF CYCLES 
+
+## Loading data
+
+
+```{r cycle_classification_BC loading data, eval = TRUE, cache = FALSE}
+
+load(file = paste0(IO$input_data, "users.Rdata"), verbose = TRUE)
+load(file = paste0(IO$input_data, "cycles.Rdata"), verbose = TRUE)
+
+head(cycles)
+
+```
+
+
+## Looking for variables that are good priors for BC categories
+
+
+```{r cycle_classification_BC priors}
+
+cycles$n_cycles = cycles$cycle_id
+
+df_n_cycles =  aggregate( n_cycles ~  birth_control, cycles, lu )
+colnames(df_n_cycles) = c("birth_control","n_cycles_tot")
+
+df_n_days_obs = aggregate( n_cycles ~ n_days_obs + birth_control, cycles, lu )
+df_n_days_obs = merge(df_n_days_obs, df_n_cycles, all = TRUE)
+df_n_days_obs$perc_cycles = df_n_days_obs$n_cycles/df_n_days_obs$n_cycles_tot
+
+df_BC_log = aggregate( n_cycles ~ any_BC + birth_control, cycles, lu )
+df_BC_log = merge(df_BC_log, df_n_cycles, all = TRUE)
+df_BC_log$perc_cycles = df_BC_log$n_cycles/df_BC_log$n_cycles_tot
+
+cycles$diff_BC = cycles$n_days_obs - cycles$any_BC # difference between the number of BC_log and the number of days with any log
+df_diff_BC = aggregate( n_cycles ~ diff_BC + birth_control, cycles, lu )
+df_diff_BC = merge(df_diff_BC, df_n_cycles, all = TRUE)
+df_diff_BC$perc_cycles = df_diff_BC$n_cycles/df_diff_BC$n_cycles_tot
+
+
+df_CL = aggregate( n_cycles ~ cycle_length + birth_control, cycles, lu )
+df_CL = merge(df_CL, df_n_cycles, all = TRUE)
+df_CL$perc_cycles = df_CL$n_cycles/df_CL$n_cycles_tot
+
+df_CN = aggregate( n_cycles ~ cycle_nb + birth_control, cycles, lu )
+df_CN = merge(df_CN, df_n_cycles, all = TRUE)
+df_CN$perc_cycles = df_CN$n_cycles/df_CN$n_cycles_tot
+
+
+df_prot_sex_log = aggregate( n_cycles ~ sex_prot + birth_control, cycles, lu )
+df_prot_sex_log = merge(df_prot_sex_log, df_n_cycles, all = TRUE)
+df_prot_sex_log$perc_cycles = df_prot_sex_log$n_cycles/df_prot_sex_log$n_cycles_tot
+
+df_unprot_sex_log = aggregate( n_cycles ~ sex_unprot + birth_control, cycles, lu )
+df_unprot_sex_log = merge(df_unprot_sex_log, df_n_cycles, all = TRUE)
+df_unprot_sex_log$perc_cycles = df_unprot_sex_log$n_cycles/df_unprot_sex_log$n_cycles_tot
+
+cycles$cycle_cat = cut(cycles$cycle_nb, breaks = seq(1,max(cycles$cycle_nb)+3, by = 3))
+
+df_CL_sd = aggregate(cycle_length ~ user_id + birth_control + cycle_cat, cycles, sd, na.rm = TRUE)
+colnames(df_CL_sd) = c("user_id","birth_control","cycle_cat","cycle_length_sd_3_cycles")
+
+```
+
+
+```{r cycle_classification_BC priors visualization}
+
+g_n_days_obs = ggplot(df_n_days_obs, aes(x = n_days_obs, y = perc_cycles, col = birth_control)) + geom_line() + xlim(c(0,50)) + ylim(c(0,0.1)) + theme(legend.position = "top") + scale_color_manual(values = cols$BC)
+df_n_days_obs = df_n_days_obs[order(df_n_days_obs$birth_control, df_n_days_obs$n_days_obs),]
+p1 = df_n_days_obs$perc_cycles[(df_n_days_obs$birth_control == "pill")][1:50]
+p2 = df_n_days_obs$perc_cycles[(df_n_days_obs$birth_control != "pill")][1:50]
+score_n_days_obs = data.frame(n_days_obs = 1:50, s = p1-p2)
+g_score_n_days_obs = ggplot(score_n_days_obs, aes(x = n_days_obs, y = s))+geom_line() + geom_hline(yintercept = 0, linetype = 2, col = "gray")
+
+grid.arrange(g_n_days_obs, g_score_n_days_obs, ncol = 1, heights = c(2,1.5) )
+rm(g_n_days_obs,g_score_n_days_obs)
+
+g_BC_log = ggplot(df_BC_log, aes(x = any_BC, y = perc_cycles, col = birth_control)) + geom_line() + xlim(c(0,50))+ theme(legend.position = "top")+ scale_color_manual(values = cols$BC)
+df_BC_log = df_BC_log[order(df_BC_log$birth_control, df_BC_log$any_BC),]
+p1 = df_BC_log$perc_cycles[(df_BC_log$birth_control == "pill")][1:50]
+p2 = df_BC_log$perc_cycles[(df_BC_log$birth_control != "pill")][1:50]
+score_BC_log = data.frame(any_BC = df_BC_log$any_BC[1:50], s = p1-p2)
+g_score_BC_log= ggplot(score_BC_log, aes(x = any_BC, y = s))+geom_line() + geom_hline(yintercept = 0, linetype = 2, col = "gray")
+
+grid.arrange(g_BC_log, g_score_BC_log, ncol = 1, heights = c(2,1.5) )
+rm(g_BC_log, g_score_BC_log)
+
+g_diff_BC = ggplot(df_diff_BC, aes(x = diff_BC, y = perc_cycles, col = birth_control)) + geom_line()+ xlim(c(-20,50))+ theme(legend.position = "top")+ scale_color_manual(values = cols$BC)
+df_diff_BC = df_diff_BC[order(df_diff_BC$birth_control, df_diff_BC$diff_BC),]
+p1 = df_diff_BC$perc_cycles[(df_diff_BC$birth_control == "pill")&(df_diff_BC$diff_BC %in% c(-20:50))]
+p2 = df_diff_BC$perc_cycles[(df_diff_BC$birth_control != "pill")&(df_diff_BC$diff_BC %in% c(-20:50))]
+score_diff_BC = data.frame(diff_BC = -20:50, s = p1-p2)
+g_score_diff_BC = ggplot(score_diff_BC, aes(x = diff_BC, y = s))+geom_line()+ geom_hline(yintercept = 0, linetype = 2, col = "gray")
+
+grid.arrange(g_diff_BC, g_score_diff_BC, ncol = 1, heights = c(2,1.5) )
+rm(g_diff_BC, g_score_diff_BC)
+
+g_CL = ggplot(df_CL, aes(x = cycle_length, y = perc_cycles, col = birth_control)) + geom_line() + xlim(c(0,100))+ theme(legend.position = "top")+ scale_color_manual(values = cols$BC)
+df_CL = df_CL[order(df_CL$birth_control, df_CL$cycle_length),]
+p1 = df_CL$perc_cycles[(df_CL$birth_control == "pill")][1:100]
+p2 = df_CL$perc_cycles[(df_CL$birth_control != "pill")][1:100]
+score_CL = data.frame(cycle_length =  df_CL$cycle_length[1:100], s = p1-p2)
+g_score_CL = ggplot(score_CL, aes(x = cycle_length, y = s))+geom_line() + xlim(c(0,100))+ geom_hline(yintercept = 0, linetype = 2, col = "gray")
+
+grid.arrange(g_CL, g_score_CL, ncol = 1, heights = c(2,1.5) )
+rm(g_CL, g_score_CL)
+
+ggplot(df_CL_sd, aes(x = cycle_length_sd_3_cycles, fill = birth_control)) + 
+  geom_histogram(aes(y = ..density..),alpha = 0.5, position = "identity", binwidth = 1)+ xlim(c(-1,30)) + scale_fill_manual(values = cols$BC)
+# we don't need a score for this one because the distributions are unimodal
+
+
+ggplot(df_CN, aes(x = cycle_nb, y = perc_cycles, col = birth_control)) + geom_line() + xlim(c(0,50)) + scale_color_manual(values = cols$BC)
+# we don't need a score for this one because the distributions are unimodal
+
+g_prot_sex_log = ggplot(df_prot_sex_log, aes(x = sex_prot, y = perc_cycles, col = birth_control)) + geom_line() + xlim(c(0,50)) + ylim(c(0,0.1))+ scale_color_manual(values = cols$BC)
+g_unprot_sex_log = ggplot(df_unprot_sex_log, aes(x = sex_unprot, y = perc_cycles, col = birth_control)) + geom_line() + xlim(c(0,50)) + ylim(c(0,0.1))+ scale_color_manual(values = cols$BC)
+grid.arrange(g_prot_sex_log, g_unprot_sex_log, ncol = 1)
+rm(g_prot_sex_log, g_unprot_sex_log)
+
+
+rm(p1,p2)
+
+```
+
+As expected, we observe that
+
+- logging any BC-related features
+- cycle length
+- regularity
+- number of days with any feature logged
+- difference between the number of BC-related logs and the number of days with any feature logged
+
+are good priors for BC and can be used as input variable to classify cycles.
+
+Interestingly, the cycle_nb seems to also be relevant, probably because the BC logging feature is "new".
+
+The BC logging feature wasn't present originally and it looks like changes in the app design/interface/options has driven changes in logging behavior of that feature.
+
+!! reminder !! the dates for a user are artificially shifted by a random number in [-180,+180] (= +- 6 months) . The transitions are probably sharper in reality as changes have been made in the app.
+
+
+
+```{r cycle_classification_BC date of first BC log, fig.height= 5, fig.width= 14}
+
+cycles$cycle_end_f =  factor(as.character(cycles$cycle_end), levels = as.character(sort(unique(cycles$cycle_end))))
+
+cycles$cycle_end_m =  12*year(cycles$cycle_end)+month(cycles$cycle_end)
+cycles$cycle_end_mf  = factor(cycles$cycle_end_m , levels = sort(unique(cycles$cycle_end_m )))
+
+month_labels = aggregate(cycle_end ~ cycle_end_m, cycles, min)
+cycles$cycle_end_month = month_labels$cycle_end[match(cycles$cycle_end_m, month_labels$cycle_end_m)]
+
+
+ggplot(cycles, aes(x = cycle_end_month , y = any_BC, fill = birth_control, group = cycle_end_mf)) + geom_boxplot(outlier.alpha = 0.005, alpha = 0.5) + facet_grid( birth_control ~.) + ylim(c(0,30)) + guides(col = FALSE, fill = FALSE)+ scale_fill_manual(values = cols$BC)
+
+rm(month_labels)
+
+```
+
+So, the cycle date needs to be included as an input variable as well.
+
+
+
+
+```{r cycle_classification_BC defining input var based on priors, eval = FALSE}
+
+cy = cycles[,c("user_id","cycle_id","cycle_nb","is_first_cycle","cycle_length","cycle_end","cycle_end_m","n_days_obs","any_BC","diff_BC","birth_control")]
+
+cy$user_id_n = as.numeric(factor(cy$user_id, levels = unique(cy$user_id)))
+
+o = order(cy$user_id, cy$cycle_nb)
+cy = cy[o,]
+rm(o)
+
+cy$n_days_obs[is.na(cy$n_days_obs) & (cy$birth_control == "pill")] = mean(cy$n_days_obs[(cy$birth_control == "pill")], na.rm = TRUE)
+cy$n_days_obs[is.na(cy$n_days_obs) & (cy$birth_control != "pill")] = mean(cy$n_days_obs[(cy$birth_control != "pill")], na.rm = TRUE)
+
+cy$score_n_days_obs = score_n_days_obs$s[match(cy$n_days_obs, score_n_days_obs$n_days_obs)]
+cy$score_n_days_obs[is.na(cy$score_n_days_obs)] = 0
+
+cy$score_BC = score_BC_log$s[match(cy$n_days_obs, score_BC_log$any_BC)]
+cy$score_BC[is.na(cy$score_BC)] = 0
+
+cy$score_diff_BC = score_diff_BC$s[match(cy$diff_BC, score_diff_BC$diff_BC)]
+cy$score_diff_BC[is.na(cy$score_diff_BC)] = 0
+
+cy$score_CL = score_CL$s[match(cy$n_days_obs, score_CL$cycle_length)]
+cy$score_CL[is.na(cy$score_CL)] = 0
+
+cy$cycle_id_prev = paste0(cy$user_id,"_",cy$cycle_nb-1)
+cy$cycle_id_prev2 = paste0(cy$user_id,"_",cy$cycle_nb-2)
+cy$cycle_id_next = paste0(cy$user_id,"_",cy$cycle_nb+1)
+cy$cycle_id_next2 = paste0(cy$user_id,"_",cy$cycle_nb+2)
+
+cy$cycle_length_next = cy$cycle_length[match( cy$cycle_id_next, cy$cycle_id)]
+cy$cycle_length_next2 = cy$cycle_length[match( cy$cycle_id_next2, cy$cycle_id)]
+
+cy$cl_sd_3c = apply(cy[,grep("cycle_length",colnames(cy))], 1, sd, na.rm = TRUE)
+agg = aggregate(cl_sd_3c ~ user_id, cy, mean, na.rm = TRUE)
+cy$cl_sd_3c_u = agg$cl_sd_3c[match(cy$user_id,agg$user_id)]
+cy$cl_sd_3c[is.na(cy$cl_sd_3c)] = cy$cl_sd_3c_u[is.na(cy$cl_sd_3c)]
+cy$diff_cl_sd_3c = cy$cl_sd_3c - cy$cl_sd_3c_u
+
+
+save(cy, file = paste0(IO$tmp_Rdata,"cy.Rdata"))
+
+rm(df_BC_log, df_CN, df_CL, df_CL_sd, df_n_cycles, df_n_days_obs, df_prot_sex_log, df_unprot_sex_log, score_BC_log, score_CL, score_n_days_obs, agg)
+```
+
+
+```{r cycle_classification_BC load cy, eval = TRUE}
+load(file = paste0(IO$tmp_Rdata,"cy.Rdata"), verbose = TRUE)
+```
+
+
+## Input and output variables
+
+```{r cycle_classification_BC input variables}
+inputs = c("cycle_length","n_days_obs","any_BC","score_n_days_obs","score_BC","score_CL","cl_sd_3c","diff_cl_sd_3c","cycle_nb", "cycle_end_m")
+inputs
+```
+
+```{r cycle_classification_BC output variable}
+
+cy$birth_control_b = par$BC_dict$binary[match(cy$birth_control, par$BC_dict$name)]
+
+```
+
+
+
+
+## Classifying cycles : Exploratory analyses
+
+To classify cycles, we will use the following approach:
+
+1. Supervised classifier
+    + train a supervised classifier, using the on-boarding BC information as the "TRUE" labels
+    + predict the probability of the binary class for each cycle
+    
+2. HMM to add some kind of memory and reflect the fact that most people do not switch BC every other cycles.
+    + initialise the HMM
+    + fit the HMM
+    + decode with the HMM > classification of cycles.
+    
+3. Confidence score: we define a confidence score on the newly assigned cycles/users so that we can filter out users for which BC method is unclear.
+
+
+### Testing with a subset of the data
+
+To fasten the computation, we first test on a fraction of the users
+
+```{r cycle_classification_BC data subset}
+
+cy_full = cy
+
+par$fraction_cy = 0.1
+set.seed(2019)
+selected_user_ids = unique(c(unique(cy_full$user_id[cy_full$user_id_n %in% 1:100]), sample(unique(cy_full$user_id),round(lu(cy_full$user_id)*par$fraction_cy))))
+
+cy = cy_full[cy_full$user_id %in% selected_user_ids, ]
+rm(selected_user_ids)
+
+ggplot(cy_full, aes(x = n_days_obs, col = birth_control))  + xlim(c(0,100))+
+  geom_freqpoly(aes(y = ..density..),binwidth = 1, alpha = 0.5) +
+  geom_freqpoly(data = cy, aes(x = n_days_obs, y = ..density.., col = birth_control),binwidth = 1, lty = 2) + scale_color_manual(values = cols$BC)
+
+
+ggplot(cy_full, aes(x = cycle_length, col = birth_control))  + xlim(c(0,100))+
+  geom_freqpoly(aes(y = ..density..),binwidth = 1, alpha = 0.5) +
+  geom_freqpoly(data = cy, aes(x = cycle_length, y = ..density.., col = birth_control),binwidth = 1, lty = 2) + scale_color_manual(values = cols$BC)
+
+
+ggplot(cy_full, aes(x = any_BC, col = birth_control))  + xlim(c(0,50))+
+  geom_freqpoly(aes(y = ..density..),binwidth = 1, alpha = 0.5) +
+  geom_freqpoly(data = cy, aes(x = any_BC, y = ..density.., col = birth_control),binwidth = 1, lty = 2) + scale_color_manual(values = cols$BC)
+
+
+ggplot(cy_full, aes(x = diff_cl_sd_3c, col = birth_control))  + xlim(c(0,30))+
+  geom_freqpoly(aes(y = ..density..),binwidth = 1, alpha = 0.5) +
+  geom_freqpoly(data = cy, aes(x = diff_cl_sd_3c, y = ..density.., col = birth_control),binwidth = 1, lty = 2) + scale_color_manual(values = cols$BC)
+
+```
+
+
+
+### Supervised classifier on the on-boarding BC information
+
+Several methods can be used to classify and predict the BC method.
+Here, we compare two methods:
+- a simple Logistic Regression
+- a SVM (support vector machine) to account for potential non-linearities
+- a Random Forest to account for potential non-linearities
+
+#### Using logistic regression
+
+```{r cycle_classification_BC prediction of BC using logistic regression}
+
+#load(file = paste0(IO$tmp_Rdata,"cy.Rdata"), verbose = TRUE)
+tic()
+eval(parse(text = paste0("glm_fit = glm(birth_control_b ~ ",paste(inputs, collapse = " + "),", data = cy, family = 'binomial' )")))
+toc() # takes about 20 seconds on the full dataset
+summary(glm_fit)
+
+cy$LR_prob = predict(glm_fit, newdata = cy[,inputs], type = "response")
+#cy$BC_LR_prob = factor(par$BC_dict$name[match(round(cy$LR_prob),par$BC_dict$binary)], levels = par$BC_dict$name)
+
+table_cont = table(round(cy$LR_prob), cy$birth_control)
+
+ggplot(cy, aes(x = cy$LR_prob, fill = birth_control)) + geom_density(alpha = 0.5, col = NA, bw = 0.005) + geom_vline(xintercept = 0.5, lty = 2)+ scale_fill_manual(values = cols$BC)
+
+table_cont
+round(t(t(table_cont)/apply(table_cont, 2, sum)), digits = 2)
+```
+
+```{r cycle_classification_BC save LR results}
+save(cy, file = paste0(IO$tmp_Rdata, "cy_expl_LR.Rdata"))
+```
+
+
+
+```{r cycle_classification_BC visualising the BC imputation with LR, fig.height= 10, fig.width=14}
+
+sub_cy = cy[cy$user_id_n %in% 1:80,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n[order(sub_cy$birth_control)]))
+g_gml_cat = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = factor(round(LR_prob)))) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y") + scale_color_manual(values = cols$BC) + theme(legend.position = "top")
+g_gml = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = LR_prob)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position = "top")
+grid.arrange( g_gml, g_gml_cat, nrow =1)
+
+rm(g_gml, g_gml_cat, sub_cy)
+```
+
+This already gives interesting results. However, the probability for each class (N/C or pill) do not look symmetric at all and that might cause problems when we train the HMM. 
+
+And thus, one way to overcome this is to use non-linear classifier such as SVM
+
+
+
+
+#### Using SVM
+
+SVM is significantly slower than logistic regression.
+
+We can user parallelSVM to fasten the process.
+Let's first check that results are similar on 5000 cycles
+
+```{r cycle_classification_BC test svm vs parallelSVM}
+
+sample_size = 5000
+j = sample(1:nrow(cy),sample_size)
+
+# fit
+tic()
+eval(parse(text = paste0("svm_fit = svm(birth_control ~ ",paste(inputs, collapse = " + "),", data = cy[j,] , probability = TRUE)")))
+toc()
+summary(svm_fit)
+
+# fit
+tic()
+eval(parse(text = paste0("svm_fit_p = parallelSVM(birth_control ~ ",paste(inputs, collapse = " + "),", data = cy[j,] , probability = TRUE)")))
+toc()
+summary(svm_fit_p)
+
+
+# prediction
+j = 1:10000 
+
+tic()
+SVM_prob = predict(svm_fit, newdata = cy[j,inputs], decision.value = TRUE, probability = TRUE)
+toc()
+SVM_prob = attr(SVM_prob, "probabilities")
+
+
+
+tic()
+SVM_prob_p = predict(svm_fit_p, newdata = cy[j,inputs], decision.value = TRUE, probability = TRUE)
+toc()
+SVM_prob_p = attr(SVM_prob_p, "probabilities")
+
+
+# comparison
+df_svm = data.frame(i = j, 
+                    svm_prob = SVM_prob[,which(colnames(SVM_prob) == "pill")], 
+                    svm_prob_p = SVM_prob_p[,which(colnames(SVM_prob_p) == "pill")], 
+                    birth_control = cy$birth_control[j])
+ggplot(df_svm, aes(x= svm_prob, y = svm_prob_p, col = birth_control )) + geom_point(alpha = 0.1) + geom_abline(slope = 1, intercept = 0) + xlim(c(0,1)) + ylim(c(0,1)) + geom_rug(alpha = 0.01)+ scale_color_manual(values = cols$BC)
+
+rm(df_svm, svm_fit, svm_fit_p, SVM_prob, SVM_prob_p)
+
+```
+They give fairly similar results, so, we can probably safely use "parallelSVM"
+
+
+
+We will still only use a subset (5%) of the data to train the model.
+
+```{r cycle_classification_BC svm training subset size}
+sample_size = round(0.05*nrow(cy))
+sample_size
+```
+
+
+This represents `r sample_size` cycles.
+
+```{r cycle_classification_BC svm}
+
+# fit
+tic()
+eval(parse(text = paste0("svm_fit = parallelSVM(birth_control ~ ",paste(inputs, collapse = " + "),", data = cy[sample(1:nrow(cy),sample_size),] , probability = TRUE)")))
+toc()
+summary(svm_fit)
+
+
+# prediction
+cy$SVM_prob = NA
+j = 1:nrow(cy)
+#j = which(cy$user_id_n %in% 1:1000)
+
+tic()
+SVM_prob = predict(svm_fit, newdata = cy[j,inputs], decision.value = TRUE, probability = TRUE)
+toc()
+SVM_prob_p = attr(SVM_prob, "probabilities")
+head(SVM_prob_p)
+
+
+cy$SVM_prob[j] = SVM_prob_p[,which(colnames(SVM_prob_p) == "pill")]
+
+#comparison
+table_cont = table(cy$SVM_prob<0.5, cy$birth_control)
+
+
+ggplot(cy[j[1:10000],], aes(y =SVM_prob, x = LR_prob, col = birth_control )) + geom_point(alpha = 0.1) + geom_abline(slope = 1, intercept = 0) + xlim(c(0,1))+ ylim(c(0,1))+ scale_color_manual(values = cols$BC)
+ggplot(cy, aes(x =SVM_prob, fill = birth_control )) + geom_density(alpha = 0.5, bw = 0.01, col = NA) + geom_vline(xintercept = 0.5, linetype = 2)+ xlim(c(0,1))+ scale_fill_manual(values = cols$BC)
+
+table_cont 
+round(t(t(table_cont)/apply(table_cont, 2, sum)), digits = 2)
+
+
+rm(SVM_prob, table_cont)
+```
+
+
+```{r cycle_classification_BC save svm}
+save(cy, file = paste0(IO$tmp_Rdata, "cy_expl_SVM.Rdata"))
+```
+
+
+
+```{r cycle_classification_BC vizualization with svm, fig.height= 9, fig.width=14}
+
+sub_cy = cy[cy$user_id_n %in% 1:80,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n[order(sub_cy$birth_control)]))
+
+g_svm = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = SVM_prob)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+theme(legend.position="top")
+g_gml = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = LR_prob)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position="top")
+
+grid.arrange(g_gml,g_svm, nrow = 1)
+
+rm(sub_cy,g_svm, g_gml)
+
+```
+
+
+
+#### Using Random Forests
+
+
+```{r cycle_classification_BC RF training subset size}
+sample_size = round(0.05*nrow(cy))
+sample_size
+```
+
+Sub-set for RF training has `sample_size` cycles.
+
+```{r cycle_classification_BC RF}
+
+# fit
+tic()
+eval(parse(text = paste0("rf_fit = randomForest(birth_control ~ ",paste(inputs, collapse = " + "),", data = cy[sample(1:nrow(cy),sample_size),], ntree = 1000)")))
+toc()
+rf_fit
+importance(rf_fit)
+
+
+# prediction
+cy$RF_prob = NA
+j = 1:nrow(cy)
+#j = which(cy$user_id_n %in% 1:1000)
+
+tic()
+RF_prob = predict(rf_fit, newdata = cy[j,inputs], type = 'prob')
+toc()
+head(RF_prob)
+
+cy$RF_prob[j] = RF_prob[,2]
+
+#comparison
+table_cont = table(cy$RF_prob<0.5, cy$birth_control)
+
+
+ggplot(cy[j[1:10000],], aes(y =RF_prob, x = LR_prob, col = birth_control )) + geom_point(alpha = 0.1) + geom_abline(slope = 1, intercept = 0) + xlim(c(0,1))+ ylim(c(0,1)) + scale_color_manual(values = cols$BC)
+ggplot(cy[j[1:10000],], aes(y =RF_prob, x = SVM_prob, col = birth_control )) + geom_point(alpha = 0.1) + geom_abline(slope = 1, intercept = 0) + xlim(c(0,1))+ ylim(c(0,1)) + scale_color_manual(values = cols$BC)
+
+ggplot(cy, aes(x =RF_prob, fill = birth_control )) + geom_density(alpha = 0.5, bw = 0.01, col = NA) + geom_vline(xintercept = 0.5, linetype = 2)+ xlim(c(0,1)) + scale_fill_manual(values = cols$BC)
+ggplot(cy, aes(x =SVM_prob, fill = birth_control )) + geom_density(alpha = 0.5, bw = 0.01, col = NA) + geom_vline(xintercept = 0.5, linetype = 2)+ xlim(c(0,1)) + scale_fill_manual(values = cols$BC)
+ggplot(cy, aes(x =LR_prob, fill = birth_control )) + geom_density(alpha = 0.5, bw = 0.01, col = NA) + geom_vline(xintercept = 0.5, linetype = 2)+ xlim(c(0,1)) + scale_fill_manual(values = cols$BC)
+
+table_cont 
+round(t(t(table_cont)/apply(table_cont, 2, sum)), digits = 2)
+
+rm(RF_prob, table_cont)
+
+```
+
+
+```{r cycle_classification_BC save RF}
+save(cy, file = paste0(IO$tmp_Rdata, "cy_expl_RF.Rdata"))
+```
+
+
+
+```{r cycle_classification_BC vizualization with RF, fig.height= 9, fig.width=14}
+
+sub_cy = cy[cy$user_id_n %in% 1:80,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n[order(sub_cy$birth_control)]))
+
+
+g_rf = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = RF_prob)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+theme(legend.position="top")
+g_gml = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = LR_prob)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position="top")
+g_svm = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = SVM_prob)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+theme(legend.position="top")
+
+grid.arrange(g_gml,g_svm,g_rf, nrow = 1)
+
+rm(sub_cy,g_svm, g_gml,g_rf)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Using an HMM to account for "BC-memory"
+
+
+
+#### Defining and initializing the HMM
+
+![](../Figures Tables Media/Media/cycle_classification_hmm_states_4 states HMM.png)
+
+
+```{r cycle_classification_BC hmm with fit: model initialization}
+hmm = list()
+
+# defining model
+
+hmm$bc_states = c("none / condoms","pill","X-nc", "X-pill") # we split the state X into 2 sub-states to account for the on-boarding BC info of a given user
+hmm$symbols = c(paste0("p_",0:10),"X-nc","X-pill")
+
+#initializing model
+
+bc_emission_prob.N = c(dbeta(seq(0,1,by = 0.1), shape1 = 1 , shape2 = 3)+0.2,0,0) # more likely to observe LOW score for N/C
+bc_emission_prob.P = c(dbeta(seq(0,1,by = 0.1), shape1 = 3 , shape2 = 1)+0.2,0,0) # more likely to observe HIGH score for N/C
+bc_emission_prob.Xnc = c(rep(0,11),1,0) # we only observe Xs when we switch users
+bc_emission_prob.Xpill = c(rep(0,11),0,1) # we only observe Xs when we switch users
+
+# building and normalizing emission prob matrix
+hmm$bc_emission_prob = matrix(c(bc_emission_prob.N,bc_emission_prob.P, bc_emission_prob.Xnc, bc_emission_prob.Xpill),nrow = length(hmm$bc_states), ncol = length(hmm$symbols), byrow = TRUE)
+hmm$bc_emission_prob = hmm$bc_emission_prob/apply(hmm$bc_emission_prob, 1, sum)
+
+plot(seq(0,1,by = 0.1) , bc_emission_prob.N[1:11], type = "l", col = cols$NC, lwd = 2)
+points(seq(0,1,by = 0.1) , bc_emission_prob.P[1:11], type = "l", col = cols$pill, lwd = 2)
+
+rm(bc_emission_prob.N,bc_emission_prob.P,bc_emission_prob.Xnc, bc_emission_prob.Xpill)
+
+hmm$start_prob_nc = 0.6  #
+hmm$bc_transition_prob = matrix(c(0.9,0.08,0.01,0.01,0.08,0.9,0.01,0.01,hmm$start_prob_nc,1-hmm$start_prob_nc,0,0,1-hmm$start_prob_nc,hmm$start_prob_nc,0,0), nrow = length(hmm$bc_states), ncol = length(hmm$bc_states), byrow = TRUE)
+hmm$start_prob = c(hmm$start_prob_nc,1-hmm$start_prob_nc)[as.numeric(cy$birth_control[1])]
+hmm$start_prob = c(hmm$start_prob, 1 - hmm$start_prob , 0,0)
+hmm_mod = initHMM(
+  States =  hmm$bc_states, Symbols =  hmm$symbols, 
+  startProbs =  hmm$start_prob, transProbs =  hmm$bc_transition_prob, 
+  emissionProbs =  hmm$bc_emission_prob)
+
+```
+
+
+```{r cycle_classification_BC hmm fit parameters}
+n_users_for_fit = ifelse(nrow(cy) < 500000, 300, 1000)
+n_users_for_small_fit = 100
+```
+
+
+
+#### with LR probs
+
+```{r cycle_classification_BC hmm with fit - observations with LR}
+#cy = cy[order(cy$user_id, cy$cycle_nb),]
+
+obs_p =  paste0("p_",round(10*cy$LR_prob))
+
+# inserting Xs
+x = which(diff(cy$user_id_n) !=0) 
+obs_x = c("X-nc","X-pill")[as.numeric(cy$birth_control)]
+id = c(seq_along(obs_p)*10, 10*x+5)
+o = order(id)
+obs = c(obs_p, obs_x)[o]
+
+rm(x, id, o, obs_p, obs_x)
+
+```
+
+```{r cycle_classification_BC viterbi on init model with LR}
+# running viterbi
+tic()
+vit_init = viterbi(hmm = hmm_mod, obs = obs) 
+toc()
+
+vit_init_no_x = vit_init[-grep("X-",vit_init)]
+cy$BC_hmm_init_LR = vit_init_no_x
+```
+
+
+
+```{r cycle_classification_BC hmm with fit - fitting model with LR}
+# hmm fit
+tic()
+hmm_fit = HMM::baumWelch(hmm = hmm_mod, obs = obs[1:(grep("X-",obs)[n_users_for_fit])])
+toc()
+
+tic()
+hmm_fit1 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (grep("X-",obs)[1000]+1) : (grep("X-",obs)[1000+n_users_for_small_fit]) ])
+hmm_fit2 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (grep("X-",obs)[4000]+1) : (grep("X-",obs)[4000+n_users_for_small_fit]) ])
+hmm_fit3 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (grep("X-",obs)[6000]+1) : (grep("X-",obs)[6000+n_users_for_small_fit]) ])
+toc()
+
+hmm_fit$hmm$transProbs
+hmm_fit1$hmm$transProbs
+hmm_fit2$hmm$transProbs
+hmm_fit3$hmm$transProbs
+
+agg = aggregate(cycle_id ~ round(LR_prob, digits = 1) + birth_control,cy, lu)
+colnames(agg) = c("LR_prob","birth_control","n_cycles")
+agg_sum = aggregate(cycle_id ~ birth_control,cy, lu)
+colnames(agg_sum) = c("birth_control", "n_cycles_tot")
+agg = merge(agg, agg_sum, all = TRUE)
+agg$density = agg$n_cycles/agg$n_cycles_tot
+
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit$hmm$emissionProbs[1:2,1:11]), type = "l",lty = 1, col = c(cols$NC, cols$pill), ylim = c(0,0.5)))
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit1$hmm$emissionProbs[1:2,1:11]), type = "l", lty = 2,col = c(cols$NC, cols$pill), add = TRUE))
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit2$hmm$emissionProbs[1:2,1:11]), type = "l", lty = 3,col = c(cols$NC, cols$pill), add = TRUE))
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit3$hmm$emissionProbs[1:2,1:11]), type = "l", lty = 4, col = c(cols$NC, cols$pill), add = TRUE))
+print(points(agg$LR_prob[agg$birth_control == "none / condoms"], agg$density [agg$birth_control == "none / condoms"], lwd = 2, col = cols$NC))
+print(points(agg$LR_prob[agg$birth_control == "pill"], agg$density [agg$birth_control == "pill"], lwd = 2, col = cols$pill))
+
+hmm_mod
+hmm_fit
+
+save(hmm_fit, hmm_fit1, hmm_fit2 , hmm_fit3 , file = paste0(IO$tmp_Rdata, "hmm_fit_for_cycle_classification_on_BC.Rdata"))
+```
+
+```{r cycle_classification_BC hmm with fit - running model with LR}
+# running viterbi
+tic()
+vit = viterbi(hmm = hmm_fit$hmm, obs = obs) 
+toc()
+
+vit_no_x = vit[-grep("X-",vit)]
+cy$BC_hmm_LR = vit_no_x
+
+table_cont_LR_bc = table(cy$BC_hmm_LR, cy$birth_control) # birth_control on top, BC on the left
+round(t(t(table_cont_LR_bc)/apply(table_cont_LR_bc, 2, sum)), digits = 2)
+
+table_cont_LR_init = table(cy$BC_hmm_LR, cy$BC_hmm_init_LR)
+round(t(t(table_cont_LR_init)/apply(table_cont_LR_init, 2, sum)), digits = 2)
+
+table_cont_init_bc = table(cy$BC_hmm_init_LR, cy$birth_control)
+round(t(t(table_cont_init_bc)/apply(table_cont_init_bc, 2, sum)), digits = 2)
+
+```
+
+
+```{r cycle_classification_BC save cy with HMM fit with LR }
+save(cy, file = paste0(IO$tmp_Rdata, "cy_expl_with_HMM_fit_LR.Rdata"))
+```
+
+
+
+
+```{r cycle_classification_BC vizualization with HMM fit with LR, fig.height= 9, fig.width=14}
+
+sub_cy = cy[cy$user_id_n %in% 1:80,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n[order(sub_cy$birth_control)]))
+
+g_vit = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_LR)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ theme(legend.position="top")+ scale_color_manual(values = cols$BC)
+g_vit_init = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_init_LR)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC)
+g_gml = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = LR_prob)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position="top")
+
+grid.arrange(g_vit, g_vit_init, g_gml, nrow = 1)
+
+rm(sub_cy, g_vit, g_gml, g_vit_init)
+
+```
+
+
+
+```{r cycle_classification_BC clear workspace after hmm fit with LR}
+rm(hmm_fit, hmm_fit1,hmm_fit2, hmm_fit3, vit, vit_no_x, obs)
+```
+
+
+```{r cycle_classification_BC checks after hmm fit with LR}
+
+ggplot(cy, aes(col = birth_control, x = cycle_length)) + geom_freqpoly(binwidth = 1) + xlim(c(0,100))
+ggplot(cy, aes(col = BC_hmm_LR, x = cycle_length)) + geom_freqpoly(binwidth = 1) + xlim(c(0,100))
+
+
+ggplot(cy, aes(col = birth_control, x = any_BC)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_init_LR, x = any_BC)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_LR, x = any_BC)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+
+
+ggplot(cy, aes(col = birth_control, x = n_days_obs)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_LR, x = n_days_obs)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+
+
+ggplot(cy, aes(col = birth_control, x = cl_sd_3c)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_LR, x = cl_sd_3c)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+
+```
+
+
+
+#### with SVM probs
+
+```{r cycle_classification_BC hmm with fit - observations with SVM}
+#cy = cy[order(cy$user_id, cy$cycle_nb),]
+
+obs_p =  paste0("p_",round(10*cy$SVM_prob))
+
+# inserting Xs
+x = which(diff(cy$user_id_n) !=0) 
+obs_x = c("X-nc","X-pill")[as.numeric(cy$birth_control)]
+id = c(seq_along(obs_p)*10, 10*x+5)
+o = order(id)
+obs = c(obs_p, obs_x)[o]
+
+rm(x, id, o, obs_p, obs_x)
+
+```
+
+```{r cycle_classification_BC viterbi on init model with SVM}
+# running viterbi
+tic()
+vit_init = viterbi(hmm = hmm_mod, obs = obs) 
+toc()
+
+vit_init_no_x = vit_init[-grep("X-",vit_init)]
+cy$BC_hmm_init_SVM = vit_init_no_x
+```
+
+
+
+```{r cycle_classification_BC hmm with fit - fitting model with SVM}
+# hmm fit
+tic()
+hmm_fit = HMM::baumWelch(hmm = hmm_mod, obs = obs[1:(grep("X-",obs)[n_users_for_fit])])
+toc()
+
+tic()
+hmm_fit1 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (grep("X-",obs)[1000]+1) : (grep("X-",obs)[1000+n_users_for_small_fit]) ])
+hmm_fit2 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (grep("X-",obs)[4000]+1) : (grep("X-",obs)[4000+n_users_for_small_fit]) ])
+hmm_fit3 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (grep("X-",obs)[5000]+1) : (grep("X-",obs)[5000+n_users_for_small_fit]) ])
+toc()
+
+hmm_fit$hmm$transProbs
+hmm_fit1$hmm$transProbs
+hmm_fit2$hmm$transProbs
+hmm_fit3$hmm$transProbs
+
+agg = aggregate(cycle_id ~ round(SVM_prob, digits = 1) + birth_control,cy, lu)
+colnames(agg) = c("SVM_prob","birth_control","n_cycles")
+agg_sum = aggregate(cycle_id ~ birth_control,cy, lu)
+colnames(agg_sum) = c("birth_control", "n_cycles_tot")
+agg = merge(agg, agg_sum, all = TRUE)
+agg$density = agg$n_cycles/agg$n_cycles_tot
+
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit$hmm$emissionProbs[1:2,1:11]), type = "l",lty = 1, col = c(cols$NC, cols$pill)))
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit1$hmm$emissionProbs[1:2,1:11]), type = "l", lty = 2,col = c(cols$NC, cols$pill), add = TRUE))
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit2$hmm$emissionProbs[1:2,1:11]), type = "l", lty = 3,col = c(cols$NC, cols$pill), add = TRUE))
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit3$hmm$emissionProbs[1:2,1:11]), type = "l", lty = 4, col = c(cols$NC, cols$pill), add = TRUE))
+print(points(agg$SVM_prob[agg$birth_control == "none / condoms"], agg$density [agg$birth_control == "none / condoms"], lwd = 2, col = cols$NC))
+print(points(agg$SVM_prob[agg$birth_control == "pill"], agg$density [agg$birth_control == "pill"], lwd = 2, col = cols$pill))
+
+hmm_mod
+hmm_fit
+
+save(hmm_fit, hmm_fit1, hmm_fit2 , hmm_fit3 , file = paste0(IO$tmp_Rdata, "hmm_fit_for_cycle_classification_on_BC.Rdata"))
+```
+
+```{r cycle_classification_BC hmm with fit - running model with SVM}
+# running viterbi
+tic()
+vit = viterbi(hmm = hmm_fit$hmm, obs = obs) 
+toc()
+
+vit_no_x = vit[-grep("X-",vit)]
+cy$BC_hmm_SVM = vit_no_x
+
+table_cont_SVM_bc = table(cy$BC_hmm_SVM, cy$birth_control) # birth_control on top, BC on the left
+round(t(t(table_cont_SVM_bc)/apply(table_cont_SVM_bc, 2, sum)), digits = 2)
+
+table_cont_SVM_init = table(cy$BC_hmm_SVM, cy$BC_hmm_init_SVM)
+round(t(t(table_cont_SVM_init)/apply(table_cont_SVM_init, 2, sum)), digits = 2)
+
+table_cont_init_bc = table(cy$BC_hmm_init_SVM, cy$birth_control)
+round(t(t(table_cont_init_bc)/apply(table_cont_init_bc, 2, sum)), digits = 2)
+
+```
+
+
+```{r cycle_classification_BC save cy with HMM fit with SVM }
+save(cy, file = paste0(IO$tmp_Rdata, "cy_expl_with_HMM_fit_SVM.Rdata"))
+```
+
+
+
+
+```{r cycle_classification_BC vizualization with HMM fit with SVM, fig.height= 9, fig.width=14}
+
+sub_cy = cy[cy$user_id_n %in% 1:80,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n[order(sub_cy$birth_control)]))
+
+g_vit = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_SVM)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ theme(legend.position="top")+ scale_color_manual(values = cols$BC)
+g_vit_init = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_init_SVM)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC)
+g_svm = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = SVM_prob)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position="top")
+
+grid.arrange(g_vit, g_vit_init, g_svm, nrow = 1)
+
+rm(sub_cy, g_vit, g_svm, g_vit_init)
+
+```
+
+
+
+```{r cycle_classification_BC clear workspace after hmm fit with SVM}
+rm(hmm_fit, hmm_fit1,hmm_fit2, hmm_fit3, vit, vit_no_x, obs)
+```
+
+
+```{r cycle_classification_BC checks after hmm fit with SVM}
+
+ggplot(cy, aes(col = birth_control, x = cycle_length)) + geom_freqpoly(binwidth = 1) + xlim(c(0,100))
+ggplot(cy, aes(col = BC_hmm_SVM, x = cycle_length)) + geom_freqpoly(binwidth = 1) + xlim(c(0,100))
+
+
+ggplot(cy, aes(col = birth_control, x = any_BC)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_init_SVM, x = any_BC)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_SVM, x = any_BC)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+
+
+ggplot(cy, aes(col = birth_control, x = n_days_obs)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_SVM, x = n_days_obs)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+
+
+ggplot(cy, aes(col = birth_control, x = cl_sd_3c)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_SVM, x = cl_sd_3c)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+
+```
+
+
+
+
+
+#### with RF probs
+
+```{r cycle_classification_BC hmm with fit - observations with RF}
+#cy = cy[order(cy$user_id, cy$cycle_nb),]
+
+obs_p =  paste0("p_",round(10*cy$RF_prob))
+
+# inserting Xs
+x = which(diff(cy$user_id_n) !=0) 
+obs_x = c("X-nc","X-pill")[as.numeric(cy$birth_control)]
+id = c(seq_along(obs_p)*10, 10*x+5)
+o = order(id)
+obs = c(obs_p, obs_x)[o]
+
+rm(x, id, o, obs_p, obs_x)
+
+```
+
+```{r cycle_classification_BC viterbi on init model with RF}
+# running viterbi
+tic()
+vit_init = viterbi(hmm = hmm_mod, obs = obs) 
+toc()
+
+vit_init_no_x = vit_init[-grep("X-",vit_init)]
+cy$BC_hmm_init_RF = vit_init_no_x
+```
+
+
+
+```{r cycle_classification_BC hmm with fit - fitting model with RF}
+# hmm fit
+tic()
+hmm_fit = HMM::baumWelch(hmm = hmm_mod, obs = obs[1:(grep("X-",obs)[n_users_for_fit])])
+toc()
+
+tic()
+hmm_fit1 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (grep("X-",obs)[2000]+1) : (grep("X-",obs)[2000+n_users_for_small_fit]) ])
+hmm_fit2 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (grep("X-",obs)[4000]+1) : (grep("X-",obs)[4000+n_users_for_small_fit]) ])
+hmm_fit3 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (grep("X-",obs)[5000]+1) : (grep("X-",obs)[5000+n_users_for_small_fit]) ])
+toc()
+
+hmm_fit$hmm$transProbs
+hmm_fit1$hmm$transProbs
+hmm_fit2$hmm$transProbs
+hmm_fit3$hmm$transProbs
+
+agg = aggregate(cycle_id ~ round(RF_prob, digits = 1) + birth_control,cy, lu)
+colnames(agg) = c("RF_prob","birth_control","n_cycles")
+agg_sum = aggregate(cycle_id ~ birth_control,cy, lu)
+colnames(agg_sum) = c("birth_control", "n_cycles_tot")
+agg = merge(agg, agg_sum, all = TRUE)
+agg$density = agg$n_cycles/agg$n_cycles_tot
+
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit$hmm$emissionProbs[1:2,1:11]), type = "l",lty = 1, col = c(cols$NC, cols$pill)))
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit1$hmm$emissionProbs[1:2,1:11]), type = "l", lty = 2,col = c(cols$NC, cols$pill), add = TRUE))
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit2$hmm$emissionProbs[1:2,1:11]), type = "l", lty = 3,col = c(cols$NC, cols$pill), add = TRUE))
+print(matplot(seq(0,1,by = 0.1),t(hmm_fit3$hmm$emissionProbs[1:2,1:11]), type = "l", lty = 4, col = c(cols$NC, cols$pill), add = TRUE))
+print(points(agg$RF_prob[agg$birth_control == "none / condoms"], agg$density [agg$birth_control == "none / condoms"], lwd = 2, col = cols$NC))
+print(points(agg$RF_prob[agg$birth_control == "pill"], agg$density [agg$birth_control == "pill"], lwd = 2, col = cols$pill))
+
+hmm_mod
+hmm_fit
+
+save(hmm_fit, hmm_fit1, hmm_fit2 , hmm_fit3 , file = paste0(IO$tmp_Rdata, "hmm_fit_for_cycle_classification_on_BC_hmm_RF.Rdata"))
+```
+
+```{r cycle_classification_BC hmm with fit - running model with RF}
+# running viterbi
+tic()
+vit = viterbi(hmm = hmm_fit$hmm, obs = obs) 
+toc()
+
+vit_no_x = vit[-grep("X-",vit)]
+cy$BC_hmm_RF = vit_no_x
+
+table_cont_RF_bc = table(cy$BC_hmm_RF, cy$birth_control) # birth_control on top, BC on the left
+round(t(t(table_cont_RF_bc)/apply(table_cont_RF_bc, 2, sum)), digits = 2)
+
+table_cont_RF_init = table(cy$BC_hmm_RF, cy$BC_hmm_init_RF)
+round(t(t(table_cont_RF_init)/apply(table_cont_RF_init, 2, sum)), digits = 2)
+
+table_cont_init_bc = table(cy$BC_hmm_init_RF, cy$birth_control)
+round(t(t(table_cont_init_bc)/apply(table_cont_init_bc, 2, sum)), digits = 2)
+
+```
+
+
+```{r cycle_classification_BC save cy with HMM fit with RF }
+save(cy, file = paste0(IO$tmp_Rdata, "cy_expl_with_HMM_fit_RF.Rdata"))
+```
+
+
+
+
+```{r cycle_classification_BC vizualization with HMM fit with RF, fig.height= 9, fig.width=14}
+
+sub_cy = cy[cy$user_id_n %in% 1:80,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n[order(sub_cy$birth_control)]))
+
+g_vit = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_RF)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ theme(legend.position="top") + scale_color_manual(values = cols$BC)
+g_vit_init = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_init_RF)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC)
+g_RF = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = RF_prob)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position="top")
+
+grid.arrange(g_vit, g_vit_init, g_RF, nrow = 1)
+
+rm(sub_cy, g_vit, g_RF, g_vit_init)
+
+```
+
+
+
+```{r cycle_classification_BC clear workspace after hmm fit with RF}
+rm(hmm_fit, hmm_fit1,hmm_fit2, hmm_fit3, hmm_mod, vit, vit_no_x, obs)
+```
+
+
+```{r cycle_classification_BC checks after hmm fit with RF}
+
+ggplot(cy, aes(col = birth_control, x = cycle_length)) + geom_freqpoly(binwidth = 1) + xlim(c(0,100))
+ggplot(cy, aes(col = BC_hmm_RF, x = cycle_length)) + geom_freqpoly(binwidth = 1) + xlim(c(0,100))
+
+
+ggplot(cy, aes(col = birth_control, x = any_BC)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_init_RF, x = any_BC)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_RF, x = any_BC)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+
+
+ggplot(cy, aes(col = birth_control, x = n_days_obs)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_RF, x = n_days_obs)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+
+
+ggplot(cy, aes(col = birth_control, x = cl_sd_3c)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+ggplot(cy, aes(col = BC_hmm_RF, x = cl_sd_3c)) + geom_freqpoly(binwidth = 1) + xlim(c(0,50))
+
+```
+
+
+
+
+
+
+
+
+
+#### Comparison of the 3 hmm fits
+
+
+```{r cycle_classification_BC vizualization of the hmm fits with different classifiers, fig.height= 9, fig.width=14}
+
+sub_cy = cy[cy$user_id_n %in% 1:80,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n[order(sub_cy$birth_control)]))
+
+g_LR = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_LR)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ theme(legend.position="top") + scale_color_manual(values = cols$BC)
+g_SVM = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_SVM)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC)
+g_RF = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_RF)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y") + theme(legend.position="top") + scale_color_manual(values = cols$BC)
+
+grid.arrange(g_LR, g_SVM, g_RF, nrow = 1)
+
+rm(sub_cy, g_LR, g_SVM, g_RF)
+
+```
+
+And the comparison on a few specific users
+
+
+```{r cycle_classification_BC comparison specific cases, fig.height= 8, fig.width=11}
+
+user_id_n = c(46,75,72,67,10,42,19, 48,38,79,39)
+
+sub_cy = cy[cy$user_id_n %in% user_id_n,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n))
+
+g_LR = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_LR)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ theme(legend.position="top") + scale_color_manual(values = cols$BC)
+g_SVM = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_SVM)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC)
+g_RF = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_RF)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y") + theme(legend.position="top") + scale_color_manual(values = cols$BC)
+
+grid.arrange(g_LR, g_SVM, g_RF, nrow = 1)
+
+rm(sub_cy, g_LR, g_SVM, g_RF)
+```
+
+```{r cycle_classification_BC individual checks after hmm fit with input variables, fig.height= 10, fig.width=8}
+
+for(u in user_id_n){
+  j =  which(cy$user_id_n == u)
+  sub_cy = cy[j,]
+  
+  g_BC = ggplot(sub_cy, aes(x = cycle_nb, size = 2)) +
+    geom_point(y = 0, aes(col = birth_control))+
+    geom_point(y = -1, aes(col = BC_hmm_LR), shape = 11)+
+    geom_point(y = -2, aes(col = BC_hmm_SVM), shape = 10) +
+    geom_point(y = -3, aes(col = BC_hmm_RF), shape = 17) + 
+    ylim(c(-3,0)) + scale_color_manual(values = cols$BC)+guides(col = FALSE, size = FALSE) + ggtitle(u)
+  
+  g_BC_prob = ggplot(sub_cy, aes(x = cycle_nb, y = LR_prob, col =  LR_prob)) +
+    geom_hline(yintercept = 0.5, linetype = 2)+
+    geom_line() + geom_point(size = 2, shape = 11)+  
+    geom_line(aes(y = SVM_prob, col = SVM_prob)) + geom_point(aes(y = SVM_prob, col = SVM_prob),size = 2, shape = 10)+
+    geom_line(aes(y = RF_prob, col = RF_prob)) + geom_point(aes(y = RF_prob, col = RF_prob),size = 2, shape = 17)+
+    scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5) +
+    ylim(c(-0.04,1.04)) + guides(col = FALSE, size = FALSE)
+  
+  g_cl = ggplot(sub_cy, aes(x = cycle_nb, y = cycle_length)) +
+    geom_point()+ geom_line() + expand_limits(y = 0) + geom_hline(yintercept = 28, linetype = 2)
+  
+  g_sd = ggplot(sub_cy, aes(x = cycle_nb, y = cl_sd_3c)) +
+    geom_point() + geom_line() + expand_limits(y = 0)
+  
+  g_sd_diff = ggplot(sub_cy, aes(x = cycle_nb, y = diff_cl_sd_3c)) +
+    geom_point() + geom_line() + expand_limits(y = 0)
+  
+  g_any_BC = ggplot(sub_cy, aes(x = cycle_nb, y = any_BC)) +
+    geom_point()+ geom_line() + expand_limits(y = 0) + geom_hline(yintercept = 21, linetype = 2)
+  
+   g_n_days = ggplot(sub_cy, aes(x = cycle_nb, y = n_days_obs)) +
+    geom_point()+ geom_line() + expand_limits(y = 0) + geom_hline(yintercept = 28, linetype = 2)
+   
+  k = which(cycles$user_id == sub_cy$user_id[1]) 
+  sub_cycles = melt(cycles[k,c("cycle_nb","sex_prot","sex_unprot","sex_withdrawal")], id.vars = "cycle_nb")
+
+  g_sex = ggplot(sub_cycles, aes(x = cycle_nb, y = value, fill = variable)) +
+    geom_bar(stat  = "identity", position = "stack") + scale_fill_manual(values = c("green3","tomato","gold2")) + guides(fill = FALSE)
+
+  
+  grid.arrange(g_BC,g_BC_prob, g_cl, g_sd, g_any_BC, g_n_days, g_sex, ncol = 1)
+  
+  rm(sub_cy,sub_cycles, j, k, g_BC, g_cl, g_any_sd, g_any_BC, g_n_days,g_any_sd_diff)
+  
+}
+
+
+rm(u,user_id_n)
+```
+
+
+
+ Comparison of some of the input variable distributions with original and new labels:
+ 
+```{r cycle_classification_BC comparison of the input variable distributions hmm fit, fig.width=15, fig.height= 5, warning=FALSE, echo = FALSE}
+
+g_cl_LR = ggplot(cy, aes(x = cycle_length)) +  xlim(c(0,100))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_LR), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_LR), binwidth = 1) + ggtitle("LR")
+
+g_cl_SVM = ggplot(cy, aes(x = cycle_length)) +  xlim(c(0,100))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_SVM), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_SVM), binwidth = 1) + ggtitle("SVM")
+
+g_cl_RF = ggplot(cy, aes(x = cycle_length)) +  xlim(c(0,100))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_RF), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_RF), binwidth = 1) + ggtitle("RF")
+
+grid.arrange(g_cl_LR, g_cl_SVM, g_cl_RF, nrow = 1)
+rm(g_cl_LR, g_cl_SVM, g_cl_RF)
+
+g_any_BC_LR = ggplot(cy, aes(x = any_BC)) +  xlim(c(0,50))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_LR), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_LR), binwidth = 1)+ ggtitle("LR")
+
+g_any_BC_SVM = ggplot(cy, aes(x = any_BC)) +  xlim(c(0,50))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_SVM), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_SVM), binwidth = 1)+ ggtitle("SVM")
+
+g_any_BC_RF = ggplot(cy, aes(x = any_BC)) +  xlim(c(0,50))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_RF), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_RF), binwidth = 1) + ggtitle("RF")
+
+grid.arrange(g_any_BC_LR, g_any_BC_SVM, g_any_BC_RF, nrow = 1)
+rm(g_any_BC_LR, g_any_BC_SVM, g_any_BC_RF)
+
+
+g_n_days_obs_LR = ggplot(cy, aes(x = n_days_obs)) +  xlim(c(0,50))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_LR), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_LR), binwidth = 1)+ ggtitle("LR")
+
+g_n_days_obs_SVM = ggplot(cy, aes(x = n_days_obs)) +  xlim(c(0,50))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_SVM), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_SVM), binwidth = 1)+ ggtitle("SVM")
+
+g_n_days_obs_RF = ggplot(cy, aes(x = n_days_obs)) +  xlim(c(0,50))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_RF), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_RF), binwidth = 1) + ggtitle("RF")
+
+grid.arrange(g_n_days_obs_LR, g_n_days_obs_SVM, g_n_days_obs_RF, nrow = 1)
+rm(g_n_days_obs_LR, g_n_days_obs_SVM, g_n_days_obs_RF)
+
+
+
+g_sd_LR = ggplot(cy, aes(x = cl_sd_3c)) +  xlim(c(0,50))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_LR), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_LR), binwidth = 1)+ ggtitle("LR")
+
+g_sd_SVM = ggplot(cy, aes(x = cl_sd_3c)) +  xlim(c(0,50))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_SVM), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_SVM), binwidth = 1)+ ggtitle("SVM")
+
+g_sd_RF = ggplot(cy, aes(x = cl_sd_3c)) +  xlim(c(0,50))+ guides(col = FALSE) +
+  geom_freqpoly(aes(col = birth_control), binwidth = 1, alpha = 0.5, linetype = 1) +
+  geom_freqpoly(aes(col = BC_hmm_init_RF), binwidth = 1, linetype = 2) +
+  geom_freqpoly(aes(col = BC_hmm_RF), binwidth = 1) + ggtitle("RF")
+
+grid.arrange(g_sd_LR, g_sd_SVM, g_sd_RF, nrow = 1)
+rm(g_sd_LR, g_sd_SVM, g_sd_RF)
+
+```
+
+
+
+
+
+
+
+#### Problems
+
+The trained HMM with LR or RF too often classify a cycles as "NC" when it could well be "Pill". One of the reason is that, as soon as "any_BC" is 0, a cycle gets almost automatically classified as "NC".
+I guess that this is because of the initial distribution of "any_BC" and the model automatically assumes that if any_BC = 0, it means that the user is not taking the pill.
+
+Logging a positive # of BC feature IS a strong indication a user is on the pill.
+The absence of it is NOT a strong indication that the user is NOT on the pill.
+
+The way I look at it as a human is:
+
+- is `any_BC` positive? if yes > pill (+ - history)
+
+- are cycles ~ 28 days or multiples of 28 days? if yes > pill
+
+- is there a change in cycle regularity? if more regular > pill
+
+- is there a change in sexual behavior? if more unprotected sex > pill
+
+- what BC has the user declared? is it really inconsistent with observations? if not > what the user has declared.
+
+
+
+SVM seems to be better at doing that.
+However, in most case, the untrained hmm is doing better than the trained one because the trained one is shifting the "decision" probability away from 0.5.
+
+
+#### Would another supervised classification method be more suitable?
+
+Maybe using clustering?
+
+
+- clustering (unsupervised; many clusters) 
+
+- probability of BC in each cluster 
+
+- HMM (3 states: Pill, NC, unknown)
+
+
+### Confidence score for the new BC classification using prediction probabilities
+
+```{r cycle_classification_BC confidence score based on the prediction probability}
+
+for(pred_meth in c("LR","SVM","RF")){
+  
+  eval(parse(text = paste0("cy$BC_tmp = par$BC_dict$binary[match(cy$BC_hmm_",pred_meth,",par$BC_dict$name )]")))
+  eval(parse(text = paste0("cy$conf_",pred_meth," = 1 - abs(cy$BC_tmp - cy$",pred_meth,"_prob)")))
+  
+  #cy$BC_tmp = par$BC_dict$name[match(cy$BC_tmp,par$BC_dict$binary )]
+  
+  eval(parse(text = paste0("g = ggplot(cy, aes(x = conf_",pred_meth,", fill = BC_hmm_",pred_meth,")) ")))
+  g = g  + geom_histogram(alpha = 0.5, position = "identity", binwidth = 0.01) + facet_grid( birth_control ~ . ) + ggtitle(paste0(pred_meth," - cycles confidence score"))
+  print(g)
+  
+  eval(parse(text = paste0("g = ggplot(cy, aes(x = conf_",pred_meth,", fill = BC_hmm_init_",pred_meth,")) ")))
+  g = g  + geom_histogram(alpha = 0.5, position = "identity", binwidth = 0.01) + facet_grid( birth_control ~ . ) + ggtitle(paste0(pred_meth," - cycles confidence score"))
+  print(g)
+  
+  eval(parse(text = paste0("agg = aggregate(conf_",pred_meth," ~ user_id + birth_control, cy, mean)")))
+  
+  eval(parse(text = paste0("g = ggplot(agg, aes(x = conf_",pred_meth,", fill = birth_control)) ")))
+  g = g + geom_histogram(alpha = 0.5, position = "identity") + facet_grid( birth_control ~ . )+ ggtitle(paste0(pred_meth," - users' average confidence score"))
+  print(g)
+}
+
+
+```
+
+```{r cycle_classification_BC confidence score with BC_hmm_init_SVM}
+
+cy$BC_tmp = par$BC_dict$binary[match(cy$BC_hmm_init_SVM,par$BC_dict$name )] 
+cy$conf_SVM_init = 1 - abs(cy$BC_tmp - cy$SVM_prob)
+
+g = ggplot(cy, aes(x = conf_SVM_init, fill = birth_control))
+g = g  + geom_histogram(alpha = 0.5, position = "identity", binwidth = 0.01) + facet_grid( BC_hmm_init_SVM ~ . ) + ggtitle("SVM init - cycles confidence score")
+g + geom_vline(xintercept = c(0.6,0.75), size = 0.3, linetype = 2)
+
+
+g + ylim(c(0,3000))
+```
+
+With SVM, I could set different thresholds for pill or N/C as the distribution of probabilities is not symmetrical.
+
+
+```{r cycle_classification_BC defining an alternative condidence score to reflect the assymetry in the probability distributions}
+
+by = 0.001
+h_pill = hist(cy$SVM_prob[(cy$birth_control == "pill") & (cy$BC_hmm_init_SVM == "pill")], breaks = seq(0-by/2,1+by/2,by = by))
+h_nc = hist(1-cy$SVM_prob[(cy$birth_control != "pill") & (cy$BC_hmm_init_SVM != "pill")], breaks = seq(0-by/2,1+by/2,by = by))
+
+h_pill = data.frame(mids = h_pill$mids, density = h_pill$density, cumsum = cumsum(h_pill$density)/max(cumsum(h_pill$density)))
+h_nc = data.frame(mids = h_nc$mids, density = h_nc$density, cumsum = cumsum(h_nc$density)/max(cumsum(h_nc$density)))
+
+ggplot(h_pill, aes(x = mids, y = cumsum) )+ geom_line()+ geom_point() + geom_line(aes(y = density/10)) + geom_hline(yintercept = 0.15)
+ggplot(h_nc, aes(x = mids, y = cumsum) )+ geom_line()+ geom_point() + geom_line(aes(y = density/10))+ geom_hline(yintercept = 0.15)
+
+cy$conf = 0
+cy$conf[cy$BC_hmm_init_SVM == "pill"] = h_pill$cumsum[match(round(cy$SVM_prob[cy$BC_hmm_init_SVM == "pill"],digits = 3),round(h_pill$mids, digits = 3))]
+cy$conf[cy$BC_hmm_init_SVM != "pill"] =   h_nc$cumsum[match(round(1-cy$SVM_prob[cy$BC_hmm_init_SVM != "pill"],digits = 3),round(h_nc$mids, digits = 3))]
+
+
+g = ggplot(cy, aes(x = conf, fill = birth_control))
+g = g  + geom_histogram(alpha = 0.5, position = "identity", binwidth = 0.05) + facet_grid( BC_hmm_init_SVM ~ . ) + ggtitle("SVM init - cycles confidence score")
+g + geom_vline(xintercept = c(0.15), size = 0.3, linetype = 2)
+
+
+
+```
+
+
+
+
+- we take all users for which the new label is the same as the original label
+- for users that have cycles with different labels, we only take users for which all cycles high enough confidence score for the new labels and for which the average confidence over that sequence of consecutive cycle is high enough as well.
+
+
+```{r cycle_classification_BC cycle selection}
+
+cy$BC = NA
+
+conf = (cy$conf >= 0.05)
+conf_u = aggregate(conf, by = list(user_id = cy$user_id), FUN = all)
+
+conf_av_u = aggregate(cy$conf_SVM_init, by = list(user_id = cy$user_id), FUN = mean)
+hist(conf_av_u$x, breaks = 100)
+conf_av_u = aggregate(cy$conf, by = list(user_id = cy$user_id), FUN = mean)
+hist(conf_av_u$x, breaks = 100)
+
+
+same = (cy$birth_control == cy$BC_hmm_init_SVM)
+same_u = aggregate(same, by = list(user_id = cy$user_id), FUN = all)
+
+user_ids = union(intersect(conf_u$user_id[conf_u$x],conf_av_u$user_id[conf_av_u$x >= 0.2]), same_u$user_id[same_u$x])
+
+cy$BC[cy$user_id %in% user_ids] = cy$BC_hmm_init_SVM[cy$user_id %in% user_ids]
+cy$BC[is.na(cy$BC)] = "unclear"
+
+table(cy$BC, cy$birth_control)
+
+
+```
+
+
+We could refine this cycle selection by allowing for selecting cycles that are in a strech of at least X (6?) consecutive cycles with high enough confidence each and overall.
+
+
+### Saving last cy file
+
+
+```{r cycle_classification_BC save last cy}
+save(cy, file = paste0(IO$tmp_Rdata,"cy_expl_final.Rdata"))
+```
+
+
+
+
+## Classifying cycles : SUMMARY
+
+The best strategy seems to be
+
+1. train a SVM on the original birth_control labels to obtain probabilities
+
+2. define (and not train) a HMM to add memory in the assignation.
+
+3. define a confidence score that reflect the assymetry in the probability distribution (from 1.)
+
+4. select cycles based on that confidence score.
+
+
+
+
+
+
+
+

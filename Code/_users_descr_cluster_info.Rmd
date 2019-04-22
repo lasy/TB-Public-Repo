@@ -1,0 +1,139 @@
+---
+title: "Adding cluster info on the users table"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r users_descr_cluster_info librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r users_descr_cluster_info setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+
+```{r users_descr_cluster_info loading cycles_m and users}
+
+load(paste0(IO$output_data, "cycles_m.Rdata"), verbose = TRUE)
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+
+```
+
+
+## Cluster for cycles without TB tracking
+
+
+We define 3 clusters for the cycles without any TB symptoms logged.
+
+- regular tracking (tracks all the time)
+
+- pre-menstrual tracking (mostly starts tracking in the last week before their period)
+
+- menstrual tracking (mostly track during their period)
+
+
+```{r users_descr_cluster_info clusters for cycles without TB tracking}
+
+g = ggplot(cycles_m, aes(alpha = 0.3)) + 
+  geom_histogram(aes(x = n_days_obs_lut_D),binwidth = 1, fill = "goldenrod1")+
+  geom_histogram(aes(x = n_days_obs_lut_7),binwidth = 1, fill = "tomato1")+
+  geom_histogram(aes(x = n_days_obs_foll_Df),binwidth = 1, fill = "slateblue1")
+g
+
+
+
+cycles_m$cluster = as.character(cycles_m$cluster)
+
+no_TB = which(is.na(cycles_m$cluster_num))
+cycles_m$cluster_num[no_TB] = ifelse(cycles_m$n_days_obs_lut_D[no_TB]>=10,-2,
+                                                           ifelse(cycles_m$n_days_obs_lut_7[no_TB]>=4,-1,0))
+
+no_TB_cluster_names =  c("regular tracking","pre-menstrual tracking","menstrual tracking")
+
+cycles_m$cluster[no_TB] =no_TB_cluster_names[cycles_m$cluster_num[no_TB]+3]
+
+```
+
+
+
+## Adding clusters info on the users table
+
+
+```{r users_descr_cluster_info most prevalent cluster for each user}
+
+cycles_m$cluster_num_f = factor(cycles_m$cluster_num, levels = sort(unique(cycles_m$cluster_num)))
+
+# most prevalent cluster for each user
+agg = aggregate( cluster_num_f ~ user_id, cycles_m, function(x) (which.max(table(x))+min(cycles_m$cluster_num)-1) )
+colnames(agg) = c("user_id","most_preval_clust")
+
+users = merge(users, agg, all.x = TRUE)
+```
+
+
+
+
+
+```{r users_descr_cluster_info frequency of each cluster per users}
+
+br = (min(cycles_m$cluster_num, na.rm = TRUE)-0.5):(max(cycles_m$cluster_num, na.rm = TRUE)+0.5)
+
+# most prevalent cluster for each user
+agg = aggregate( cluster_num ~ user_id, cycles_m, function(x){hist(x, breaks = br, plot = FALSE)$counts} )
+agg2 = cbind(data.frame(user_id = agg$user_id), as.data.frame(agg$cluster_num))
+colnames(agg2) = c("user_id",paste0("n_",c(no_TB_cluster_names,paste0("cl_",1:max(cycles_m$cluster_num)))))
+
+users = merge(users, agg2, all.x = TRUE)
+
+
+j = grep("n_cl_",colnames(users))
+
+users$n_cycles_with_TB = apply(users[,j],1,sum)
+
+cycles_m$cycle_id_m = as.character(cycles_m$cycle_id_m)
+agg = aggregate(cycle_id_m ~ user_id, cycles_m, lu)
+colnames(agg) = c("user_id","n_cycles_m")
+users = merge(users, agg, all.x = TRUE)
+
+users$perc_cycles_with_TB = users$n_cycles_with_TB / users$n_cycles_m
+
+
+
+```
+
+
+```{r users_descr_cluster_info number of cluster for each user}
+
+agg = aggregate( cluster_num_f ~ user_id, cycles_m, lu )
+colnames(agg) = c("user_id","n_clust")
+
+users = merge(users, agg, all.x = TRUE)
+```
+
+
+
+```{r users_descr_cluster_info save users}
+save(users, file = paste0(IO$output_data, "users.Rdata"))
+file.copy(from = paste0(IO$output_data, "users.Rdata"), to = paste0(IO$tmp_data, "users_with_clusters_info.Rdata"))
+```
+
+
+
+
+
+

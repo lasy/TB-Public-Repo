@@ -1,0 +1,112 @@
+---
+title: "Imputing TB logs"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r cycle_clust_imputing_logs librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r cycle_clust_imputing_logs setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Imputing logs
+
+The absence of a TB log is not the same when other features were logged or not.
+
+Also missing days in the middle of a logged sequence are not the same as missing days at the beginning or end of menstruation-centered cycles.
+
+
+### Imputing logs: principles.
+
+For any $i$ that is in a "missing data" position (i.e. n_logs = 0) in a sequence of **max 3 missing days in a row** and that is **not at the beginning or the end** of the cycle_m
+
+$x_i = interpolation_i(X_L - X_N) * F_i$
+
+where $x_i$ is the imputed value at position $i$,
+$X_L$ is the TB value on the **Last** day where anything got logged (can be 1 or 0)
+$X_N$ is the TB value on the **Next** day where anything got logged (can be 1 or 0)
+$F_i$ is a factor that must reflect
+
+* the uncertainty of imputing data: we actually DO NOT know what happened 
+
+* the total number of missing day in a row: if we are missing more days, the uncertainty increases. 
+
+* the position in the missing day sequence: we have more uncertainties in the middle than at the edges of a missing day sequence.
+
+We have the conditions:
+
+$ F_i < 1 $
+
+and if $N_S1 > N_S2$ where $N_S1$ (resp $N_S2$) = length of missing days in a row in sequence 1 (resp 2), then $F_i1 < F_i2$ 
+
+and $ F_i < F_j $ if $i$ is more on the middle than $j$
+
+
+$F_i$ of the shape of an hyperbolic cosine could be a good option that respect these conditions.
+
+[https://en.wikipedia.org/wiki/Catenary](https://en.wikipedia.org/wiki/Catenary)
+
+
+
+
+```{r cycle_clust_imputing_logs loading d_wide}
+
+load(file = paste0(IO$tmp_data,"d_wide.Rdata"), verbose = TRUE)
+
+```
+```{r cycle_clust_imputing_logs imputing logs}
+
+d_wide_imputed =  t(apply(d_wide[,-1], 1, impute))
+d_wide_imputed_df = data.frame(cycle_id_m = d_wide$cycle_id_m, d_wide_imputed)
+colnames(d_wide_imputed_df) = colnames(d_wide)
+d_wide = d_wide_imputed_df
+
+save(d_wide, file = paste0(IO$tmp_data,"d_wide_imputed.Rdata"))
+rm(d_wide_imputed, d_wide_imputed_df)
+```
+
+
+```{r cycle_clust_imputing_logs creating d}
+
+load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+
+
+d = reshape(d_wide, 
+            idvar = "cycle_id_m", 
+            varying = list(2:ncol(d_wide)), 
+            new.row.names = 1:(nrow(d_wide)*(par$Df+par$D+1)),
+            direction = "long")
+colnames(d) = c("cycle_id_m","cycleday_m_D","tender_breasts")
+d$cycleday_m_D = d$cycleday_m_D - par$D - 1
+m = match(d$cycle_id_m, cycles$cycle_id)
+d$user_id = cycles$user_id[m]
+d$cycle_nb_m = cycles$cycle_nb[m]
+d$cycle_id_m = as.character(d$cycle_id_m)
+
+
+save(d, file = paste0(IO$tmp_data,"d_imputed.Rdata"))
+
+
+```
+
+
+
+
+

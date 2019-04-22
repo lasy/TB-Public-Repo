@@ -1,0 +1,89 @@
+---
+title: "Counting the number of logs per day of observation"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r data_prep_n_logs librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r data_prep_n_logs setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Counting the number of logs per day of observation (and adding these rows to the tables)
+
+
+```{r data_prep_n_logs counting and saving n_logs}
+
+days_folder = paste0(IO$output_data,"days/")
+
+tmp_days_folder = paste0(IO$tmp_data,"days_before_n_logs/")
+file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
+
+
+filenames = list.files(days_folder)
+
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+foreach(filename = filenames) %dopar%
+{
+  cat(filename,"\n")
+  load(paste0(days_folder, filename), verbose = TRUE)
+  
+  # defining a unique identifier for each day of observation (user_id + date)
+  days$day_id = paste0(days$user_id, "_", days$date)
+  # counting the number of logs on that day
+  days_n_logs = aggregate(type ~ day_id, days, lu)
+  # formating the dataframe
+  days_n_logs$number = days_n_logs$type
+  days_n_logs$type = "n_logs"
+  days_n_logs$category = "n_logs"
+  
+  # making sure the new dataframe with the n_logs has the same # of columns and fill the missing ones with the same value as in the original table
+  m = match(days_n_logs$day_id, days$day_id)
+  cns = setdiff(colnames(days), colnames(days_n_logs))
+  for(cn in cns){eval(parse(text = paste0("days_n_logs$",cn," = days$",cn,"[m]")))}
+  rm(m, cn, cns)
+  # and re-ordering the columns to make sure they match
+  oc = match(colnames(days),colnames(days_n_logs))
+  days_n_logs = days_n_logs[,oc]; rm(oc)
+  
+  # adding the n_logs
+  days = rbind(days, days_n_logs)
+  # sorting days
+  o = order(days$user_id, days$date)
+  days = days[o,]; rm(o)
+  
+  save(days, file = paste0(days_folder, filename))
+}
+
+
+```
+
+
+
+```{r data_prep_n_logs checking counting and saving n_logs}
+load(paste0(days_folder, filenames[length(filenames)]), verbose = TRUE)
+summary(days)
+head(days)
+```
+

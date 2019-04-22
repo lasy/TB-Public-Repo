@@ -1,0 +1,786 @@
+---
+title: "tmp"
+author: "Laura Symul"
+date: "2/22/2019"
+output: html_document
+---
+
+
+# OVERALL PROFILES
+
+
+## Overall profile
+
+
+```{r overall_profile overall profile}
+
+days_filenames = list.files(paste0(IO$input_data, "days/"))
+
+registerDoParallel(par$n_cores)
+
+tic()
+agg = foreach(days_filename = days_filenames, .combine = rbind)%dopar%{
+  load(paste0(IO$input_data,"days/",days_filename), verbose = TRUE)
+  days$n_tender_breasts = 1
+  agg = aggregate(n_tender_breasts ~ cycleday_m_D , days[days$type == TB,], length)
+  agg$n_cycles = length(unique(days$cycle_id_m))
+  return(agg)
+}
+
+toc()
+stopImplicitCluster()
+
+
+a = aggregate(agg[,c("n_tender_breasts","n_cycles")] , by = list(cycleday_m_D = agg$cycleday_m_D), FUN = sum)
+a$perc_tender_breasts = a$n_tender_breasts/a$n_cycles
+
+g = ggplot(a, aes(x = cycleday_m_D, y = perc_tender_breasts)) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_line() + geom_point(size = 0.6)+ 
+  scale_y_continuous(labels = scales::percent)+ scale_x_continuous(breaks = par$x.axis)+
+  xlab("cycleday from 1st day of menstruation") + ylab("% of reported breasts tenderness")
+g
+
+
+ggsave(filename = paste0(IO$panels, "1_overall_profile.pdf"), plot = g, width = viz$full_width/2, height = viz$full_width/4)
+
+rm(g, a, agg, days_filenames)
+
+```
+
+
+
+```{r overall_profile overall profile of n logs}
+
+days_filenames = list.files(paste0(IO$input_data, "days/"))
+
+registerDoParallel(par$n_cores)
+
+tic()
+agg = foreach(days_filename = days_filenames, .combine = rbind)%dopar%{
+  load(paste0(IO$input_data,"days/",days_filename), verbose = TRUE)
+  days$n_logs = days$number
+  agg = aggregate(n_logs ~ cycleday_m_D , days[days$type == "n_logs",], sum)
+  agg$n_cycles = length(unique(days$cycle_id_m))
+  return(agg)
+}
+
+toc()
+stopImplicitCluster()
+
+
+a = aggregate(agg[,c("n_logs","n_cycles")] , by = list(cycleday_m_D = agg$cycleday_m_D), FUN = sum)
+a$n_logs_per_cycle = a$n_logs/a$n_cycles
+
+g = ggplot(a, aes(x = cycleday_m_D, y = n_logs_per_cycle)) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_line() + geom_point(size = 0.6)+ 
+  scale_x_continuous(breaks = par$x.axis)+
+  xlab("cycleday from 1st day of menstruation") + ylab("avg # of logged features per cycle")
+g
+
+
+ggsave(filename = paste0(IO$panels, "S1X_overall_profile_of_logged_features.pdf"), plot = g, width = viz$full_width/2, height = viz$full_width/4)
+
+rm(g, a, agg, days_filenames)
+
+```
+
+
+
+
+
+
+# CYCLE CLASSIFICATION Birth Control
+
+Also, a lot of "first cycles" classification seems off.
+
+```{r cycle_classification_BC checking distribution of BC_glm_prob, fig.width= 10, fig.height= 5}
+ggplot(cy[cy$cycle_nb <= 30,], aes( x = factor(cycle_nb) ,y = BC_glm_prob,  fill = birth_control)) + geom_boxplot()
+```
+
+
+Indeed, the distributions of `BC_glm_prob`  for the first cycles overlap a lot more.
+Averaging the first cycle value with the next one could help to remove some of the "first cycle tracking behavior" effect.
+
+#### Correcting 1st cycle BC probability
+
+```{r cycle_classification_BC changing BC_glm_prob for the first cycle of the user}
+cy$BC_glm_prob_original = cy$BC_glm_prob
+
+cy$BC_glm_prob = cy$BC_glm_prob_original 
+
+j = which((cy$is_first_cycle) & (cy$birth_control == "pill"))
+cy$BC_glm_prob[j] = apply( cbind(cy$BC_glm_prob[j], cy$BC_glm_prob[match(cy$cycle_id_next[j],cy$cycle_id)]),1,mean, na.rm = TRUE)
+j = which((cy$is_first_cycle) & (cy$birth_control != "pill"))
+cy$BC_glm_prob[j] = apply( cbind(cy$BC_glm_prob[j],cy$BC_glm_prob[match(cy$cycle_id_next[j],cy$cycle_id)]),1,mean, na.rm = TRUE)
+
+#cy$BC_glm_prob[is.na(cy$BC_glm_prob)] = cy$BC_glm_prob_original[is.na(cy$BC_glm_prob)]
+rm(j)
+```
+
+```{r cycle_classification_BC checking distribution of BC_glm_prob with cycle_nb - corrected, fig.width= 10, fig.height= 5}
+ggplot(cy[cy$cycle_nb <= 30,], aes( x = factor(cycle_nb) ,y = BC_glm_prob,  fill = birth_control)) + geom_boxplot()
+```
+
+```{r cycle_classification_BC save cy with logistic regression}
+save(cy, file = paste0(IO$tmp_Rdata, "cy_with_logistic_regression.Rdata"))
+```
+
+
+
+```{r cycle_classification_BC hmm}
+hmm = list()
+
+hmm$bc_states = c("none / condoms","pill","X")
+hmm$symbols = c(paste0("p_",0:10),"X")
+
+bc_emission_prob.N = c(dbeta(seq(0,1,by = 0.1), shape1 = 1 , shape2 = 3)+0.2,0) # more likely to observe LOW score for N/C
+bc_emission_prob.P = c(dbeta(seq(0,1,by = 0.1), shape1 = 3 , shape2 = 1)+0.2,0) # more likely to observe HIGH score for N/C
+bc_emission_prob.X = c(rep(0,11),1) # we only observe X when we switch users
+
+# building and normalizing emission prob matrix
+hmm$bc_emission_prob = matrix(c(bc_emission_prob.N,bc_emission_prob.P,bc_emission_prob.X),nrow = length(hmm$bc_states), ncol = length(hmm$symbols), byrow = TRUE)
+hmm$bc_emission_prob = hmm$bc_emission_prob/apply(hmm$bc_emission_prob, 1, sum)
+
+plot(seq(0,1,by = 0.1) , bc_emission_prob.N[1:11], type = "l", col = "coral1", lwd = 2)
+points(seq(0,1,by = 0.1) , bc_emission_prob.P[1:11], type = "l", col = "cyan3", lwd = 2)
+
+
+rm(bc_emission_prob.N,bc_emission_prob.P,bc_emission_prob.X )
+
+#cy = cy[order(cy$user_id, cy$cycle_nb),]
+cy$BC = ""
+
+for(bc in 1:length(levels(cy$birth_control))){
+  cat(bc,"\n")
+  
+  #setting up model
+  hmm$start_prob = c(0.6,0.4)[bc]  #
+  hmm$bc_transition_prob = matrix(c(0.9,0.09,0.01,0.09,0.9,0.01,hmm$start_prob,1-hmm$start_prob,0), nrow = length(hmm$bc_states), ncol = length(hmm$bc_states), byrow = TRUE)
+  hmm$start_prob = c(hmm$start_prob, 1-hmm$start_prob,0)
+  hmm_mod = initHMM(
+    States =  hmm$bc_states, Symbols =  hmm$symbols, 
+    startProbs =  hmm$start_prob, transProbs =  hmm$bc_transition_prob, 
+    emissionProbs =  hmm$bc_emission_prob)
+  
+  # selecting cycles
+  j = which(cy$birth_control == levels(cy$birth_control)[bc])
+  obs_p =  paste0("p_",round(10*cy$BC_glm_prob[j]))
+  
+  # inserting Xs
+  x = which(diff(cy$user_id_n[j]) !=0) 
+  obs_x = rep("X", length(x))
+  id = c(seq_along(obs_p)*10, 10*x+5)
+  o = order(id)
+  obs = c(obs_p, obs_x)[o]
+  
+  # running viterbi
+  vit = viterbi(hmm = hmm_mod, obs = obs) 
+  vit_no_x = vit[-which(vit == "X")]
+  cy$BC[j] = vit_no_x
+}
+
+hmm_mod
+
+rm(vit, x, obs_p, obs_x, obs, hmm, hmm_mod, bc, id, o, j)
+
+table(cy$BC, cy$birth_control)
+```
+
+```{r cycle_classification_BC save cy with HMM}
+save(cy, file = paste0(IO$tmp_Rdata, "cy_with_HMM.Rdata"))
+```
+
+
+
+
+```{r cycle_classification_BC vizualization, fig.height= 10, fig.width=14}
+
+sub_cy = cy[cy$user_id_n %in% 1:80,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n[order(sub_cy$birth_control)]))
+g_vit = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")
+g_gml = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_glm_prob_original)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = "coral1", high = "cyan3", mid = "gray90", midpoint = 0.5)
+grid.arrange(g_vit, g_gml, nrow = 1)
+
+rm(sub_cy, g_vit, g_gml)
+
+```
+
+
+
+```{r cycle_classification_BC manual checks, eval = FALSE}
+j = which(cy$user_id_n %in% c(17, 79,8,33,36) ) # c(17,7)
+cy[j,c("user_id_n",inputs,"BC_glm_prob_original","BC","birth_control")]
+
+rm(j)
+
+```
+
+## fitting the hmm - 2 separate fits corresponding to the initial BC info
+
+```{r cycle_classification_BC BC_hmm_init }
+cy$BC_hmm_init = cy$BC
+```
+
+
+```{r cycle_classification_BC hmm with fit - 2 separate fits}
+hmm = list()
+
+hmm$bc_states = c("none / condoms","pill","X")
+hmm$symbols = c(paste0("p_",0:10),"X")
+
+bc_emission_prob.N = c(dbeta(seq(0,1,by = 0.1), shape1 = 1 , shape2 = 3)+0.2,0) # more likely to observe LOW score for N/C
+bc_emission_prob.P = c(dbeta(seq(0,1,by = 0.1), shape1 = 3 , shape2 = 1)+0.2,0) # more likely to observe HIGH score for N/C
+bc_emission_prob.X = c(rep(0,11),1) # we only observe X when we switch users
+
+# building and normalizing emission prob matrix
+hmm$bc_emission_prob = matrix(c(bc_emission_prob.N,bc_emission_prob.P,bc_emission_prob.X),nrow = length(hmm$bc_states), ncol = length(hmm$symbols), byrow = TRUE)
+hmm$bc_emission_prob = hmm$bc_emission_prob/apply(hmm$bc_emission_prob, 1, sum)
+
+plot(seq(0,1,by = 0.1) , bc_emission_prob.N[1:11], type = "l", col = "coral1", lwd = 2)
+points(seq(0,1,by = 0.1) , bc_emission_prob.P[1:11], type = "l", col = "cyan3", lwd = 2)
+
+
+rm(bc_emission_prob.N,bc_emission_prob.P,bc_emission_prob.X )
+
+#cy = cy[order(cy$user_id, cy$cycle_nb),]
+cy$BC = ""
+
+for(bc in 1:length(levels(cy$birth_control))){
+  cat(bc,"\n")
+  
+  #setting up model
+  hmm$start_prob = c(0.6,0.4)[bc]  #
+  hmm$bc_transition_prob = matrix(c(0.9,0.09,0.01,0.09,0.9,0.01,hmm$start_prob,1-hmm$start_prob,0), nrow = length(hmm$bc_states), ncol = length(hmm$bc_states), byrow = TRUE)
+  hmm$start_prob = c(hmm$start_prob, 1-hmm$start_prob,0)
+  hmm_mod = initHMM(
+    States =  hmm$bc_states, Symbols =  hmm$symbols, 
+    startProbs =  hmm$start_prob, transProbs =  hmm$bc_transition_prob, 
+    emissionProbs =  hmm$bc_emission_prob)
+  
+  # selecting cycles
+  j = which(cy$birth_control == levels(cy$birth_control)[bc])
+  obs_p =  paste0("p_",round(10*cy$BC_glm_prob[j]))
+  
+  # inserting Xs
+  x = which(diff(cy$user_id_n[j]) !=0) 
+  obs_x = rep("X", length(x))
+  id = c(seq_along(obs_p)*10, 10*x+5)
+  o = order(id)
+  obs = c(obs_p, obs_x)[o]
+  
+  # hmm fit
+  tic()
+  hmm_fit = HMM::baumWelch(hmm = hmm_mod, obs = obs[1:(which(obs == "X")[1000])])
+  hmm_fit1 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (which(obs == "X")[10000]+1) : (which(obs == "X")[10500]) ])
+  hmm_fit2 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (which(obs == "X")[20000]+1) : (which(obs == "X")[20500]) ])
+  hmm_fit3 = HMM::baumWelch(hmm = hmm_mod, obs = obs[ (which(obs == "X")[50000]+1) : (which(obs == "X")[50500]) ])
+  toc()
+  
+  hmm_fit$hmm$transProbs
+  hmm_fit1$hmm$transProbs
+  hmm_fit2$hmm$transProbs
+  hmm_fit3$hmm$transProbs
+
+  par(mfrow = c(2,2))
+  print(matplot(t(hmm_fit$hmm$emissionProbs), type = "l", lty  = 1, col = c("coral1", "cyan3","gray")))
+  print(matplot(t(hmm_fit1$hmm$emissionProbs), type = "l", lty  = 1, col = c("coral1", "cyan3","gray")))
+  print(matplot(t(hmm_fit2$hmm$emissionProbs), type = "l", lty  = 1, col = c("coral1", "cyan3","gray")))
+  print(matplot(t(hmm_fit3$hmm$emissionProbs), type = "l", lty  = 1, col = c("coral1", "cyan3","gray")))
+
+  
+  # running viterbi
+  vit = viterbi(hmm = hmm_fit$hmm, obs = obs) 
+  vit_no_x = vit[-which(vit == "X")]
+  cy$BC[j] = vit_no_x
+}
+
+hmm_mod
+hmm_fit
+
+rm(vit, x, obs_p, obs_x, obs, hmm, hmm_mod, hmm_fit, bc, id, o, j)
+
+table(cy$BC, cy$birth_control)
+table(cy$BC, cy$BC_hmm_init)
+```
+
+
+```{r cycle_classification_BC save cy with HMM fit - 2 separate fits}
+save(cy, file = paste0(IO$tmp_Rdata, "cy_with_HMM_fit.Rdata"))
+```
+
+
+
+
+```{r cycle_classification_BC vizualization with HMM fit - 2 separate fits, fig.height= 10, fig.width=14}
+
+sub_cy = cy[cy$user_id_n %in% 1:80,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n[order(sub_cy$birth_control)]))
+g_vit = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")
+g_gml = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_glm_prob_original)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")+ scale_color_gradient2(low = "coral1", high = "cyan3", mid = "gray90", midpoint = 0.5)
+grid.arrange(g_vit, g_gml, nrow = 1)
+
+rm(sub_cy, g_vit, g_gml)
+
+```
+
+
+
+# FIGURES
+
+
+
+```{r cycle_clusters}
+load(file = paste0(IO$figure_data, "breast_tenderness_and_tracking_profiles_per_clusters_clara.Rdata"), verbose = TRUE)
+
+g = ggplot(agg, aes(x = cycleday_m_D, y = fraction_of_cycles, col = as.factor(cluster_num))) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_line() + geom_point(size = 0.6)+
+  scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values= cols$clusters_clara , name="Clusters")+
+  xlab("cycleday from 1st day of menstruation") + ylab("avg symptom occurence")+
+  guides(col = FALSE) + expand_limits(y = 0)
+g
+
+ggsave(filename = paste0(IO$panels, "2_TB_symptoms_by_clusters.pdf"), plot = g, width = viz$full_width/12*5, height = viz$full_width/6)
+
+
+g = ggplot(agg, aes(x = cycleday_m_D, y = fraction_of_cycles_with_logs, col = as.factor(cluster_num))) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_line() + geom_point(size = 0.6)+
+  scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values= cols$clusters_clara , name="Clusters")+
+  xlab("cycleday from 1st day of menstruation") + ylab("avg tracking frequency")+
+  guides(col = FALSE) + expand_limits(y = 0)
+g
+
+ggsave(filename = paste0(IO$panels, "2_tracking_behavior_by_clusters.pdf"), plot = g, width = viz$full_width/12*5, height = viz$full_width/6)
+
+
+a = aggregate(n_cycles ~ cluster_num, agg, unique)
+a = a[order(a$n_cycles),]
+a$cluster_o = 1:nrow(a) 
+a$cluster = paste0("Cluster ",nrow(a):1)
+a$cluster = factor(a$cluster, levels = a$cluster)
+
+g = ggplot(a, aes(x = cluster, y = n_cycles, fill = as.factor(cluster_num))) + 
+  geom_bar(stat="identity", color = NA) + 
+  coord_flip() + 
+  scale_fill_manual(values= cols$clusters_clara , name="Clusters")+
+  scale_y_continuous(name = "# cycles", labels = scales::comma)+
+  scale_x_discrete(labels = NULL)+
+  xlab("") + 
+  guides(fill = FALSE) 
+g
+
+ggsave(filename = paste0(IO$panels, "2_n_cycles_per_cluster.pdf"), plot = g, width = viz$full_width/16*4, height = viz$full_width/5)
+
+rm(g, a, agg)
+
+```
+
+
+
+
+
+
+
+# CYCLE CLUSTERING
+
+
+
+
+
+
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara_expl test silhouette, eval = FALSE}
+cycle_ids = unique(d$cycle_id_m)
+n_centers = 2:10
+avg_silhouette_score = c()
+tic()
+for(n_center in n_centers){
+  cat(n_center,"\n")
+  clara_n = clara(d_wide[,-1], k = n_center, metric = "custom_jaccard", w = w, cjratio = r)
+  cat("\t",clara_n$silinfo$avg.width,"\n")
+  avg_silhouette_score = c(avg_silhouette_score,clara_n$silinfo$avg.width)
+  
+  silh = as.data.frame(clara_n$silinfo$widths)
+  
+  g = ggplot(silh, aes(x = factor(cluster), y = sil_width)) + 
+    geom_violin()+
+    geom_point(aes(col = factor(neighbor)))+
+    geom_point(data = data.frame(cluster = c(1:n_center),clus.avg.widths = clara_n$silinfo$clus.avg.widths), 
+               aes(y = clus.avg.widths), size = 5, col = "black", alpha = 0.5)+
+    geom_hline(yintercept = clara_n$silinfo$avg.width)+
+    ylim(c(-1,1))
+  print(g)
+  
+  silh$x = nrow(silh):1
+  
+  g = ggplot(silh, aes(fill = factor(cluster),x = x, y = sil_width)) + coord_flip()+
+    geom_bar(stat = "identity")+
+    geom_hline(yintercept = clara_n$silinfo$avg.width, linetype = 2)+
+    ylim(c(-1,1))
+  print(g)
+  #plot(clara_n)
+}
+toc()
+plot(n_centers, avg_silhouette_score, type = "b")
+
+```
+
+
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara exploring number of clusters with clara old, eval = FALSE, fig.width= 8, fig.height= 4, cache = FALSE}
+cycle_ids = unique(d$cycle_id_m)
+n_centers = 2:7
+df = data.frame()
+tic()
+for(n_center in n_centers){
+  cat(n_center,"\n")
+  for(r in c(0,0.5,0.6,0.7,0.75,0.8,0.9,1)){
+    cat("\t",r,"\n")
+    clara_n = clara(d_wide[,-1], k = n_center, metric = "custom_jaccard", w = w, cjratio = r)
+    
+    cat("\t\t",clara_n$silinfo$avg.width,"\n")
+    df = rbind(df,data.frame(n_clust = n_center, r = r, avg_silhouette_score = clara_n$silinfo$avg.width))
+    
+    silh = as.data.frame(clara_n$silinfo$widths)
+    silh$x = nrow(silh):1
+    silh$rows = rownames(silh)
+    
+    d$cluster_num = clara_n$clustering[match(d$cycle_id_m, d_wide$cycle_id_m)]
+    d_imputed$cluster_num = clara_n$clustering[match(d_imputed$cycle_id_m, d_wide$cycle_id_m)]
+    
+    # # show the samples chosen by clara
+    # m = match(clusters_clara$sample, rownames(d_wide))
+    # m = match( d_imputed$cycle_id_m, d_wide$cycle_id_m[m])
+    # m = which(!is.na(m))
+    # d_subset = d_imputed[m,]
+    # d_subset = d_subset[order(d_subset$cluster_num),]
+    # d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+    # print(ggplot_imputed_TB(d_subset, facet_grid = FALSE)+scale_size(range = c(2,2)))
+    
+    # show the samples chosen by clara FOR SILHOUETTE
+    m = match(silh$rows, rownames(d_wide))
+    cycle_ids_silh = as.character(d_wide$cycle_id_m[m])
+    m = which(!is.na(match( d_imputed$cycle_id_m, cycle_ids_silh)))
+    d_subset = d_imputed[m,]
+    d_subset = d_subset[order(d_subset$cluster_num),]
+    d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = rev(cycle_ids_silh))
+    g_samples = ggplot_imputed_TB(d_subset, facet_grid = FALSE)+scale_size(range = c(2,2)) + ggtitle(paste0("r = ",r))
+    #print(g_samples)
+    
+    g_silh = ggplot(silh, aes(fill = factor(cluster),x = factor(x), y = sil_width)) + coord_flip()+
+      geom_bar(stat = "identity")+
+      #ylim(c(-1,1))+
+      geom_hline(yintercept = clara_n$silinfo$avg.width, linetype = 2)+ 
+      ggtitle(paste0("avg. silh score = ",clara_n$silinfo$avg.width))+
+      guides(fill = FALSE)+
+      xlab("")
+    #print(g_silh)
+    
+    grid.arrange(g_samples, g_silh, nrow = 1, widths = c(2,1))
+    
+    #### plots
+    # first showing some examples
+    # set.seed(6)
+    # random_cycle_ids =  cycle_ids[sample(1:length(cycle_ids),50)]
+    # d_subset = d[d$cycle_id_m %in% random_cycle_ids,]
+    # # ordered colored dots
+    # d_subset = d_subset[order(d_subset$cluster_num),]
+    # d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+    # print(ggplot(d_subset, aes(x = cycleday_m_D, y = cycle_id_m, col = factor(cluster_num))) + geom_point()+ guides(col = FALSE))
+    # 
+    # then showing the profiles for the clusters
+    # agg = aggregate(tender_breasts ~ cycleday_m_D + cluster_num, d, sum)
+    # print(ggplot(agg, aes(x = cycleday_m_D, y =tender_breasts, col = factor(cluster_num))) + geom_line() + facet_grid(cluster_num ~.))
+    
+    # and showing the medoids
+    # medoids = as.data.frame(clara_n$medoids)
+    # colnames(medoids) = paste0("tender_breasts.",(-18:7)+18)
+    # medoids$cluster_num = 1:n_center
+    # 
+    # medoids = reshape(medoids, idvar = "cluster_num", varying = 1:(ncol(medoids)-1), direction = "long")
+    # medoids$cycleday_m_D = medoids$time-18
+    # 
+    # print(ggplot(medoids, aes(x = cycleday_m_D, y = tender_breasts, col =  factor(cluster_num)))+geom_hline(yintercept = 0) + geom_line(size = 1.5)+ facet_grid(cluster_num ~.))
+    # 
+    # # plus showing the number of cycles in each cluster
+    # print(ggplot(data.frame(as.data.frame(clara_n$clusinfo),cluster_num = 1:n_center), aes(x = cluster_num, y = size, fill = factor(cluster_num))) + geom_bar(stat = "identity")+ guides(fill = FALSE))
+  }
+}
+toc()
+
+df$n_clusters = factor(df$n_clust)
+ggplot(df, aes(x = n_clusters, y = avg_silhouette_score, fill = avg_silhouette_score)) + geom_bar(stat = "identity")+ facet_grid(r ~ .)
+ggplot(df, aes(x = n_clust, y = avg_silhouette_score, col = r, group = r)) + geom_line()
+
+rm( d_subset, n_center, n_centers)
+```
+
+
+
+
+
+
+## Old stuff from cycle classification wrt birth control
+
+
+
+
+
+```{r cycle_classification_BC hmm cycle by cycle, eval = FALSE}
+
+bc_states = c("N","P")
+bc_transition_prob = matrix(c(0.9,0.1,0.1,0.9), nrow = 2, ncol = 2)
+
+bc_emission_prob.N = dbeta(seq(0,1,by = 0.1), shape1 = 1 , shape2 = 3)+0.2
+bc_emission_prob.P = dbeta(seq(0,1,by = 0.1), shape1 = 3 , shape2 = 1)+0.2
+bc_emission_prob = matrix(c(bc_emission_prob.N,bc_emission_prob.P),nrow = 2, ncol = 11, byrow = TRUE)
+bc_emission_prob = bc_emission_prob/apply(bc_emission_prob, 1, sum)
+matplot(t(bc_emission_prob), type = "l", ylim = c(0,max(bc_emission_prob)))
+        
+symbols = paste0("p_",0:10)
+
+agg = aggregate(BC_glm ~ user_id, cy, lu)
+dpl = ddply(cy, c("user_id"), summarise,
+            min = min(BC_glm), max = max())
+
+
+cy$viterbi = ""
+
+us = unique(agg$user_id[agg$BC_glm == 2])
+pb = txtProgressBar(min = 0, max = length(us), initial = 0) 
+for(i in 1:length(us)){
+  u = us[i]
+  if(i%%1000){setTxtProgressBar(pb,i)}
+  j = which(cy$user_id == u)  
+  sub_cy = cy[j,]
+  sub_cy = sub_cy[order(sub_cy$cycle_nb),]
+  start_prob = c(0.9,0.1)[sub_cy$birth_control[1]]  
+  start_prob = c(start_prob, 1-start_prob)
+  hmm_mod = initHMM(States = bc_states, Symbols = symbols, startProbs = start_prob, transProbs = bc_transition_prob, emissionProbs = bc_emission_prob)
+
+  obs =  paste0("p_",round(10*sub_cy$BC_glm_prob))
+  sub_cy$viterbi = viterbi(hmm = hmm_mod, obs = obs) 
+  
+  cy$viterbi[match(sub_cy$cycle_id, cy$cycle_id)] = sub_cy$viterbi
+}
+
+
+
+```
+
+
+
+```{r cycle_classification_BC hmm fast}
+
+bc_states = c("none / condoms","pill","X")
+symbols = c(paste0("p_",0:10),"X")
+
+bc_emission_prob.N = c(dbeta(seq(0,1,by = 0.1), shape1 = 1 , shape2 = 3)+0.2,0)
+bc_emission_prob.P = c(dbeta(seq(0,1,by = 0.1), shape1 = 3 , shape2 = 1)+0.2,0)
+bc_emission_prob.X = c(rep(0,11),1)
+
+bc_emission_prob = matrix(c(bc_emission_prob.N,bc_emission_prob.P,bc_emission_prob.X),nrow = length(bc_states), ncol = length(symbols), byrow = TRUE)
+bc_emission_prob = bc_emission_prob/apply(bc_emission_prob, 1, sum)
+matplot(t(bc_emission_prob), type = "l", ylim = c(0,max(bc_emission_prob)))
+        
+
+for(bc in 1:length(levels(cy$birth_control))){
+  
+  #setting up model
+  start_prob = c(0.6,0.4)[bc]  # it is more likely to start in the state that was declared on the on-boarding data
+  bc_transition_prob = matrix(c(0.95,0.04,0.01,0.04,0.95,0.01,start_prob,1-start_prob,0), nrow = length(bc_states), ncol = length(bc_states), byrow = TRUE)
+  start_prob = c(start_prob, 1-start_prob,0)
+  hmm_mod = initHMM(States = bc_states, Symbols = symbols, startProbs = start_prob, transProbs = bc_transition_prob, emissionProbs = bc_emission_prob)
+  
+  
+  # selecting cycles
+  
+  j = which(cy$birth_control == levels(cy$birth_control)[bc])
+  obs_p =  paste0("p_",round(10*cy$BC_glm_prob[j]))
+  
+  # inserting Xs
+  x = which(diff(cy$user_id_n[j]) !=0)
+  obs_x = rep("X", length(x))
+  obs = c(obs_p, obs_x)
+  id = c(seq_along(obs_p)*10, 10*x+5)
+  o = order(id)
+  obs = obs[o]
+  
+  # running viterbi
+  tic()
+  vit = viterbi(hmm = hmm_mod, obs = obs) 
+  toc()
+  vit_no_x = vit[-which(vit == "X")]
+  cy$viterbi[j] = vit_no_x
+}
+
+
+```
+
+```{r cycle_classification_BC vizualization, fig.height= 10, fig.width=14}
+
+sub_cy = cy[cy$user_id_n %in% 1:50,]
+sub_cy$user_id_n = factor(sub_cy$user_id_n, levels = unique(sub_cy$user_id_n[order(sub_cy$birth_control)]))
+g_vit = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = viterbi)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")
+g_gml = ggplot(sub_cy, aes(x = cycle_nb, y = user_id_n, col = BC_glm)) + geom_point() + facet_grid(birth_control ~ ., scale = "free_y")
+grid.arrange(g_vit, g_gml, nrow = 1)
+
+```
+
+
+what is weird is that the first cycle is often "off"... 
+
+
+```{r cycle_classification_BC distribution of BC_glm_prob with cycle_nb, fig.width= 10, fig.height= 5}
+ggplot(cy[cy$cycle_nb <= 30,], aes( x = factor(cycle_nb) ,y = BC_glm_prob,  fill = birth_control)) + geom_boxplot()
+```
+
+Well, not so weird apparently at the cycle number seems to have an impact on the BC_glm_prob.
+Maybe I could add "cycle_nb" as an input variable for the gml.
+
+
+```{r cycle_classification_BC input variables - adding cycle_nb}
+inputs = c(inputs,"cycle_nb")
+```
+
+```{r cycle_classification_BC imputation of BC - adding cycle_nb}
+
+#load(file = paste0(IO$tmp_Rdata,"cy.Rdata"), verbose = TRUE)
+
+eval(parse(text = paste0("glm_fit_1 = glm(birth_control ~ ",paste(inputs, collapse = " + "),", data = cy, family = 'binomial' )")))
+summary(glm_fit_1)
+
+cy$BC_glm_s = predict(glm_fit_1, newdata = cy[,inputs])
+cy$BC_glm_prob = 1/(1+exp(-cy$BC_glm_s))
+cy$BC_glm = factor(c("none / condoms","pill")[(cy$BC_glm_s>0)+1], levels = levels(cy$birth_control))
+
+ggplot(cy, aes(x = cy$BC_glm_s, fill = birth_control)) + geom_density(alpha = 0.5, col = NA) + xlim(c(-5,5))
+ggplot(cy, aes(x = cy$BC_glm_prob, fill = birth_control)) + geom_density(alpha = 0.5, col = NA)
+
+table(cy$BC_glm, cy$birth_control)
+```
+```{r cycle_classification_BC checking distribution of BC_glm_prob with cycle_nb, fig.width= 10, fig.height= 5}
+ggplot(cy[cy$cycle_nb <= 30,], aes( x = factor(cycle_nb) ,y = BC_glm_prob,  fill = birth_control)) + geom_boxplot()
+```
+
+It is not going to help much for the first cycle (but seems to help in classifying later cycles).
+So, maybe, I could artificially change the BC_glm_prob for the first cycle of each user
+
+
+
+
+
+
+
+
+## trying to use auto-regression
+
+
+```{r cycle_classification_BC adding history BC}
+
+cy$BC_glm_prev = cy$BC_glm[match(cy$cycle_id_prev, cy$cycle_id)]
+cy$BC_glm_prev[is.na(cy$BC_glm_prev)] = as.character(cy$birth_control[is.na(cy$BC_glm_prev)])
+cy$BC_glm_prev2 = cy$BC_glm[match(cy$cycle_id_prev2, cy$cycle_id)]
+cy$BC_glm_prev2[is.na(cy$BC_glm_prev2)] = as.character(cy$birth_control[is.na(cy$BC_glm_prev2)])
+
+
+scores = c(0.25,0.75)[as.numeric(cy$birth_control)]
+cy$BC_glm_prob_prev = cy$BC_glm_prob[match(cy$cycle_id_prev, cy$cycle_id)]
+cy$BC_glm_prob_prev[is.na(cy$BC_glm_prob_prev)] = scores[is.na(cy$BC_glm_prob_prev)]
+cy$BC_glm_prob_prev2 = cy$BC_glm_prob[match(cy$cycle_id_prev2, cy$cycle_id)]
+cy$BC_glm_prob_prev2[is.na(cy$BC_glm_prob_prev2)] = scores[is.na(cy$BC_glm_prob_prev2)]
+
+
+```
+
+
+```{r cycle_classification_BC auto-regression}
+glm_fit_2 = glm(birth_control ~ score_n_days_obs + score_BC + score_CL + cycle_length + cl_sd_3c + diff_cl_sd_3c + n_days_obs + any_BC + BC_glm_prob_prev + BC_glm_prob_prev2 , data = cy, family = 'binomial' )
+summary(glm_fit_2)
+
+cy$BC_s = predict(glm_fit_2, newdata = cy[,c("score_n_days_obs","score_BC","score_CL","cycle_length","cl_sd_3c","diff_cl_sd_3c","n_days_obs","any_BC","BC_glm_prob_prev","BC_glm_prob_prev2")])
+
+cy$BC_prob = 1/(1+exp(-cy$BC_s))
+
+ggplot(cy, aes(x = cy$BC_s, fill = birth_control)) + geom_density(alpha = 0.5, col = NA) #+ xlim(c(-50000,50000))
+ggplot(cy, aes(x = cy$BC_s, fill = birth_control)) + geom_density(alpha = 0.5, col = NA) + xlim(c(-50000,50000))
+ggplot(cy, aes(x = cy$BC_prob, fill = birth_control)) + geom_density(alpha = 0.5, col = NA)
+
+ggplot(cy, aes(x = cy$BC_s, fill = BC_glm)) + geom_density(alpha = 0.5, col = NA)#+ xlim(c(-50000,50000))
+ggplot(cy, aes(x = cy$BC_s, fill = BC_glm)) + geom_density(alpha = 0.5, col = NA) + xlim(c(-50000,50000))
+ggplot(cy, aes(x = cy$BC_prob, fill = BC_glm)) + geom_density(alpha = 0.5, col = NA) 
+
+
+cy$BC = c("none / condoms","pill")[(cy$BC_prob>0.5)+1]
+
+table(cy$BC, cy$birth_control)
+table(cy$BC, cy$BC_glm)
+
+
+head(cy[,c("user_id_n","cycle_nb","cycle_length","cl_sd_3c","diff_cl_sd_3c","n_days_obs","any_BC","birth_control","BC_glm","BC","BC_prob")], 100)
+
+```
+
+
+```{r cycle_classification_BC clustering}
+
+
+rownames(cy) = 1:nrow(cy)
+
+S = data.frame()
+
+for(k in 2:10){
+  cat(k,"\n")
+  tic()
+  clusters_clara = clara(cy[,inputs], k = k , metric = "euclidean", samples = 50)
+  toc()
+  
+  
+  silh = as.data.frame(clusters_clara$silinfo$widths)
+  silh$x = 1:nrow(silh)
+  silh$rows = as.numeric(rownames(silh))
+  silh$n_clust = k
+  silh = silh[,c("x","n_clust","cluster","neighbor","sil_width","rows")]
+  silh$birth_control = cy$birth_control[silh$rows]
+  
+  
+  g_silh = ggplot(silh, aes(fill = factor(cluster),x = factor(x, levels =rev(x)), y = sil_width)) + coord_flip()+
+    geom_bar(stat = "identity")+
+    geom_point(aes( col = factor(birth_control),y = pmax(0,sil_width) + 0.025), size = 3)+
+    #ylim(c(-1,1))+
+    geom_hline(yintercept = clusters_clara$silinfo$avg.width, linetype = 2)+ 
+    ggtitle(paste0("avg. silh score = ",round(clusters_clara$silinfo$avg.width,digits = 3)))+
+    guides(fill = FALSE, color = FALSE)+
+    xlab("")+ylab("silh width")+ scale_x_discrete(position = "top")
+  print(g_silh)
+  
+  eval(parse(text = paste0("cy$c_",k," = clusters_clara$clustering")))
+  S = rbind(S, silh)
+}
+
+agg = aggregate(sil_width ~ n_clust,S, mean)
+ggplot(agg, aes(x = n_clust, y = sil_width))+ geom_line()
+
+
+g_silh = ggplot(S, aes(fill = factor(cluster),x = factor(x), y = sil_width)) + coord_flip()+
+  geom_bar(stat = "identity")+ facet_grid( . ~ n_clust)+
+  guides(fill = FALSE, color = FALSE)+
+  xlab("")+ylab("silh width")+ scale_x_discrete(position = "top")
+
+print(g_silh)
+
+save(S, file = paste0(IO$tmp_Rdata,"silhouette_cycle_classification.Rdata"))
+save(cy, file = paste0(IO$tmp_Rdata,"cy_clusters.Rdata"))
+
+
+```
+
+
+

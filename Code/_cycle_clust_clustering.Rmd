@@ -1,0 +1,247 @@
+---
+title: "Determining the optimal number of clusters"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r cycle_clust_clustering librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r cycle_clust_clustering setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Clustering
+
+
+```{r cycle_clust_clustering loading d_wide, d and cycles_m}
+
+load(paste0(IO$tmp_data,"d_wide_imputed.Rdata"), verbose = TRUE)
+load(paste0(IO$tmp_data,"d_imputed.Rdata"), verbose = TRUE)
+load(paste0(IO$output_data, "cycles_m.Rdata"), verbose = TRUE)
+
+```
+
+
+
+```{r cycle_clust_clustering load silhouette summary}
+load(file = paste0(IO$tmp_Rdata,"silhouette_score_summary.Rdata"), verbose = TRUE)
+```
+
+```{r cycle_clust_clustering silhouette summary}
+df$n_clusters = factor(df$n_clust)
+ggplot(df, aes(x = n_clusters, y = avg_silhouette_score, fill = avg_silhouette_score)) + geom_bar(stat = "identity")+ facet_grid(r ~ .)
+```
+
+
+
+```{r cycle_clust_clustering finding N}
+r = par$r
+
+cycle_ids = unique(d$cycle_id_m)
+n_center = df$n_clust[which((df$r == r) & (df$avg_silhouette_score == max(df$avg_silhouette_score[df$r == r])))]
+rm(df)
+```
+
+The ideal number of cluster is `r n_center`
+
+```{r cycle_clust_clustering clustering, cache = FALSE}
+clusters_clara = clara(d_wide[,-1], k = n_center, 
+                       metric = "custom_jaccard", 
+                       w = par$w, cjratio = par$r,
+                       samples = par$clara$samples, sampsize = par$clara$sampsize)
+
+# re-order clusters by avg silh score.
+o = order(clusters_clara$silinfo$clus.avg.widths, decreasing = TRUE)
+cl_table = data.frame(cl_i = o, cl_num = 1:length(o),cl = paste0("cl",1:length(o)))
+cl_table = cl_table[order(cl_table$cl_i),]
+
+
+cycles_m$cluster = cl_table$cl[clusters_clara$clustering[match(cycles_m$cycle_id_m, d_wide$cycle_id_m)]]
+cycles_m$cluster_num = cl_table$cl_num[clusters_clara$clustering[match(cycles_m$cycle_id_m, d_wide$cycle_id_m)]]
+
+d$cluster = cl_table$cl[clusters_clara$clustering[match(d$cycle_id_m, d_wide$cycle_id_m)]]
+d$cluster_num = cl_table$cl_num[clusters_clara$clustering[match(d$cycle_id_m, d_wide$cycle_id_m)]]
+
+# silhouette info
+silh = as.data.frame(clusters_clara$silinfo$widths)
+silh$x = 1:nrow(silh)
+silh$rows = as.numeric(rownames(silh))
+silh$cluster_i = silh$cluster
+silh$cluster = cl_table$cl[silh$cluster_i]
+silh$cluster_num = cl_table$cl_num[silh$cluster_i]
+silh$neighbor_i = silh$neighbor
+silh$neighbor = cl_table$cl[silh$neighbor_i]
+silh$neighbor_num = cl_table$cl_num[silh$neighbor_i]
+silh = silh[order(silh$cluster, silh$x),]
+silh$x = 1:nrow(silh)
+
+silh = silh[,c("x","cluster","neighbor","sil_width","rows", "cluster_num","neighbor")]
+
+save(silh, file = paste0(IO$out_Rdata, "silhouette_width.Rdata"))
+```
+
+
+```{r cycle_clust_clustering save d_imputed with clusters}
+rownames(d) = 1:nrow(d)
+d = d[,c("user_id","cycle_id_m","cycle_nb_m","cycleday_m_D","tender_breasts","cluster","cluster_num")]
+
+save(d, file = paste0(IO$tmp_Rdata,"d_imputed_with_clusters.Rdata"))
+
+save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
+file.copy(from = paste0(IO$output_data, "cycles_m.Rdata"), to = paste0(IO$tmp_data, "cycles_m_with_clusters.Rdata"))
+
+```
+
+
+
+
+
+```{r cycle_clust_clustering plots N clusters, fig.width= 10, fig.height= 4}
+
+#### plots
+# showing some random examples with d
+set.seed(10)
+random_cycle_ids = cycle_ids[sample(1:length(cycle_ids),50)]
+d_subset = d[d$cycle_id_m %in% random_cycle_ids,]
+# ordered colored dots
+d_subset = d_subset[order(d_subset$cluster_num),]
+d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+print(ggplot_imputed_TB(d_subset, facet_grid = NULL)+scale_size(range = c(2,2)))
+rm(random_cycle_ids, sd_subset)
+
+# show the samples chosen by clara FOR SILHOUETTE
+m = match(silh$rows, rownames(d_wide))
+cycle_ids_silh = as.character(d_wide$cycle_id_m[m])
+m = which(!is.na(match( d$cycle_id_m, cycle_ids_silh)))
+d_subset = d[m,]
+d_subset = d_subset[order(d_subset$cluster_num),]
+d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = rev(cycle_ids_silh))
+
+save(d_subset, file = paste0(IO$out_Rdata, "representative_cycles_clusters.Rdata"))
+
+g_samples = ggplot_imputed_TB(d_subset, facet_grid = NULL)+scale_size(range = c(2,2)) + ggtitle(paste0("r = ",r))
+rm(m, cycle_ids_silh, d_subset)
+
+g_silh = ggplot(silh, aes(fill = factor(cluster),x = factor(x, levels =rev(x)), y = sil_width)) + coord_flip()+
+  geom_bar(stat = "identity")+
+  geom_point(aes( col = factor(neighbor),y = pmax(0,sil_width) + 0.025), size = 3)+
+  #ylim(c(-1,1))+
+  geom_hline(yintercept = clusters_clara$silinfo$avg.width, linetype = 2)+ 
+  ggtitle(paste0("avg. silh score = ",round(clusters_clara$silinfo$avg.width,digits = 3)))+
+  guides(fill = FALSE, color = FALSE)+
+  xlab("")+ylab("silh width")+ scale_x_discrete(position = "top")
+
+
+
+mds_eig = cmdscale(d = clusters_clara$diss, k = 10, eig = TRUE)
+mds = data.frame(mds_eig$points)
+colnames(mds) = c(paste0("d",1:10))
+mds$cluster_num = as.factor(cl_table$cl_num[clusters_clara$clustering[match(rownames(mds), names(clusters_clara$clustering))]])
+m = match( silh$rows, rownames(mds))
+mds = mds[m,]
+mds$num = 1:nrow(mds)
+save(mds, file = paste0(IO$out_Rdata, "mds_representative_samples.Rdata"))
+save(mds_eig, file = paste0(IO$out_Rdata, "mds_eig.Rdata"))
+
+g_mds = ggplot(mds, aes(x = d1, y = d2, col = cluster_num)) + coord_fixed()+
+  geom_point(size = 4, alpha = 0.5) + 
+  geom_text(label = 1:nrow(mds))+
+  guides(color = FALSE)+ggtitle("MDS")+xlab("")+ylab("")
+
+
+grid.arrange(g_samples, g_silh, g_mds, nrow = 1, widths = c(2,1,2.2))
+rm(g_samples, g_silh, g_mds)
+rm(mds, m)
+
+
+# symptom profiles for the clusters
+d$tb_binary = (d$tender_breasts==1)*1
+agg = aggregate(tb_binary ~ cycleday_m_D + cluster_num, d, sum)
+#print(ggplot(agg, aes(x = cycleday_m_D, y = tb_binary, col = factor(cluster_num))) + geom_line() + facet_grid(cluster_num ~.))
+
+agg2 = aggregate(cycle_id_m ~ cluster_num, d, lu)
+colnames(agg2)[length(colnames(agg2))] = "n_cycles"
+agg  = merge(agg, agg2, all = TRUE)
+agg$fraction_of_cycles = agg$tb_binary/agg$n_cycles
+
+# average tracking behavior profiles 
+agg2 = aggregate(cycle_id_m ~ cycleday_m_D + cluster_num, d[d$tender_breasts>=0,],lu)
+colnames(agg2)[length(colnames(agg2))] = "n_cycles_with_logs"
+agg  = merge(agg, agg2, all = TRUE)
+agg$fraction_of_cycles_with_logs = agg$n_cycles_with_logs/agg$n_cycles
+
+
+g_symptom_profiles = ggplot(agg, aes(x = cycleday_m_D, y = fraction_of_cycles, col = factor(cluster_num))) + geom_point(size = 0.6) + geom_line()
+
+g_tracking_profiles = ggplot(agg, aes(x = cycleday_m_D, y = fraction_of_cycles_with_logs, col = factor(cluster_num))) + geom_point(size = 0.6) + geom_line() + ylim(c(0,1))
+
+grid.arrange(g_symptom_profiles, g_tracking_profiles)
+
+save(agg, file = paste0(IO$out_Rdata, "breast_tenderness_and_tracking_profiles_per_clusters_clara.Rdata"))
+rm(agg, agg2, g_symptom_profiles, g_tracking_profiles)
+
+
+# and showing the medoids
+medoids = as.data.frame(clusters_clara$medoids)
+colnames(medoids) = paste0("tender_breasts.",(-18:7)+18)
+medoids$cluster_num = cl_table$cl_num[1:n_center]
+
+medoids = reshape(medoids, idvar = "cluster_num", varying = 1:(ncol(medoids)-1), direction = "long")
+medoids$cycleday_m_D = medoids$time-18
+
+print(ggplot(medoids, aes(x = cycleday_m_D, y = tender_breasts, col =  factor(cluster_num)))+geom_hline(yintercept = 0, col = "gray") + geom_line(size = 1.5)+ facet_grid(cluster_num ~.))
+
+print(ggplot(medoids, aes(x = cycleday_m_D, y = tender_breasts, col =  factor(cluster_num)))+geom_hline(yintercept = 0, col = "gray") + geom_line(size = 1.5, alpha = 0.5))
+
+# plus showing the number of cycles in each cluster
+print(ggplot(data.frame(as.data.frame(clusters_clara$clusinfo),cluster_num = cl_table$cl_num), aes(x = cluster_num, y = size, fill = factor(cluster_num))) + geom_bar(stat = "identity")+ guides(fill = FALSE))
+
+rm(medoids, silh)
+
+```
+
+
+
+
+
+```{r cycle_clust_clustering proportion of clusters withing age and BC categories, eval = TRUE}
+
+cycles_m$age_cat = cut(cycles_m$age, breaks = breaks$age)
+
+#cycles_cluster$cluster_num_f = as.factor(cycles_cluster$cluster_num, levels = c(3,2,1,4))
+
+g = ggplot(cycles_m[(!is.na(cycles_m$cluster_num)),], aes(x = age_cat, fill = as.factor(cluster_num)))+
+  facet_grid( . ~ BC)+
+  geom_bar(position = "fill")
+g
+
+g = ggplot(cycles_m[(!is.na(cycles_m$cluster_num))&(cycles_m$BC %in% par$BC_dict$name),], 
+           aes(x = age_cat, fill = as.factor(cluster_num)))+
+  facet_grid( . ~ BC)+
+  geom_bar(position = "fill")
+g
+
+
+save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
+file.copy(from = paste0(IO$output_data, "cycles_m.Rdata"), to = paste0(IO$tmp_data, "cycles_m_with_clusters_and_age_cat.Rdata"))
+
+
+```
+
+

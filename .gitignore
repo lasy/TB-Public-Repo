@@ -1,2 +1,5 @@
 # ignore all folders that are caches from the .Rmd
 *_cache/
+
+# ignore all html files in "Code old" folder
+Code old/*.html

@@ -1,0 +1,269 @@
+---
+title: "Defining cycle ID, cycle day and menstruation-centered cycle IDs"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r data_prep_cycle_id librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r data_prep_cycle_id setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Defining cycle IDs and menstruation-centered cycles
+
+### Defining a cycle ID in the cycle table
+
+
+
+```{r data_prep_cycle_id load cycle table}
+file.copy(paste0(IO$output_data,"cycles.Rdata"),paste0(IO$tmp_data,"cycles_before_cycle_id.Rdata"), overwrite = TRUE)
+load(paste0(IO$output_data,"cycles.Rdata"), verbose = TRUE)
+```
+
+
+```{r data_prep_cycle_id defining the cycle id}
+cycles$cycle_id = paste0(cycles$user_id,"_", cycles$cycle_nb)
+```
+
+
+```{r data_prep_cycle_id saving cycles}
+save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
+```
+
+
+
+
+### Linking the days with the cycles
+
+
+```{r data_prep_cycle_id linking the days with the cycles}
+
+days_folder = paste0(IO$output_data,"days/")
+
+tmp_days_folder = paste0(IO$tmp_data,"days_before_cycle_id/")
+file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
+
+filenames = list.files(days_folder)
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+foreach(filename = filenames) %dopar% 
+{
+  cat(filename,"\n")
+  load(paste0(days_folder, filename), verbose = TRUE)
+  
+   # take the part of cycles that matches with the days users
+  j = which(cycles$user_id %in% unique(days$user_id))
+  cycles_sub = cycles[j,]
+  
+  # expand cycles for each day
+  cycles_sub_exp = as.data.frame(lapply(cycles_sub, rep, cycles_sub$cycle_length))
+  cycles_sub_exp$cycleday = ave(rep(1,nrow(cycles_sub_exp)), cycles_sub_exp$cycle_id, FUN =cumsum)
+  cycles_sub_exp$date = cycles_sub_exp$cycle_start + (cycles_sub_exp$cycleday - 1)
+  cycles_sub_exp$day_id = paste0(cycles_sub_exp$user_id, "_", cycles_sub_exp$date)
+  
+  
+  # match days and cycles_sub_exp
+  m = match(days$day_id, cycles_sub_exp$day_id)
+  days$cycle_nb = cycles_sub_exp$cycle_nb[m]
+  days$cycle_id = cycles_sub_exp$cycle_id[m]
+  days$cycle_length = cycles_sub_exp$cycle_length[m]
+  days$cycleday = cycles_sub_exp$cycleday[m]
+  
+  days$cycleday_from_end = days$cycleday - days$cycle_length - 1
+  
+  d = duplicated(days[,c("user_id","date","category","type","cycleday")])
+  if(sum(d)>0){days = days[-which(d),]}
+
+  save(days, file = paste0(days_folder, filename))
+}
+
+stopCluster(cl)
+
+```
+
+```{r data_prep_cycle_id checking linking the days with the cycles}
+
+load(paste0(days_folder, filenames[length(filenames)]), verbose = TRUE)
+
+head(days)
+summary(days)
+```
+
+
+Checking for duplicates in the original dataset that Clue provided.
+
+```{r data_prep_cycle_id MISC checking if there are duplicates in the original data}
+
+# suspecting for example a duplicate on light period for user # 00147343bfdb6aff66efe58308b606d20959d8c4 on the 2017-06-04
+
+files=  list.files(paste0(IO$tmp_data, "tracking_raw_batches/"))
+j = grep("_batch_1.Rdata", files)
+files = files[j]
+
+for(file in files){
+  cat(file,"\n")
+  load(file = paste0(IO$tmp_data, 'tracking_raw_batches/',file), verbose = TRUE)
+  print(which(days$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4"))
+}
+
+load(file = paste0(IO$input_data, 'tracking_filtered/tracking_filtered_split_cq.Rdata'))
+which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4")
+
+TRACKING = tracking[which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4"),]
+
+load(file = paste0(IO$input_data, 'tracking_filtered/tracking_filtered_split_cr.Rdata'))
+which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4")
+
+
+TRACKING = rbind(TRACKING, tracking[which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4"),])
+TRACKING[TRACKING$date == "2017-06-04",]
+
+rm(TRACKING, tracking, files, file, j)
+
+
+```
+
+
+
+## Defining menstruation-centered cycles
+
+
+We consider the luteal phase to be "fixed" so that any day within D days from the next menses will belong to the next cycle.
+
+We also define a Df which is the number of days from the follicular phase that we want to consider when we want to standardize cycles.
+
+The column "cycleday_m" counts the days from menstruation with 0 = first day of menstruation going from -D to +x with x = cycle_length - D.
+
+The column "cycleday_m_D" counts the days from menstruation with 0 = first day of menstruation going from -D to +X with X = min(Df,cycle_length - D).
+
+Also, the start of the first cycle and the end of the last cycles should be removed so that cycle_id_m, cycleday_m and cycleday_m_D = NA for those (as they are "incomplete menstruation-centered cycles").
+
+
+
+```{r data_prep_cycle_id define menstruation-centered cycle_id - parameters}
+
+par$Df
+par$D
+
+```
+
+
+```{r data_prep_cycle_id define menstruation-centered cycle_id - function}
+
+define_menstruation_centered_cycles = function(days = days, par = par){
+  
+  # cycle id and cycle number
+  
+  days$cycle_id_m = days$cycle_id
+  days$cycle_nb_m = days$cycle_nb
+  
+  end.j = which(days$cycleday_from_end >= -par$D)
+  days$cycle_id_m[end.j] = paste0(days$user_id[end.j],"_",days$cycle_nb[end.j]+1)
+  days$cycle_nb_m[end.j] = days$cycle_nb[end.j]+1
+  
+  rm(end.j)
+  
+  # cycleday_m and cycleday_m_D
+  
+  days$cycleday_m = days$cycleday-1
+  days$cycleday_m_D = NA
+  
+  j.start = which((days$cycle_id_m == days$cycle_id) & (days$cycleday_m <= par$Df))
+  days$cycleday_m_D[j.start] = days$cycleday[j.start]-1
+  
+  j.end = which(days$cycle_id_m != days$cycle_id)
+  days$cycleday_m[j.end] = days$cycleday_from_end[j.end]
+  days$cycleday_m_D[j.end] = days$cycleday_from_end[j.end]
+  
+  
+  rm(j.start, j.end)
+  
+  # ignore what is before or after the first or last FULL cycle_id_m 
+  # (i.e. we set to NA the start of the first cycle of a user 
+  # and the end of the last cycle of a user)
+  
+  agg = aggregate(cycle_nb ~ user_id, days, range)
+  agg$cycle_id_m1 = paste0(agg$user_id, "_",agg$cycle_nb[,1])
+  agg$cycle_id_m2 = paste0(agg$user_id, "_",agg$cycle_nb[,2]+1)
+  
+  m1 = match(days$cycle_id_m, agg$cycle_id_m1)
+  days$cycle_id_m[!is.na(m1)] = NA
+  days$cycle_nb_m[!is.na(m1)] = NA
+  days$cycleday_m[!is.na(m1)] = NA
+  days$cycleday_m_D[!is.na(m1)] = NA
+  
+  
+  m2 = match(days$cycle_id_m, agg$cycle_id_m2)
+  days$cycle_id_m[!is.na(m2)] = NA
+  days$cycle_nb_m[!is.na(m2)] = NA
+  days$cycleday_m[!is.na(m2)] = NA
+  days$cycleday_m_D[!is.na(m2)] = NA
+  
+  rm(agg, m1, m2)
+  
+  return(days)
+
+}
+
+
+```
+
+
+
+```{r define menstruation-centered cycle_id, eval = TRUE}
+
+days_folder = paste0(IO$output_data,"days/")
+
+tmp_days_folder = paste0(IO$tmp_data,"days_before_menstruation_centered_cycles/")
+file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
+
+clue_file_list = list.files(days_folder)
+
+registerDoParallel(par$n_cores)
+
+tic()
+foreach(file = clue_file_list) %dopar%
+{
+  cat(file,"\n")
+  load(paste0(days_folder,file), verbose = TRUE)
+  cat(dim(days),"\n")
+  days  = define_menstruation_centered_cycles(days = days, par = par)
+  cat(dim(days),"\n")
+  save(days, file = paste0(days_folder,file))
+  rm(days)
+}
+toc()
+stopImplicitCluster()
+
+```
+
+
+
+```{r define checking menstruation-centered cycle_id, eval = TRUE}
+  
+load(paste0(days_folder,clue_file_list[1]), verbose = TRUE)
+
+head(days[days$cycle_nb == 2, ])
+
+```

@@ -1,0 +1,51 @@
+---
+title: Breast Tenderness
+author: "Laura Symul, Susan Holmes and Paula Hillard"
+date: "2019"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: no
+    toc_float: true
+    toc_depth: 5
+    number_sections: false
+    fig_caption: true
+
+---
+
+![](Figures Tables Media/Media/Clue TB icon banner-02.png)
+
+
+
+# Pre-print
+
+
+The current version of the paper can be downloaded on !! [bioRxiv](XXX) !!
+
+
+# Peer-reviewed published article
+Coming soon
+
+# Figures, Code and Data
+
+Code and aggregated data to reproduce the figures can be found and downloaded on the github repo !! [TB-Public-Repo](https://github.com/lasy/TB-Public-Repo) !! .
+
+Specifically, click !! [here](https://lasy.github.io/TB-Public-Repo/Code/Tender_Breasts_FIGURES.html) !! for the rendered  !! [Rmd](https://github.com/lasy/TB-Public-Repo/blob/master/Code/Tender_Breasts_FIGURES.Rmd) !! (R code // R markdown) used to generate the Figures.
+
+
+# Contact
+Any question or request can be addressed at Laura Symul 
+
+[lsymul@stanford.edu](mailto:lsymul@stanford.edu) 
+
+[laurasymul@gmail.com](mailto:laurasymul@gmail.com) 
+
+[lsy.works](http://lsy.works/)
+
+[twitter](https://twitter.com/LauraSymul) @LauraSymul
+
+
+![](Figures Tables Media/Media/Clue TB icon banner-02.png)
+
+

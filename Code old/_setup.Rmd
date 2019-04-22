@@ -1,0 +1,35 @@
+---
+title: "Project set-up"
+author: "Laura Symul"
+date: "12/10/2018"
+output: html_document
+---
+
+```{r setup setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+
+```{r setup librairies and stuff, include = FALSE, eval = TRUE}
+source("00_variables.R")
+source("00_libraries.R")
+source("00_functions.R")
+```
+
+
+
+```{r setup parameters, include=FALSE}
+par = list()
+par$reset = FALSE
+par$selected_countries = c("United States","United Kingdom", "Brazil","Germany","France", "Unknown")
+par$x.axis = seq(-14,7,by = 7)
+par$n_cores = detectCores() - 1
+
+TB = "tender_breasts"
+
+```
+
+```{r setup ggplot setup, include=FALSE}
+theme_set(theme_minimal())
+```

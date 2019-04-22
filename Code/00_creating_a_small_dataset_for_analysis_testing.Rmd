@@ -1,0 +1,141 @@
+---
+title: "Subset of Clue data for TB analysis"
+author: "Laura Symul"
+date: "4/11/2019"
+output: html_document
+---
+
+
+
+
+```{r subset librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+```{r}
+IO$input_data_full_dataset = IO$input_data
+IO$input_data_subset = paste0(IO$r_Data,"input_data/Clue_20180119_subset/")
+```
+
+
+
+```{r loading users and cycles}
+
+load(paste0(IO$input_data_full_dataset,"users_filtered.Rdata"), verbose = TRUE)
+dim(users)
+users_o = users
+
+
+load(paste0(IO$input_data_full_dataset,"cycles_filtered.Rdata"), verbose = TRUE)
+dim(cycles)
+cycles_o = cycles
+
+
+```
+
+
+```{r selecting random users : 10% of the whole population}
+
+users$subsample = FALSE
+
+N = round(nrow(users)/10)
+
+j = sample(1:nrow(users), N)
+
+users$subsample[j] = TRUE
+
+```
+
+
+We want to quickly check that the distributions of the selected random users are representative of the whole population.
+
+
+```{r adding first and last cycle dates to users}
+
+agg_min = aggregate(cycle_start ~ user_id, cycles, min)
+colnames(agg_min) = c("user_id","first_cycle_date")
+agg_max = aggregate(cycle_start ~ user_id, cycles, max)
+colnames(agg_max) = c("user_id","last_cycle_date")
+
+
+users = merge(users, agg_min, by = "user_id", all = TRUE)
+users = merge(users, agg_max, by = "user_id", all = TRUE)
+
+```
+
+
+```{r checking the distributions}
+
+colnames = colnames(users[,-which(colnames(users) %in% c("user_id","subsample"))])
+for(this_col in colnames){
+  eval(parse(text = paste0('v = data.frame(user_id = users$user_id, subsample = users$subsample, v = users$',this_col,')')))
+  g = ggplot(v, aes(x = v, fill = subsample)) + geom_bar() + facet_grid(subsample ~ ., scale = 'free_y') + ggtitle(this_col)
+  print(g)
+}
+
+```
+
+Good enough, we can proceed.
+
+```{r saving users}
+
+users = users_o[which(users$subsample),]
+save(users, file = paste0(IO$input_data_subset,"users_filtered.Rdata"))
+
+```
+
+Now we can filter cycles
+
+```{r filtering cycles}
+j = which(cycles_o$user_id %in% users$user_id)
+length(j)/nrow(cycles_o)
+cycles = cycles_o[j,]
+
+```
+
+
+
+```{r save cycles}
+save(cycles, file = paste0(IO$input_data_subset,"cycles_filtered.Rdata"))
+```
+
+
+And now we can filter tracking tables.
+
+First, we need to create the folder
+```{r create tracking dir}
+tracking_subset_folder = paste0(IO$input_data_subset,"tracking_filtered/")
+dir.create(tracking_subset_folder)
+```
+
+Then filter and save each file
+
+```{r filter}
+tracking_fullset_folder = paste0(IO$input_data_full_dataset,"tracking_filtered/")
+filenames = list.files(tracking_fullset_folder)
+for(file in filenames){
+  cat(file, "\n")
+  load(file = paste0(tracking_fullset_folder, file), verbose = TRUE)
+  j = which(tracking$user_id %in% users$user_id)
+  cat("% of original dataset: ",round(length(j)/nrow(tracking)*100, digits = 2),"\n")
+  tracking= tracking[j,]
+  save(tracking, file = paste0(tracking_subset_folder,file))
+}
+
+```
+
+and we're done!
+
+
+
+
+```{r fixing a bug , eval = FALSE, include = FALSE}
+folder = paste0(IO$input_data,"tracking_filtered/")
+files  = list.files(folder)
+for(file in files){
+  cat(file, "\n")
+  file.rename(from = paste0(folder, file), to = paste0(folder, substring(file, 2)))
+}
+
+```
+

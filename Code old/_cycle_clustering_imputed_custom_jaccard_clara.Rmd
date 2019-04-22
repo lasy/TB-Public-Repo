@@ -1,0 +1,518 @@
+---
+title: "Cycle clustering with categorical data and custom_jaccard distance"
+author: "Laura Symul"
+date: "12/10/2018"
+output: html_document
+---
+
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+##  CYCLES CLUSTERING IMPUTED DATA AND CUSTOM_JACCARD DISTANCE (clara)
+
+
+### Loading data
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara loading data, eval = TRUE, cache = FALSE}
+load(file = paste0(IO$tmp_Rdata,"d_wide_imputed.Rdata"), verbose = TRUE)
+load(file = paste0(IO$tmp_Rdata, "d_imputed.Rdata"), verbose = TRUE)
+load(file = paste0(IO$input_data, "users.Rdata"), verbose = TRUE)
+```
+
+### Using clara with CUSTOM_JACCARD distance and weight on the cycledays
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara weight for distance evaluation and r, eval = TRUE, fig.height=3, fig.width=7}
+
+sigmoid = function(x, ix, s){ 1/(1+exp(-(x-ix)*s))}
+
+w  = 0.5 + (sigmoid(-18:7,ix = -12,s = 0.5) - sigmoid(-18:7, ix = 8, s = 0.6))/2
+ww = data.frame(cycleday_m_D = -18:7, w = w)
+
+save(ww, file = paste0(IO$out_Rdata, "weight_for_distance.Rdata"))
+
+ggplot(ww, aes(x = cycleday_m_D, y = w)) + geom_point() + geom_line() + scale_x_continuous(breaks = par$x.axis)+ ylim(c(0,1))
+
+```
+
+### Ideal number of clusters
+
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara load silhouette summary}
+load(file = paste0(IO$tmp_Rdata,"silhouette_score_summary.Rdata"), verbose = TRUE)
+```
+
+```{r cycle_clustering_imputed_custom_jaccard_clara silhouette summary}
+df$n_clusters = factor(df$n_clust)
+ggplot(df, aes(x = n_clusters, y = avg_silhouette_score, fill = avg_silhouette_score)) + geom_bar(stat = "identity")+ facet_grid(r ~ .)
+```
+
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara finding N}
+r = 0.75
+
+cycle_ids = unique(d_imputed$cycle_id_m)
+n_center = df$n_clust[which((df$r == r) & (df$avg_silhouette_score == max(df$avg_silhouette_score[df$r == r])))]
+rm(df)
+```
+
+The ideal number of cluster is ```n_center```
+
+```{r cycle_clustering_imputed_custom_jaccard_clara clustering, cache = FALSE}
+clusters_clara = clara(d_wide[,-1], k = n_center, metric = "custom_jaccard", w = w, cjratio = r)
+
+cycles_cluster = data.frame(cycle_id_m = d_wide$cycle_id_m, cluster_num = clusters_clara$clustering )
+
+d_imputed$cluster_num = clusters_clara$clustering[match(d_imputed$cycle_id_m, d_wide$cycle_id_m)]
+
+# silhouette info
+silh = as.data.frame(clusters_clara$silinfo$widths)
+silh$x = 1:nrow(silh)
+silh$rows = as.numeric(rownames(silh))
+
+silh = silh[,c("x","cluster","neighbor","sil_width","rows")]
+
+save(silh, file = paste0(IO$out_Rdata, "silhouette_width.Rdata"))
+```
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara save d_imputed with clusters, cache = TRUE, eval = FALSE}
+rownames(d_imputed) = 1:nrow(d_imputed)
+d_imputed = d_imputed[,c("user_id","cycle_id_m","cycle_nb_m","cycleday_m_D","tender_breasts","cluster_num")]
+
+save(d_imputed, file = paste0(IO$tmp_Rdata,"d_imputed_with_clusters.Rdata"))
+```
+
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara plots N clusters, cache = FALSE, fig.width= 10, fig.height= 4}
+
+#### plots
+# showing some random examples with d_imputed
+set.seed(10)
+random_cycle_ids = cycle_ids[sample(1:length(cycle_ids),50)]
+d_subset = d_imputed[d_imputed$cycle_id_m %in% random_cycle_ids,]
+# ordered colored dots
+d_subset = d_subset[order(d_subset$cluster_num),]
+d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
+print(ggplot_imputed_TB(d_subset, facet_grid = FALSE)+scale_size(range = c(2,2)))
+rm(random_cycle_ids, cycle_ids, d_subset)
+
+# show the samples chosen by clara FOR SILHOUETTE
+m = match(silh$rows, rownames(d_wide))
+cycle_ids_silh = as.character(d_wide$cycle_id_m[m])
+m = which(!is.na(match( d_imputed$cycle_id_m, cycle_ids_silh)))
+d_subset = d_imputed[m,]
+d_subset = d_subset[order(d_subset$cluster_num),]
+d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = rev(cycle_ids_silh))
+
+save(d_subset, file = paste0(IO$out_Rdata, "representative_cycles_clusters.Rdata"))
+
+g_samples = ggplot_imputed_TB(d_subset, facet_grid = FALSE)+scale_size(range = c(2,2)) + ggtitle(paste0("r = ",r))
+rm(m, cycle_ids_silh, d_subset)
+
+g_silh = ggplot(silh, aes(fill = factor(cluster),x = factor(x, levels =rev(x)), y = sil_width)) + coord_flip()+
+  geom_bar(stat = "identity")+
+  geom_point(aes( col = factor(neighbor),y = pmax(0,sil_width) + 0.025), size = 3)+
+  #ylim(c(-1,1))+
+  geom_hline(yintercept = clusters_clara$silinfo$avg.width, linetype = 2)+ 
+  ggtitle(paste0("avg. silh score = ",round(clusters_clara$silinfo$avg.width,digits = 3)))+
+  guides(fill = FALSE, color = FALSE)+
+  xlab("")+ylab("silh width")+ scale_x_discrete(position = "top")
+
+
+
+mds_eig = cmdscale(d = clusters_clara$diss, k = 10, eig = TRUE)
+mds = data.frame(mds_eig$points)
+colnames(mds) = c(paste0("d",1:10))
+mds$cluster_num = as.factor(clusters_clara$clustering[match(rownames(mds), names(clusters_clara$clustering))])
+m = match( silh$rows, rownames(mds))
+mds = mds[m,]
+mds$num = 1:nrow(mds)
+save(mds, file = paste0(IO$out_Rdata, "mds_representative_samples.Rdata"))
+save(mds_eig, file = paste0(IO$out_Rdata, "mds_eig.Rdata"))
+
+g_mds = ggplot(mds, aes(x = x, y = y, col = cluster_num)) + coord_fixed()+
+  geom_point(size = 4, alpha = 0.5) + 
+  geom_text(label = 1:nrow(mds))+
+  guides(color = FALSE)+ggtitle("MDS")+xlab("")+ylab("")
+rm(mds, m)
+
+grid.arrange(g_samples, g_silh, g_mds, nrow = 1, widths = c(2,1,2.2))
+rm(g_samples, g_silh, g_mds)
+
+
+# symptom profiles for the clusters
+d_imputed$tb_binary = (d_imputed$tender_breasts==1)*1
+agg = aggregate(tb_binary ~ cycleday_m_D + cluster_num, d_imputed, sum)
+#print(ggplot(agg, aes(x = cycleday_m_D, y = tb_binary, col = factor(cluster_num))) + geom_line() + facet_grid(cluster_num ~.))
+
+agg2 = aggregate(cycle_id_m ~ cluster_num, d_imputed, lu)
+colnames(agg2)[length(colnames(agg2))] = "n_cycles"
+agg  = merge(agg, agg2, all = TRUE)
+agg$fraction_of_cycles = agg$tb_binary/agg$n_cycles
+
+# average tracking behavior profiles 
+agg2 = aggregate(cycle_id_m ~ cycleday_m_D + cluster_num, d_imputed[d_imputed$tender_breasts>=0,],lu)
+colnames(agg2)[length(colnames(agg2))] = "n_cycles_with_logs"
+agg  = merge(agg, agg2, all = TRUE)
+agg$fraction_of_cycles_with_logs = agg$n_cycles_with_logs/agg$n_cycles
+
+
+g_symptom_profiles = ggplot(agg, aes(x = cycleday_m_D, y = fraction_of_cycles, col = factor(cluster_num))) + geom_point(size = 0.6) + geom_line()
+
+g_tracking_profiles = ggplot(agg, aes(x = cycleday_m_D, y = fraction_of_cycles_with_logs, col = factor(cluster_num))) + geom_point(size = 0.6) + geom_line() + ylim(c(0,1))
+
+grid.arrange(g_symptom_profiles, g_tracking_profiles)
+
+save(agg, file = paste0(IO$out_Rdata, "breast_tenderness_and_tracking_profiles_per_clusters_clara.Rdata"))
+rm(agg, agg2, g_symptom_profiles, g_tracking_profiles)
+
+
+# and showing the medoids
+medoids = as.data.frame(clusters_clara$medoids)
+colnames(medoids) = paste0("tender_breasts.",(-18:7)+18)
+medoids$cluster_num = 1:n_center
+
+medoids = reshape(medoids, idvar = "cluster_num", varying = 1:(ncol(medoids)-1), direction = "long")
+medoids$cycleday_m_D = medoids$time-18
+
+print(ggplot(medoids, aes(x = cycleday_m_D, y = tender_breasts, col =  factor(cluster_num)))+geom_hline(yintercept = 0, col = "gray") + geom_line(size = 1.5)+ facet_grid(cluster_num ~.))
+
+print(ggplot(medoids, aes(x = cycleday_m_D, y = tender_breasts, col =  factor(cluster_num)))+geom_hline(yintercept = 0, col = "gray") + geom_line(size = 1.5, alpha = 0.5))
+
+# plus showing the number of cycles in each cluster
+print(ggplot(data.frame(as.data.frame(clusters_clara$clusinfo),cluster_num = 1:n_center), aes(x = cluster_num, y = size, fill = factor(cluster_num))) + geom_bar(stat = "identity")+ guides(fill = FALSE))
+
+rm(medoids, silh)
+
+```
+
+
+
+#### DMS on a subsample of the dataset
+
+```{r cycle_clustering_imputed_custom_jaccard_clara DMS}
+
+r = 0.75
+set.seed(1)
+j = sample(1:nrow(d_wide), 5000)
+
+source("Scripts/00_functions_jaccard_like_distance.R")
+jaccard_dist = new_jaccard(d_wide[j,-1], r = r, w = w)
+
+
+mds = data.frame(cmdscale(d = jaccard_dist, k = 2))
+colnames(mds) = c("x","y")
+
+g_mds = ggplot(mds, aes(x = x, y = y)) + coord_fixed()+
+  geom_point(size = 1, alpha = 0.5) 
+g_mds
+rm(g_mds)
+
+mds = data.frame(cmdscale(d = jaccard_dist, k = 3))
+colnames(mds) = c("x","y","z")
+mds$z_cat = cut(mds$z, 20)
+mds_range = range(mds$x,mds$y,mds$z)
+mds$cluster_num = clusters_clara$clustering[j]
+
+
+```
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara DMS plots, fig.width= 12}
+
+g_mds_xy = ggplot(mds, aes(x = x, y = y, col = z_cat)) + coord_fixed(xlim = mds_range, ylim = mds_range)+
+  geom_point(size = 0.5, alpha = 0.3) + guides(color = FALSE)
+
+g_mds_yz = ggplot(mds, aes(x = z, y = y, col = z_cat)) + coord_fixed(xlim = mds_range, ylim = mds_range)+
+  geom_point(size = 0.5, alpha = 0.3) + guides(color = FALSE)
+
+g_mds_xz = ggplot(mds, aes(x = x, y = z, col = z_cat)) + coord_fixed(xlim = mds_range, ylim = mds_range)+
+  geom_point(size = 0.5, alpha = 0.3) + guides(color = FALSE)
+
+o = order(mds$x)
+cycle_ids = d_wide$cycle_id_m[j]
+cycle_ids = as.character(cycle_ids[o])
+cycle_ids = cycle_ids[seq(1,length(cycle_ids),len = 40)]
+d_subset = d_imputed[which(d_imputed$cycle_id_m %in% cycle_ids),]
+d_subset$z_cat = mds$z_cat[match(d_subset$cycle_id_m, d_wide$cycle_id_m[j])]
+d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = cycle_ids)
+
+g_x = ggplot_imputed_TB(sel_d = d_subset, facet_grid = FALSE, col = "z_cat")
+g_x_clus = ggplot_imputed_TB(sel_d = d_subset, facet_grid = FALSE)
+
+
+o = order(mds$y)
+cycle_ids = d_wide$cycle_id_m[j]
+cycle_ids = cycle_ids[o]
+cycle_ids = cycle_ids[seq(1,length(cycle_ids),len = 40)]
+d_subset = d_imputed[which(d_imputed$cycle_id_m %in% cycle_ids),]
+d_subset$z_cat = mds$z_cat[match(d_subset$cycle_id_m, d_wide$cycle_id_m[j])]
+d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = cycle_ids)
+
+g_y = ggplot_imputed_TB(sel_d = d_subset, facet_grid = FALSE, col = "z_cat")
+g_y_clus = ggplot_imputed_TB(sel_d = d_subset, facet_grid = FALSE)
+
+
+
+o = order(mds$z)
+cycle_ids = d_wide$cycle_id_m[j]
+cycle_ids = cycle_ids[o]
+cycle_ids = cycle_ids[seq(1,length(cycle_ids),len = 40)]
+d_subset = d_imputed[which(d_imputed$cycle_id_m %in% cycle_ids),]
+d_subset$z_cat = mds$z_cat[match(d_subset$cycle_id_m, d_wide$cycle_id_m[j])]
+d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = cycle_ids)
+
+g_z = ggplot_imputed_TB(sel_d = d_subset, facet_grid = FALSE, col = "z_cat")
+g_z_clus = ggplot_imputed_TB(sel_d = d_subset, facet_grid = FALSE)
+
+
+grid.arrange(g_mds_xy,g_mds_yz, g_mds_xz, nrow = 1)
+
+grid.arrange(g_x,g_y, g_z, nrow = 1)
+
+
+g_mds_clus_xy = ggplot(mds, aes(x = x, y = y, col = factor(cluster_num))) + coord_fixed(xlim = mds_range, ylim = mds_range)+
+  geom_point(size = 0.5, alpha = 0.3) + guides(color = FALSE)
+
+g_mds_clus_yz = ggplot(mds, aes(x = z, y = y, col = factor(cluster_num))) + coord_fixed(xlim = mds_range, ylim = mds_range)+
+  geom_point(size = 0.5, alpha = 0.3) + guides(color = FALSE)
+
+g_mds_clus_xz = ggplot(mds, aes(x = x, y = z, col = factor(cluster_num))) + coord_fixed(xlim = mds_range, ylim = mds_range)+
+  geom_point(size = 0.5, alpha = 0.3) + guides(color = FALSE)
+
+
+grid.arrange(g_mds_clus_xy,g_mds_clus_yz, g_mds_clus_xz, nrow = 1)
+grid.arrange(g_x_clus,g_y_clus, g_z_clus, nrow = 1)
+
+
+rm(g_mds_xy,g_mds_yz, g_mds_xz,g_x,g_y, g_z, g_mds_clus_xy,g_mds_clus_yz, g_mds_clus_xz, g_x_clus,g_y_clus, g_z_clus, mds_range, mds,j, o, cycle_ids, d_subset, jaccard_dist)
+
+```
+
+
+
+### Cycle clusters by age and birth control
+
+```{r cycle_clustering_imputed_custom_jaccard_clara load d and cycles}
+load(file = paste0(IO$tmp_Rdata,"days_TB_only.Rdata"), verbose = TRUE)
+d = days[!is.na(days$cycleday_m_D),]
+d$tender_breasts = 1
+rm(days)
+
+load(file = paste0(IO$input_data,"cycles.Rdata"), verbose = TRUE)
+```
+
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara proportion of clusters withing age and BC categories, eval = TRUE}
+
+# adding age and BC to cycles_cluster
+
+cycles_cluster$user_id = d_imputed$user_id[match(cycles_cluster$cycle_id_m, d_imputed$cycle_id_m)]
+cycles_cluster$age = users$age[match(cycles_cluster$user_id, users$user_id)]
+cycles_cluster$birth_control = users$birth_control[match(cycles_cluster$user_id, users$user_id)]
+cycles_cluster$age_cat = cut(cycles_cluster$age, breaks = breaks$age)
+
+save(cycles_cluster, file = paste0(IO$tmp_Rdata, "cycles_clusters.Rdata"))
+
+#cycles_cluster$cluster_num_f = as.factor(cycles_cluster$cluster_num, levels = c(3,2,1,4))
+
+g = ggplot(cycles_cluster, aes(x = age_cat, fill = as.factor(cluster_num)))+
+  facet_grid( . ~ birth_control)+
+  geom_bar(position = "fill")
+g
+
+
+```
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara profiles by age, BC categories and clusters, eval = TRUE}
+
+# add age, BC and clusters to d
+m = match(d$user_id, users$user_id)
+d$age = users$age[m]
+d$birth_control = users$birth_control[m]
+d$age_cat = cut(d$age, breaks = breaks$age)
+
+m = match(d$cycle_id_m, cycles_cluster$cycle_id_m)
+d$cluster_num = cycles_cluster$cluster_num[m]
+rm(m)
+
+cycles$age_cat = cut(cycles$age, breaks = breaks$age)
+
+# aggregate profiles by age_cat, BC and clusters
+agg = aggregate(tender_breasts ~ cycleday_m_D + age_cat + birth_control + cluster_num, d, sum)
+# normalizing the profiles by the number of cycles in each age and BC category
+agg2 = aggregate(cycle_id ~ age_cat + birth_control, cycles, lu)
+agg2$n_cycles = agg2$cycle_id
+agg3 = aggregate(user_id ~ age_cat + birth_control, cycles, lu)
+agg3$n_users = agg3$user_id
+agg2 = merge(agg2, agg3, all = TRUE)
+agg2$n_cycles_m = agg2$n_cycles - agg2$n_users
+agg_cycles = agg2[, c("age_cat", "birth_control", "n_cycles_m", "n_cycles" )]
+rm(agg2, agg3)
+agg = merge(agg, agg_cycles, all = TRUE)
+agg$perc_tender_breasts = agg$tender_breasts / agg$n_cycles_m
+
+g_profiles = ggplot(agg, aes(x = cycleday_m_D, y = tender_breasts, col = factor(cluster_num))) +
+  geom_line() + facet_grid( age_cat ~ birth_control) + guides(col = FALSE)
+g_profiles
+
+g_profiles = ggplot(agg, aes(x = cycleday_m_D, y = perc_tender_breasts, col = factor(cluster_num))) +
+  geom_line() + facet_grid( age_cat ~ birth_control) + guides(col = FALSE)
+g_profiles
+
+save(agg, file = paste0(IO$out_Rdata, "TB_profiles_by_cluster_age_cat_and_BC.Rdata"))
+
+rm(agg, agg_cycles, g_profiles)
+
+
+```
+
+
+#### further cycle characteristics
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara symptoms characteristics}
+
+
+# number of days with logs per cycle
+d_imputed$n_log = (d_imputed$tender_breasts >= 0)*1
+agg = aggregate(n_log ~ cycle_id_m, d_imputed, sum)
+
+cycles_cluster = merge(cycles_cluster, agg, all = TRUE)
+
+# number of symptoms per cycle
+d_imputed$tender_breasts_positive = d_imputed$tender_breasts * (d_imputed$tender_breasts >= 0)
+agg = aggregate(tender_breasts_positive ~ cycle_id_m, d_imputed, sum)
+colnames(agg) = c("cycle_id_m","n_TB")
+
+cycles_cluster = merge(cycles_cluster, agg, all = TRUE)
+
+# timing of symptoms
+d_imputed$cycleday_m_D_weighted = d_imputed$cycleday_m_D * d_imputed$tender_breasts_positive
+agg = aggregate(cycleday_m_D_weighted ~ cycle_id_m, d_imputed, mean)
+colnames(agg) = c("cycle_id_m","TB_timing")
+
+cycles_cluster = merge(cycles_cluster, agg, all = TRUE)
+
+ggplot(cycles_cluster, aes(x = n_TB, y = TB_timing, col = factor(cluster_num))) + geom_density2d(h = c(3,2)) 
+
+ggplot(cycles_cluster, aes(x = n_TB, y = n_log, col = factor(cluster_num))) + geom_density2d(h = c(3,3)) 
+
+ggplot(cycles_cluster, aes(x = TB_timing, fill = factor(cluster_num))) + geom_density(alpha = 0.3, bw = 0.1, col = NA) + guides(fill = FALSE)
+
+
+save(cycles_cluster, file = paste0(IO$tmp_Rdata, "cycles_clusters.Rdata"))
+
+
+```
+
+
+
+
+
+
+
+#### Selecting users that have all their cycles in the same cluster
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara selecting users that have all their cycles in the same clusters}
+
+# all their cycles in the same cluster
+agg = aggregate(cluster_num ~ user_id, d_imputed, lu)
+agg = agg[agg$cluster_num == 1,]
+d_imputed_selected_users = d_imputed[d_imputed$user_id %in% agg$user_id,]
+
+
+# with about N cycles
+N = 12
+agg = aggregate(cycle_id_m ~ user_id, d_imputed_selected_users, lu )
+agg = agg[agg$cycle_id_m %in% (N-2):(N+2), ]
+d_imputed_selected_users = d_imputed_selected_users[d_imputed_selected_users$user_id %in% agg$user_id,]
+
+# selected users
+for(ci in 1:n_center){
+  cat(ci,"\n")
+  j = which(d_imputed_selected_users$cluster_num == ci)
+  us = unique(d_imputed_selected_users$user_id[j])
+  us = us[1:min(length(us),10)]
+  for(u in us){
+    cat("\t",u, "\n")
+    j = which(d_imputed_selected_users$user_id == u)
+    d_this_user = d_imputed_selected_users[j,]
+    
+    d_this_user$alpha = pmax(d_this_user$tender_breasts, 0)
+    d_this_user$stroke = 1*(d_this_user$tender_breasts >=0)
+    
+    g = ggplot(d_this_user, 
+               aes(x = cycleday_m_D, y = as.factor(cycle_nb_m), col = ci,
+                   stroke = stroke/2, alpha = alpha, size = 2))+
+      scale_x_continuous(breaks = par$x.axis)+
+      geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+      geom_point(alpha = 1, fill = NA, shape=21) + geom_point()+ scale_alpha(range = c(0, 1))+ 
+      xlab("cycleday from 1st day of menstruation") + ylab("cycle number")+
+      ggtitle(paste0(u," - cluster ",ci))+
+      guides(col = FALSE, alpha = FALSE, size = FALSE)
+    print(g)
+    
+  }
+  
+}
+
+rm(ci, j, g, d_this_user, u, us, agg)
+
+```
+
+
+
+
+
+```{r cycle_clustering_imputed_custom_jaccard_clara selected users for examples, eval = TRUE}
+
+## previously manually selected clusters
+#cluster_example_users = c("62cad59cde9107f38c751222c7fb2ed53f1c48e9","39cd0f53570b53f5087312212c3d6a60754d2826","302f684cb151f87d182e592142acb4314ee66a5e","3a4aefded4d1713aadcc61fb769c906da95c39d4")
+
+cluster_example_users = c("62cad59cde9107f38c751222c7fb2ed53f1c48e9","0c7308d40012a3d72e0a0022f41a959af515abab","1c123812d268ea17ec31eae01755e72439541eab")
+
+j = which(d_imputed_selected_users$user_id %in% cluster_example_users)
+d_selected_users = d_imputed_selected_users[j,]
+
+d_selected_users$alpha = pmax(d_selected_users$tender_breasts, 0)
+d_selected_users$stroke = 1*(d_selected_users$tender_breasts >=0)
+
+save(d_selected_users, file = paste0(IO$out_Rdata, "selected_users_for_clusters_examples.Rdata"))
+
+g = ggplot(d_selected_users, 
+           aes(x = cycleday_m_D, y = as.factor(cycle_nb_m), col = as.factor(cluster_num),
+               stroke = stroke/2, alpha = alpha, size = 1))+
+  facet_grid(cluster_num ~ ., scales = "free_y")+
+  scale_x_continuous(breaks = par$x.axis)+
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_point(alpha = 1, fill = NA, shape=21) + geom_point()+ scale_alpha(range = c(0, 1))+ 
+  xlab("cycleday from 1st day of menstruation") + ylab("cycle number")+
+  guides(col = FALSE, alpha = FALSE, size = FALSE)
+g
+
+rm(g, d_selected_users, d_imputed_selected_users )
+
+```
+
+
+
+
