@@ -1,0 +1,278 @@
+---
+title: "Overall profiles Breast Tenderness"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+## Breast tenderness overall profiles
+
+### Examples
+
+
+```{r data_presentation_overall_profile load days table 1}
+load(paste0(IO$input_data,"days/days_1.Rdata"), verbose = TRUE)
+head(days)
+```
+
+
+```{r data_presentation_overall_profile examples selection, eval = FALSE, include=FALSE}
+days$counts = 1
+
+#selecting users with at least 10 cycles and regular tenderbreast logs
+
+agg = aggregate(counts ~ user_id, days[days$type == "tender_breasts",], length)
+agg2 = aggregate(cycle_id ~ user_id, days[days$type == "tender_breasts",], function(x) length(unique(x)))
+colnames(agg2) = c("user_id","n_cycles")
+agg = merge(agg, agg2)
+agg$counts_per_cycle = agg$counts / agg$n_cycles
+agg = agg[order(agg$counts_per_cycle, decreasing = TRUE),]
+
+j = which((agg$n_cycles == 10) & (agg$counts_per_cycle > 2) & (agg$counts_per_cycle < 10))
+user_ids = agg$user_id[j[11:20]]
+user_ids
+for(user_id in user_ids){
+  j = which((days$user_id == user_id)&(!is.na(days$cycle_id_m)) & (days$category != "pill_hbc"))
+  d = days[j,]
+  d$cycle_number = factor(d$cycle_nb_m, levels = min(d$cycle_nb_m, na.rm = TRUE):max(d$cycle_nb_m, na.rm = TRUE))
+  d$number[d$type == "tender_breasts"] = 4
+
+  
+  print(ggplot(d, aes(x = cycleday_m, y = category, col = type)) + geom_point()+ facet_grid(cycle_number ~.)+ ggtitle(d$user_id[1])) 
+}
+
+
+rm(agg, agg2, j, d)
+
+```
+
+
+
+
+
+```{r data_presentation_overall_profile examples fig 1A}
+
+load(paste0(IO$input_data,"days/days_1.Rdata"), verbose = TRUE)
+
+
+user_ids = c("40f6e582b35ef42ef3b2e9a783e8194b2f0a78aa","4bceeb21dd3142bedaed8abc54a7b2bcd076684b","94f55bdf0d9578f67b0081e323ac4a450c3566f3","2dd96c502ae01790d3ff2b1ba82c789dfd7d67fb")
+
+sub_days = days[days$user_id %in% user_ids,]
+save(sub_days, file = paste0(IO$r_output_data,"sub_days_examples_input_data.Rdata"))
+
+for(user_id in user_ids){
+  j = which((days$user_id == user_id)&(!is.na(days$cycle_id_m)) & (days$category != "pill_hbc"))
+  d = days[j,]
+  g = ggplot_user_example(d = d)
+  print(g)
+  
+}
+
+rm(user_id, user_ids, g, d, j)
+
+
+```
+
+
+
+
+## Profile by BC and age cat
+
+
+```{r data_presentation_overall_profile profile by BC and age cat}
+
+days_filenames = list.files(paste0(IO$input_data, "days/"))
+
+registerDoParallel(par$n_cores)
+
+tic()
+agg = foreach(days_filename = days_filenames, .combine = rbind)%dopar%{
+  load(paste0(IO$input_data,"days/",days_filename), verbose = TRUE)
+  days$n_tender_breasts = 1
+  days$age_cat = cut(days$age, breaks = breaks$age)
+  agg = aggregate(n_tender_breasts ~ cycleday_m_D + age_cat + BC , days[days$type == TB,], length)
+  agg_n_cycles = aggregate(cycle_id ~ age_cat + BC,days, function(x) length(unique(x))) 
+  colnames(agg_n_cycles)[which(colnames(agg_n_cycles) == "cycle_id")] = "n_cycles"
+  agg = merge(agg, agg_n_cycles, all =  TRUE)
+  rm(agg_n_cycles)
+  return(agg)
+}
+toc()
+stopImplicitCluster()
+
+
+a = aggregate(agg[,c("n_tender_breasts","n_cycles")] , by = list(cycleday_m_D = agg$cycleday_m_D, age_cat = agg$age_cat, BC = agg$BC), FUN = sum)
+a$perc_tender_breasts = a$n_tender_breasts/a$n_cycles
+
+a = a[-which(a$age_cat %in% par$age_cat_exclude),]
+a = a[-which((a$age_cat == "(35,40]") & (a$BC == "pill")),]
+
+a$SE = sqrt(a$perc_tender_breasts*(1-a$perc_tender_breasts)/a$n_cycles)
+
+
+save(a, file = paste0(IO$out_Rdata,"overal_pattern_of_breasts_tenderness_by_age_and_BC.Rdata"))
+
+g = ggplot(a, aes(x = cycleday_m_D, y = perc_tender_breasts, col = age_cat)) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_line() + geom_point(size = 0.6)+ facet_grid(BC ~.)+
+  scale_y_continuous(labels = scales::percent)+ scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values= cols$age_cat , name="Age group")+
+  xlab("cycleday from 1st day of menstruation") + ylab("% of reported breasts tenderness")+
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))
+g
+
+
+save(a, file = paste0(IO$out_Rdata,"overal_pattern_of_breasts_tenderness_by_age_and_BC.Rdata"))
+
+
+
+rm(g, a, agg, days_filenames)
+
+```
+
+
+
+## Profile by birth control and age cat
+
+
+```{r data_presentation_overall_profile profile by birth_control and age cat}
+
+days_filenames = list.files(paste0(IO$input_data, "days/"))
+
+registerDoParallel(par$n_cores)
+
+tic()
+agg = foreach(days_filename = days_filenames, .combine = rbind)%dopar%{
+  load(paste0(IO$input_data,"days/",days_filename), verbose = TRUE)
+  days$n_tender_breasts = 1
+  days$age_cat = cut(days$age, breaks = breaks$age)
+  agg = aggregate(n_tender_breasts ~ cycleday_m_D + age_cat + birth_control , days[days$type == TB,], length)
+  agg_n_cycles = aggregate(cycle_id ~ age_cat + birth_control,days, function(x) length(unique(x))) 
+  colnames(agg_n_cycles)[which(colnames(agg_n_cycles) == "cycle_id")] = "n_cycles"
+  agg = merge(agg, agg_n_cycles, all =  TRUE)
+  rm(agg_n_cycles)
+  return(agg)
+}
+toc()
+stopImplicitCluster()
+
+
+a = aggregate(agg[,c("n_tender_breasts","n_cycles")] , by = list(cycleday_m_D = agg$cycleday_m_D, age_cat = agg$age_cat, birth_control = agg$birth_control), FUN = sum)
+a$perc_tender_breasts = a$n_tender_breasts/a$n_cycles
+
+a = a[-which(a$age_cat %in% par$age_cat_exclude),]
+a = a[-which((a$age_cat == "(35,40]") & (a$birth_control == "pill")),]
+
+
+a$SE = sqrt(a$perc_tender_breasts*(1-a$perc_tender_breasts)/a$n_cycles)
+
+
+save(a, file = paste0(IO$out_Rdata,"overal_pattern_of_breasts_tenderness_by_age_and_BC.Rdata"))
+
+g = ggplot(a, aes(x = cycleday_m_D, y = perc_tender_breasts, col = age_cat)) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_line() + geom_point(size = 0.6)+ facet_grid(birth_control ~.)+
+  scale_y_continuous(labels = scales::percent)+ scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values= cols$age_cat , name="Age group")+
+  xlab("cycleday from 1st day of menstruation") + ylab("% of reported breasts tenderness")+
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))
+g
+
+
+rm(g, a, agg, days_filenames)
+
+```
+
+
+
+
+## Number of symptoms per user
+
+```{r data_presentation_overall_profile fraction of symptoms per cycle per users}
+
+load(paste0(IO$input_data, "users.Rdata"), verbose = TRUE)
+colnames(users)
+
+lim = 50
+users$n_tender_breasts_ul = pmin(users$n_tender_breasts, lim)
+
+agg = aggregate( user_id ~ n_tender_breasts_ul, users, uniqueN)
+agg$n_users = agg$user_id
+agg$perc_users = agg$n_users/sum(agg$n_users)*100
+
+ggplot(agg, aes(x = n_tender_breasts_ul, y = perc_users)) +
+  geom_bar(stat = "identity")
+
+lim = 3
+users$frac_tender_breasts = pmin(round(users$n_tender_breasts/users$n_cycle, digits = 1),lim)
+users$frac_tender_breasts = factor(users$frac_tender_breasts, levels = c(sort(unique(users$frac_tender_breasts)),paste0(lim,"+")))
+users$frac_tender_breasts[users$frac_tender_breasts == lim] = paste0(lim,"+")
+
+agg = aggregate( user_id ~ frac_tender_breasts, users, uniqueN)
+agg$n_users = agg$user_id
+agg$perc_users = agg$n_users/sum(agg$n_users)*100
+
+
+
+
+lim = 3
+users$n_TB_by_n_cycles = pmin(round(3*users$n_tender_breasts/users$n_cycle)/3,lim)
+
+
+agg = aggregate( user_id ~ n_TB_by_n_cycles + BC, users, uniqueN)
+agg$n_users = agg$user_id
+agg_2 = aggregate(n_users ~ BC,agg, sum)
+colnames(agg_2)[which(colnames(agg_2) == "n_users")] = "tot_n_users"
+agg = merge(agg, agg_2,by = "BC", all = TRUE)
+agg$perc_users = agg$n_users/agg$tot_n_users*100
+#agg$perc_users = agg$n_users/sum(agg$n_users)*100
+
+
+agg = agg[,c("BC","n_TB_by_n_cycles","perc_users")]
+save(agg, file = paste0(IO$out_Rdata, "avg_symptoms_per_user.Rdata"))
+
+ggplot(agg[agg$BC %in% c("pill","none / condoms"),], aes(x = n_TB_by_n_cycles, y = perc_users, fill = BC)) +
+  geom_bar(stat = "identity", position = "dodge") + scale_fill_manual(values = cols$BC)
+
+```
+
+
+```{r data_presentation_overall_profile number of symptoms per cycle}
+
+load(paste0(IO$input_data, "cycles.Rdata"), verbose = TRUE)
+
+lim = 10
+cycles$tender_breasts_ul = pmin(cycles$tender_breasts, 10)
+cycles$tender_breasts_ul[cycles$tender_breasts_ul == lim] = paste0(lim, "+")
+cycles$tender_breasts_ul = factor(cycles$tender_breasts_ul, levels = c(0:(lim-1),paste0(lim, "+")))
+
+agg =  aggregate( cycle_id ~ tender_breasts_ul + BC, cycles, uniqueN)
+agg$n_cycles = agg$cycle_id
+agg_2 = aggregate(n_cycles ~ BC,agg, sum)
+colnames(agg_2)[which(colnames(agg_2) == "n_cycles")] = "tot_n_cycles"
+agg = merge(agg, agg_2,by = "BC", all = TRUE)
+agg$perc_cycles = agg$n_cycles/agg$tot_n_cycles*100
+
+save(agg, file = paste0(IO$out_Rdata, "n_TB_per_cycle.Rdata"))
+
+ggplot(agg[agg$BC != "unclear",], aes(x = tender_breasts_ul, y = perc_cycles, fill = BC)) +
+  geom_bar(stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = cols$BC3) + guides(fill = FALSE)+
+  xlab("# of reported Tender Breast symptoms per cycle")+ ylab("% of cycles")
+  
+  
+
+
+
+```
+
+
+

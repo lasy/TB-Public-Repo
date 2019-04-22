@@ -1,0 +1,39 @@
+---
+title: "Demographics, overall symptoms and tracking profiles"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+# Data presentation (Figure 1)
+
+
+
+```{r child = '_data_presentation_demographics.Rmd', cache=TRUE}
+```
+
+
+
+```{r child = '_data_presentation_tracking_behavior.Rmd', cache=TRUE}
+```
+
+
+
+```{r child = '_data_presentation_overall_profile.Rmd', cache=TRUE}
+```
+
+
+
+
+
+

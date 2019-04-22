@@ -28,6 +28,20 @@ options(scipen=999)
 
 ## Re-classifying cycles for Birth Control
 
+### Motivations
+
+
+The birth-control variable is a user-level variable.
+Clue provided one birth-control method per user as the current one (or "on-boarding" one) provided by the user. 
+
+Unfortunately, Clue did not (so far) provided the history of changes of this variable. If a user has changed birth-control, we are not aware of this change. Even if we had this history, users do not always change this variable in their setting.
+
+However, from the tracking behavior and the information logged, we can observe birth control changes for some users.
+
+Therefore, a re-classification of cycles regardin their current birth control method seemed appropriate to be able to compare pill users from non-pill users. This re-classification also allows for the study of symptoms over birth-control transitions.
+
+
+### Method
 
 In `00_cycle_classification_BC_expl.Rdm`, we have explored the best way to re-classify cycles according to the birth control method (pill vs none/condoms).
 

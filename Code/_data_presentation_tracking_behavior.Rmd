@@ -1,0 +1,396 @@
+---
+title: "Tracking behavior"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+```{r data_presentation_tracking_behavior setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+## Tracking behavior
+
+
+```{r data_presentation_tracking_behavior loading cycles }
+load(file = paste0(IO$output_data,"cycles.Rdata"), verbose = TRUE)
+```
+
+
+```{r data_presentation_tracking_behavior n logs per cycle for pill and non-pill users}
+
+g = ggplot(cycles, aes(x = n_obs, col = birth_control)) + geom_freqpoly(binwidth = 1, position = "identity")
+g
+
+g + xlim(c(0,150))
+
+
+g = ggplot(cycles, aes(x = n_days_obs, col = birth_control)) + geom_freqpoly(binwidth = 1, position = "identity")
+g
+
+g + xlim(c(0,100))
+
+
+g = ggplot(days[days$type == "n_logs",], aes(x = number, col = birth_control)) +  geom_freqpoly(binwidth = 1, position = "identity")
+g
+
+
+g = ggplot(cycles, aes(x = n_obs, col = BC)) + geom_freqpoly(binwidth = 1, position = "identity") + scale_color_manual(values = cols$BC3)
+g + xlim(c(0,150))
+
+
+g = ggplot(cycles, aes(x = n_days_obs, col = BC)) + geom_freqpoly(binwidth = 1, position = "identity")+ scale_color_manual(values = cols$BC3)
+g + xlim(c(0,100))
+
+rm(g)
+```
+
+
+```{r data_presentation_tracking_behavior n logs per cycle for pill and non-pill users including the zeros on one days file}
+
+# but we would like to know how many zero days there
+
+x = 66
+breaks$n_logs = c(0:x+0.5, 100)
+
+agg = aggregate(number ~ birth_control, days[days$type == "n_logs",],
+                function(x){h = hist(x, breaks = breaks$n_logs, plot = FALSE); h$counts})
+agg.tmp = as.data.frame(agg$number)
+colnames(agg.tmp) = c(paste0("n_logs.",1:(x+1)))
+
+agg = cbind(data.frame(birth_control = agg$birth_control), agg.tmp)
+
+agg2 = reshape(agg, idvar = c("birth_control"), varying = list(grep("n_logs",colnames(agg))), direction = "long")
+colnames(agg2) = c("birth_control", "n_logs","n_days")
+
+
+cy = aggregate(cycle_length ~ cycle_id + user_id + birth_control, days, unique)
+ndu = aggregate(cycle_length ~ user_id + birth_control, cy, sum)
+colnames(ndu) = c("user_id","birth_control","n_days")
+
+ndu_with_logs = aggregate(cycle_length ~ user_id + birth_control, days[days$type == "n_logs",], length)
+colnames(ndu_with_logs) = c("user_id","birth_control","n_days_with_logs")
+
+ndu = merge(ndu, ndu_with_logs, all = TRUE)
+ndu$n_days_with_zero_logs = ndu$n_days - ndu$n_days_with_logs
+
+rm(cy, ndu_with_logs)
+
+agg3 = aggregate(n_days_with_zero_logs ~ birth_control , ndu, sum)
+agg3$n_logs = 0
+colnames(agg3)[colnames(agg3) == "n_days_with_zero_logs"] = "n_days"
+agg3 = data.frame(birth_control = agg3$birth_control, n_logs = agg3$n_logs, n_days = agg3$n_days)
+
+agg2 = rbind(agg3, agg2)
+
+
+ggplot(agg2, aes(x = n_logs, y = n_days, col = birth_control))  + geom_line() + geom_point(size = 0.5) + xlim(c(0,30))
+
+rm(agg, agg2, agg3, ndu, agg.tmp)
+
+```
+
+
+
+
+```{r data_presentation_tracking_behavior n logs per cycle for pill and non-pill users including the zeros on one days file - new classification}
+
+# but we would like to know how many zero days there
+
+x = 66
+breaks$n_logs = c(0:x+0.5, 100)
+
+agg = aggregate(number ~ BC, days[days$type == "n_logs",],
+                function(x){h = hist(x, breaks = breaks$n_logs, plot = FALSE); h$counts})
+agg.tmp = as.data.frame(agg$number)
+colnames(agg.tmp) = c(paste0("n_logs.",1:(x+1)))
+
+agg = cbind(data.frame(BC = agg$BC), agg.tmp)
+
+agg2 = reshape(agg, idvar = c("BC"), varying = list(grep("n_logs",colnames(agg))), direction = "long")
+colnames(agg2) = c("BC", "n_logs","n_days")
+
+
+cy = aggregate(cycle_length ~ cycle_id + user_id + BC, days, unique)
+ndu = aggregate(cycle_length ~ user_id + BC, cy, sum)
+colnames(ndu) = c("user_id","BC","n_days")
+
+ndu_with_logs = aggregate(cycle_length ~ user_id + BC, days[days$type == "n_logs",], length)
+colnames(ndu_with_logs) = c("user_id","BC","n_days_with_logs")
+
+ndu = merge(ndu, ndu_with_logs, all = TRUE)
+ndu$n_days_with_zero_logs = ndu$n_days - ndu$n_days_with_logs
+
+rm(cy, ndu_with_logs)
+
+agg3 = aggregate(n_days_with_zero_logs ~ BC , ndu, sum)
+agg3$n_logs = 0
+colnames(agg3)[colnames(agg3) == "n_days_with_zero_logs"] = "n_days"
+agg3 = data.frame(BC = agg3$BC, n_logs = agg3$n_logs, n_days = agg3$n_days)
+
+agg2 = rbind(agg3, agg2)
+
+
+ggplot(agg2, aes(x = n_logs, y = n_days, col = BC))  + geom_line() + geom_point(size = 0.5) + xlim(c(0,30)) + scale_color_manual(values = cols$BC3)
+
+
+
+```
+
+
+```{r}
+rm(agg, agg2, agg3, ndu, agg.tmp)
+```
+
+
+
+The two group of users have drastically different tracking behavior. This might bias the reporting of breast tenderness.
+
+It seems that it is necessary to account for potentially missing data and understand how to impute them eventually.
+
+```{r data_presentation_tracking_behavior load one days file as example}
+load(paste0(IO$input_data,"days/days_1.Rdata"), verbose = TRUE)
+head(days)
+```
+
+
+
+
+```{r data_presentation_tracking_behavior tracking behavior by birth control and cycleday_m_D}
+
+agg = aggregate(number ~ cycleday_m_D + birth_control, days[days$type == "n_logs",],
+                function(x){h = hist(x, breaks = breaks$n_logs, plot = FALSE); h$counts})
+agg.tmp = as.data.frame(agg$number)
+colnames(agg.tmp) = c(paste0("n_logs.",1:(x+1)))
+
+# find the number of 0 per cycleday_m_D
+n_cycles = aggregate(cycle_id_m ~ birth_control, days, lu)
+n_cycles = n_cycles[match(agg$birth_control, n_cycles$birth_control),]
+
+#sum of cycles with logs at each cycleday_m_D
+sum_cycles_n_logs_non_zero = apply(agg.tmp, 1, sum)
+# combine everything together
+agg.perc = cbind( data.frame(birth_control = agg$birth_control, 
+                        cycleday_m_D = agg$cycleday_m_D, 
+                        n_logs_0 = (n_cycles$cycle_id_m - sum_cycles_n_logs_non_zero)/n_cycles$cycle_id_m),
+                  agg.tmp/n_cycles$cycle_id_m)
+
+agg = cbind(data.frame(birth_control = agg$birth_control, 
+                        cycleday_m_D = agg$cycleday_m_D, 
+                        n_logs_0 = (n_cycles$cycle_id_m - sum_cycles_n_logs_non_zero)), agg.tmp)
+agg2 = reshape(agg.perc, 
+               idvar = c("birth_control", "cycleday_m_D"), 
+               varying = list(grep("n_logs",colnames(agg.perc))), direction = "long")
+agg2$time = agg2$time - 1
+colnames(agg2) = c("birth_control","cycleday_m_D", "n_logs","perc")
+
+ggplot(agg2[agg2$n_logs == 0,], aes(x = cycleday_m_D, y = perc, col = birth_control)) + geom_line() + ylim(c(0,1))
+ggplot(agg2[agg2$n_logs == 0,], aes(x = cycleday_m_D, y = 1-perc, col = birth_control)) + geom_line() + ylim(c(0,1))
+ggplot(agg2[agg2$n_logs %in% 1:3,], aes(x = cycleday_m_D, y = perc, col = birth_control)) + geom_line() + facet_grid(n_logs ~. )
+
+rm(agg2, agg, agg.perc, agg.tmp)
+```
+
+
+
+```{r data_presentation_tracking_behavior pill taken and period onset}
+
+agg = aggregate(cycle_id_m ~ cycleday_m_D + birth_control, days[days$type == "taken",], length)
+
+ggplot(agg, aes(x = cycleday_m_D, y =cycle_id_m,  col =  birth_control)) + geom_line() 
+
+rm(agg)
+```
+
+```{r data_presentation_tracking_behavior check if all cycles have bleeding or any log on day 1}
+clue_file_list = list.files(paste0(IO$input_data,"days/"))
+
+n_cycles_with_period_day1 = 0
+n_cycles_any_log_day1 = 0
+n_cycles = 0
+for(file in clue_file_list){
+  cat(file,"\n")
+  load(paste0(IO$input_data,"days/",file), verbose = TRUE)
+  #n_cycles_with_period_day1 = n_cycles_with_period_day1 + length(unique(days$cycle_id[(days$cycleday == 1) & (days$category == "period")]))
+  #n_cycles_any_log_day1 = n_cycles_any_log_day1 + length(unique(days$cycle_id[(days$cycleday == 1)]))
+  #n_cycles = n_cycles + length(unique(days$cycle_id))
+  n_cycles_with_period_day1 = n_cycles_with_period_day1 + length(unique(days$cycle_id_m[(days$cycleday_m_D == 0) & (days$category == "period")]))
+  n_cycles_any_log_day1 = n_cycles_any_log_day1 + length(unique(days$cycle_id_m[(days$cycleday_m_D == 0)]))
+  n_cycles = n_cycles + length(unique(days$cycle_id_m[!is.na(days$cycleday_m_D)]))
+  
+}
+n_cycles_with_period_day1/n_cycles
+n_cycles_any_log_day1/n_cycles
+
+rm(n_cycles_with_period_day1,n_cycles_any_log_day1, n_cycles)
+```
+
+
+
+```{r data_presentation_tracking_behavior tracking patterns by age and birth control categories}
+
+clue_file_list = list.files(paste0(IO$input_data,"days/"))
+
+registerDoParallel(par$n_cores)
+tic()
+a = foreach(file = clue_file_list, .combine = rbind) %dopar%{
+  cat(file,"\n")
+  load(paste0(IO$input_data,"days/",file), verbose = TRUE)
+  days$age_cat = cut(days$age, breaks = breaks$age)
+  days$n_logs = days$number
+  
+  agg_n_cycles_with_log = aggregate(cycle_id_m ~ cycleday_m_D + age_cat + birth_control, days, lu)
+  colnames(agg_n_cycles_with_log)[which(colnames(agg_n_cycles_with_log) == "cycle_id_m")] = "n_cycles"
+  
+  agg_n_logs = aggregate(n_logs ~ cycleday_m_D + age_cat + birth_control , days[days$type == "n_logs",], sum)
+  agg = merge(agg_n_cycles_with_log, agg_n_logs, all = TRUE)
+  
+  agg_tot_n_cycles = aggregate(cycle_id_m ~  age_cat + birth_control, days[!is.na(days$cycleday_m_D),], lu)
+  colnames(agg_tot_n_cycles)[which(colnames(agg_tot_n_cycles) == "cycle_id_m")] = "tot_n_cycles"
+  agg = merge(agg, agg_tot_n_cycles, all = TRUE)
+}
+toc()
+stopImplicitCluster()
+
+agg = aggregate(. ~ cycleday_m_D + birth_control + age_cat, a, sum)
+
+agg$fraction_cycles_with_logs = agg$n_cycles/agg$tot_n_cycles
+agg$perc_cycles_with_logs = round(100*agg$fraction_cycles, digits = 2)
+
+aggregate(fraction_cycles_with_logs ~ age_cat + birth_control, agg, max)
+
+agg$avg_n_logs = agg$n_logs/agg$tot_n_cycles
+
+
+agg = agg[-which(agg$age_cat %in% par$age_cat_exclude),]
+agg = agg[-which((agg$age_cat == "(35,40]") & (agg$birth_control == "pill")),]
+
+agg$SE = sqrt(agg$fraction_cycles_with_logs*(1-agg$fraction_cycles_with_logs)/agg$tot_n_cycles)
+
+
+rm(a, clue_file_list)
+
+save(agg, file = paste0(IO$out_Rdata,"tracking_behavior_overal_pattern_by_age_and_birth_control.Rdata"))
+
+```
+
+
+```{r data_presentation_tracking_behavior plotting tracking patterns by age and BC categories - Fig 1C}
+g = ggplot(agg, aes(x = cycleday_m_D, y = perc_cycles_with_logs, col = age_cat))+
+  geom_point(size = 0.6)+ geom_line() + facet_grid( birth_control ~ .)+
+  scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values= cols$age_cat , name="Age group")+
+  xlab("cycleday from 1st day of menstruation") + ylab("% of cycles with at least one logged features on that day")+
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA)) + expand_limits(y = 0)
+g
+
+g = ggplot(agg, aes(x = cycleday_m_D, y = avg_n_logs, col = age_cat)) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_line() + geom_point(size = 0.6)+ facet_grid(birth_control ~.)+
+  scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values= cols$age_cat , name="Age group")+
+  xlab("cycleday from 1st day of menstruation") + ylab("avg # of logged features per cycle")+
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA)) + expand_limits(y = 0)
+g
+
+rm(g, agg)
+
+```
+
+
+
+```{r data_presentation_tracking_behavior tracking patterns by age and BC categories}
+
+clue_file_list = list.files(paste0(IO$input_data,"days/"))
+
+registerDoParallel(par$n_cores)
+tic()
+a = foreach(file = clue_file_list, .combine = rbind) %dopar%{
+  cat(file,"\n")
+  load(paste0(IO$input_data,"days/",file), verbose = TRUE)
+  days$age_cat = cut(days$age, breaks = breaks$age)
+  days$n_logs = days$number
+  
+  agg_n_cycles_with_log = aggregate(cycle_id_m ~ cycleday_m_D + age_cat + BC, days, lu)
+  colnames(agg_n_cycles_with_log)[which(colnames(agg_n_cycles_with_log) == "cycle_id_m")] = "n_cycles"
+  
+  agg_n_logs = aggregate(n_logs ~ cycleday_m_D + age_cat + BC , days[days$type == "n_logs",], sum)
+  agg = merge(agg_n_cycles_with_log, agg_n_logs, all = TRUE)
+  
+  agg_tot_n_cycles = aggregate(cycle_id_m ~  age_cat + BC, days[!is.na(days$cycleday_m_D),], lu)
+  colnames(agg_tot_n_cycles)[which(colnames(agg_tot_n_cycles) == "cycle_id_m")] = "tot_n_cycles"
+  agg = merge(agg, agg_tot_n_cycles, all = TRUE)
+  return(agg)
+}
+toc()
+stopImplicitCluster()
+
+agg = aggregate(. ~ cycleday_m_D + BC + age_cat, a, sum)
+
+agg$fraction_cycles_with_logs = agg$n_cycles/agg$tot_n_cycles
+agg$perc_cycles_with_logs = round(100*agg$fraction_cycles, digits = 2)
+
+aggregate(fraction_cycles_with_logs ~ age_cat + BC, agg, max)
+
+agg$avg_n_logs = agg$n_logs/agg$tot_n_cycles
+
+
+agg = agg[-which(agg$age_cat %in% par$age_cat_exclude),]
+agg = agg[-which((agg$age_cat == "(35,40]") & (agg$BC == "pill")),]
+
+agg$SE = sqrt(agg$fraction_cycles_with_logs*(1-agg$fraction_cycles_with_logs)/agg$tot_n_cycles)
+
+save(agg, file = paste0(IO$out_Rdata,"tracking_behavior_overal_pattern_by_age_and_BC.Rdata"))
+
+```
+
+
+```{r}
+rm(a, clue_file_list)
+```
+
+
+
+
+```{r data_presentation_tracking_behavior plotting tracking patterns by age and BC categories - Fig 1C}
+
+agg$age_x_BC = interaction( agg$age_cat , agg$BC)
+
+g = ggplot(agg[(agg$BC != "unclear"),], aes(x = cycleday_m_D, y = perc_cycles_with_logs, col = age_x_BC))+
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_line() + geom_point(aes(shape = BC))+ 
+  scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values = cols$age_x_BC , name="Age group x Birth control")+
+  xlab("cycleday from 1st day of menstruation") + ylab("% of cycles with at least one logged features on that day")+
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA)) + expand_limits(y = 0)
+g
+
+
+
+g = ggplot(agg[(agg$BC != "unclear"),], aes(x = cycleday_m_D, y = avg_n_logs, col = age_x_BC)) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_line() + geom_point(aes(shape = BC))+ 
+  scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values = cols$age_x_BC , name="Age group x Birth control")+
+  xlab("cycleday from 1st day of menstruation") + ylab("avg # of logged features per cycle")+
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA)) + expand_limits(y = 0)
+g
+
+rm(g, agg)
+
+```
+
+
+
+
+

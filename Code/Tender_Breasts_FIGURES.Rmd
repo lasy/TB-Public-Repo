@@ -25,10 +25,72 @@ source("Scripts/00_setup.R")
 ```
 
 
+```{r load users and cycles, cache = FALSE, eval = TRUE}
+
+load(file = paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+#load(file = paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+
+```
+
+
+
+
+
 # Figure 1 INTRO
 
-## Examples
+## Demographics (Supplementary)
 
+
+```{r data_presentation_demographics number of users in each considered category}
+
+
+g = ggplot(users, aes(x = age, fill = birth_control))
+g + geom_histogram(binwidth = 1) + facet_grid(birth_control ~.)
+
+g = ggplot(users, aes(x = age, fill = country))
+g + geom_histogram(binwidth = 1) + facet_wrap(country ~.)
+
+
+
+load(file = paste0(IO$out_Rdata, "number_of_users_and_cycles_per_category.Rdata"), verbose = TRUE)
+
+
+g = ggplot(agg, aes(y = birth_control, x= 0,   col = birth_control)) + 
+  facet_grid(bmi_cat ~ age_cat) + 
+  geom_text(aes(label = n_users)) + 
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank()) + 
+  guides(color = FALSE, size = FALSE) + xlab("") + ylab("") + 
+  ggtitle("Number of users per category of age (horizontal) and bmi (vertical)")
+
+g
+
+ggsave(filename = paste0(IO$panels, "S1_X_number_of_users_per_cat.pdf"), plot = g)
+
+
+g = ggplot(agg, aes(y = birth_control, x= 0,   col = birth_control)) + 
+  facet_grid(bmi_cat ~ age_cat) + 
+  geom_text(aes(label = n_cycles)) + 
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank()) + 
+  guides(color = FALSE, size = FALSE) + xlab("") + ylab("") +
+  ggtitle("Number of cycles per category of age (horizontal) and bmi (vertical)")
+g
+
+ggsave(filename = paste0(IO$panels, "S1_X_number_of_cycles_per_cat.pdf"), plot = g)
+
+```
+
+
+
+
+
+
+## Examples
 
 
 ```{r overall_profile examples fig 1A}
