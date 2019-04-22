@@ -15,7 +15,6 @@ output:
 ---
 
 
-
 ```{r setup knitr, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 ```
@@ -23,7 +22,6 @@ knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 ```{r setup my_scripts, include = FALSE, eval = TRUE}
 source("Scripts/00_setup.R")
 ```
-
 
 
 ```{r child = '_intro_clue.Rmd', cache=TRUE}
@@ -34,19 +32,26 @@ source("Scripts/00_setup.R")
 ```
 
 
-
 ```{r child = '_data_presentation.Rmd', cache=TRUE}
 ```
-
 
 
 ```{r child = '_cycle_clustering.Rmd', cache=TRUE}
 ```
 
 
-
 ```{r child = '_users_description.Rmd', cache=TRUE}
 ```
+
+
+
+# To come
+
+- predict cluster & intensity of symptoms (after cycle clustering)
+
+- finish user description
+
+- pill transition analysis
 
 
 
