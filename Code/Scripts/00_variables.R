@@ -6,6 +6,7 @@ breaks = list()
 breaks$age = seq(10,45, by = 5)
 breaks$height = seq(100,240,by = 5)
 breaks$bmi = c(0,seq(15,33,by = 3), Inf)
+breaks$n_logs
 
 
 # VIZ variables
@@ -31,6 +32,11 @@ cols$pill = rgb(14,179,208, max = 255)
 cols$NC = rgb(253,135,115, max = 255)
 cols$BC = c(cols$NC, cols$pill)
 cols$BC3 = c(cols$BC, "gray")
+cols$on_pill = rgb(14,179,208, max = 400)
+cols$off_pill = rgb(253,135,115, max = 400)
+cols$off_on_pill = rgb(14,179,208, max = 500)
+cols$on_off_pill = rgb(253,135,115, max = 500)
+cols$BC_users = c(cols$BC, cols$on_pill,cols$off_pill,cols$off_on_pill,cols$on_off_pill,"black")
 
 cols$age_cat_BC <- scales::seq_gradient_pal("gray80", "black")(seq(0,1,length.out=5))
 cols$age_x_BC <- c(scales::seq_gradient_pal(cols$NC, "black")(seq(0,1,length.out=6))[1:5],
@@ -54,6 +60,13 @@ par$n_cores = detectCores() - 1
 
 par$BC_dict = data.frame(name = c("none / condoms","pill"),
                          binary = c(0,1))
+
+
+par$users_BC_dict = data.frame(
+  name = c("none / condoms","pill","on pill","off pill","off-on pill", "on-off pill","mult. trans."),
+  num = c(0:6))
+
+
 
 
 par$cycles_m = list()

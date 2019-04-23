@@ -41,9 +41,9 @@ users$age_cat = cut(users$age, breaks = breaks$age)
 users$bmi = users$weight / (users$height/100)^2
 users$bmi_cat = cut(users$bmi, breaks = breaks$bmi)
 
-
+cycles$age = users$age[match(cycles$user_id, users$user_id)]
 cycles$age_cat = cut(cycles$age, breaks = breaks$age)
-cycles$bmi = cycles$weight / (cycles$height/100)^2
+cycles$bmi = users$bmi[match(cycles$user_id, users$user_id)]
 cycles$bmi_cat = cut(cycles$bmi, breaks = breaks$bmi)
 
 
@@ -64,25 +64,27 @@ file.copy(from = paste0(IO$output_data, "cycles.Rdata"), to =  paste0(IO$output_
 ```{r data_presentation_demographics number of users in each considered category}
 
 
-agg_users = aggregate(user_id ~ age_cat + bmi_cat + birth_control, users, length)
+agg_users = aggregate(user_id ~ age_cat + bmi_cat + BC, users, length)
 colnames(agg_users)[which(colnames(agg_users) == "user_id")] = "n_users"
 
-agg_cycles = aggregate(cycle_id ~ age_cat + bmi_cat + birth_control, cycles, length)
+agg_cycles = aggregate(cycle_id ~ age_cat + bmi_cat + BC, cycles, length)
 colnames(agg_cycles)[which(colnames(agg_cycles) == "cycle_id")] = "n_cycles"
 
-agg = merge(agg_users, agg_users)
+agg = merge(agg_users, agg_cycles, all = TRUE)
 
 save(agg, file = paste0(IO$out_Rdata, "number_of_users_and_cycles_per_category.Rdata"))
 
 
-g = ggplot(users, aes(x = age, fill = birth_control))
-g + geom_histogram(binwidth = 1) + facet_grid(birth_control ~.)
+users$BC = factor(users$BC, levels = par$users_BC_dict$name)
+g = ggplot(users, aes(x = age, fill = BC))
+g + geom_histogram(binwidth = 1) + facet_grid(BC ~.) + scale_fill_manual(values = cols$BC_users)
 
-g = ggplot(users, aes(x = age, fill = country))
-g + geom_histogram(binwidth = 1) + facet_wrap(country ~.)
+g = ggplot(users[users$country %in% names(sort(table(users$country),decreasing = TRUE))[1:9],], 
+           aes(x = age, fill = country))
+g + geom_histogram(binwidth = 1) + facet_wrap(country ~.) + guides(fill = FALSE)
 
 
-g = ggplot(agg, aes(y = birth_control, x= 0,   col = birth_control)) + 
+g = ggplot(agg[agg$BC %in% par$BC_dict$name,], aes(y = BC, x= 0,   col = BC)) + 
   facet_grid(bmi_cat ~ age_cat) + 
   geom_text(aes(label = n_users)) + 
   theme(panel.grid.major = element_blank(),
@@ -95,7 +97,22 @@ g = ggplot(agg, aes(y = birth_control, x= 0,   col = birth_control)) +
 g
 
 
-g = ggplot(agg, aes(y = birth_control, x= 0,   col = birth_control)) + 
+agg$BC = factor(agg$BC, levels = par$users_BC_dict$name)
+g = ggplot(agg, aes(y = BC, x= 0,   col = BC)) + 
+  facet_grid(bmi_cat ~ age_cat) + 
+  geom_text(aes(label = n_users)) + 
+  scale_color_manual(values = cols$BC_users)+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank()) + 
+  guides(color = FALSE, size = FALSE) + xlab("") + ylab("") + 
+  ggtitle("Number of users per category of age (horizontal) and bmi (vertical)")
+
+g
+
+
+g = ggplot(agg[agg$BC %in% par$BC_dict$name,], aes(y = BC, x= 0,   col = BC)) + 
   facet_grid(bmi_cat ~ age_cat) + 
   geom_text(aes(label = n_cycles)) + 
   theme(panel.grid.major = element_blank(),

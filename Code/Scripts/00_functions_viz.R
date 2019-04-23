@@ -6,6 +6,7 @@ ggplot_user_example = function(d = days[1:10,], title = TRUE,size_factor = 1){
   d$cycle_number = factor(d$cycle_nb_m, levels = min(d$cycle_nb_m, na.rm = TRUE):max(d$cycle_nb_m, na.rm = TRUE))
   # for size
   d$number[d$type == "tender_breasts"] = 2
+  d$number[d$category == "period"] = match(d$type[d$category == "period"], c("spotting","light","medium","heavy"))
   d$label = d$category
   d$label[d$label == "pain"] = "TB"
   d$label[d$label == "n_logs"] = "# logs"
