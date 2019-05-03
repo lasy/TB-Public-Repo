@@ -21,11 +21,14 @@ output:
 ```
 
 
-```{r child = '_users_descr_cluster_info.Rmd', cache=TRUE}
+```{r child = '_users_descr_average_dist_per_user.Rmd', cache=TRUE}
 ```
 
-
-#####
 
 ```{r child = '_users_descr_selecting_user_examples.Rmd', cache=TRUE}
 ```
+ 
+
+```{r child = '_users_descr_evolution_of_symptoms_with_time.Rmd', cache=TRUE}
+```
+

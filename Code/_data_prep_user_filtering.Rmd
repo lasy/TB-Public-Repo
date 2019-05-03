@@ -89,12 +89,15 @@ As we are filtering users, we will also make sure that the way the tracking tabl
 
 So, we will define a `batch` number for each user and store that user's records in the file with the appropriate batch.
 
-We want a maximum of 5000 users per batch.
+We want a maximum of `r par$max_batch_size` users per batch and a minimum of `r par$min_n_batches` batches.
 
 ```{r user_filt defining a batch number for each user}
-N = 5000
-users$batch = rep(c(1:ceiling(nrow(users)/N)),each = N)[1:nrow(users)]
-rm(N)
+
+n_batch = max(par$min_n_batches, ceiling(nrow(users)/par$max_batch_size))
+batch_size = ceiling(nrow(users)/n_batch)
+
+users$batch = rep(1:n_batch, each = batch_size)[1:nrow(users)]
+
 save(users, file = paste0(IO$output_data,"users.Rdata"))
 ```
 
@@ -113,7 +116,6 @@ dir.create(days_output)
 
 ```{r user_filt filtering days}
 
-file.copy(paste0(IO$output_data,"users.Rdata"), paste0(IO$tmp_data,"users_before_filtering_days.Rdata"), overwrite = TRUE)
 
 tracking_folder = paste0(IO$input_data,"tracking_filtered/")
 filenames = list.files(tracking_folder)
@@ -142,6 +144,8 @@ users_o_f = aggregate(original_file_id ~ user_id ,users_original_files, paste0, 
 users$original_files = users_o_f$original_file_id[match(users$user_id, users_o_f$user_id)]
 
 save(users, file = paste0(IO$output_data,"users.Rdata"))
+file.copy(paste0(IO$output_data,"users.Rdata"), paste0(IO$tmp_data,"users_after_filtering_days.Rdata"), overwrite = TRUE)
+
 
 ```
 

@@ -40,7 +40,7 @@ load(paste0(IO$output_data, "cycles_m.Rdata"), verbose = TRUE)
 
 
 ```{r cycle_clust_clustering load silhouette summary}
-load(file = paste0(IO$tmp_Rdata,"silhouette_score_summary.Rdata"), verbose = TRUE)
+load(file = paste0(IO$tmp_data,"silhouette_score_summary.Rdata"), verbose = TRUE)
 ```
 
 ```{r cycle_clust_clustering silhouette summary}
@@ -60,7 +60,7 @@ rm(df)
 
 The ideal number of cluster is `r n_center`
 
-```{r cycle_clust_clustering clustering, cache = FALSE}
+```{r cycle_clust_clustering clustering, cache = TRUE}
 clusters_clara = clara(d_wide[,-1], k = n_center, 
                        metric = "custom_jaccard", 
                        w = par$w, cjratio = par$r,
@@ -101,7 +101,7 @@ save(silh, file = paste0(IO$out_Rdata, "silhouette_width.Rdata"))
 rownames(d) = 1:nrow(d)
 d = d[,c("user_id","cycle_id_m","cycle_nb_m","cycleday_m_D","tender_breasts","cluster","cluster_num")]
 
-save(d, file = paste0(IO$tmp_Rdata,"d_imputed_with_clusters.Rdata"))
+save(d, file = paste0(IO$tmp_data,"d_imputed_with_clusters.Rdata"))
 
 save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
 file.copy(from = paste0(IO$output_data, "cycles_m.Rdata"), to = paste0(IO$tmp_data, "cycles_m_with_clusters.Rdata"))

@@ -71,6 +71,13 @@ cycles_m$cluster[no_TB] =no_TB_cluster_names[cycles_m$cluster_num[no_TB]+3]
 
 
 
+
+```{r users_descr_cluster_info save cycles_m}
+save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
+file.copy(from = paste0(IO$output_data, "cycles_m.Rdata"), to = paste0(IO$tmp_data, "cycles_m_with_clusters_info.Rdata"))
+```
+
+
 ## Adding clusters info on the users table
 
 

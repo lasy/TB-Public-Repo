@@ -97,7 +97,7 @@ ggsave(filename = paste0(IO$panels, "S1_X_number_of_cycles_per_cat.pdf"), plot =
 
 #load(paste0(IO$input_data,"days/days_1.Rdata"), verbose = TRUE)
 
-load(file = paste0(IO$r_output_data,"sub_days_examples_input_data.Rdata"), verbose = TRUE)
+load(file = paste0(IO$out_Rdata,"sub_days_examples_input_data.Rdata"), verbose = TRUE)
 days = sub_days
 
 user_ids = unique(days$user_id)

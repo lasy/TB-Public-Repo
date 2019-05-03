@@ -1,0 +1,96 @@
+---
+title: "Evolution of symptoms in time"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r users_descr_evolution librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r users_descr_evolution setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+
+```{r users_descr_evolution loading cycles_m and users}
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+load(paste0(IO$output_data,"cycles_m.Rdata"), verbose=  TRUE)
+
+```
+
+
+## Selecting consistent and inconsistent users
+
+
+```{r users_descr_evolution prep}
+
+cycles_m$most_preval_clust = users$most_preval_clust[match(cycles_m$user_id, users$user_id)]
+cycles_m$most_preval_clust = factor(cycles_m$most_preval_clust, 
+                                      levels = min(cycles_m$cluster_num):max(cycles_m$cluster_num))
+
+load(paste0(IO$tmp_data,"d_wide.Rdata"), verbose = TRUE)
+
+agg = apply(d_wide[,2:ncol(d_wide)], 1, function(x){sum(x == 1)})
+cycles_m$n_TB = agg[match(cycles_m$cycle_id_m, d_wide$cycle_id_m)]
+cycles_m$n_TB[is.na(cycles_m$n_TB )] = 0
+
+save(cycles_m, file = paste0(IO$output_data,"cycles_m.Rdata"))
+file.copy(from = paste0(IO$output_data,"cycles_m.Rdata") , to = paste0(IO$tmp_data,"cycles_m_with_n_TB_and_most_preval_clust.Rdata") , overwrite = TRUE)
+
+```
+
+```{r users_descr_evolution aggregate}
+
+fraction_TB = ddply(cycles_m[(cycles_m$cycle_nb_m <= 20) & (cycles_m$BC %in% par$BC_dict$name),], 
+                    c("most_preval_clust", "cycle_nb_m", "BC"), 
+                    summarise,
+                    n_cycles = uniqueN(cycle_id_m),
+                    avg_n_TB = mean(n_TB, na.rm = TRUE),
+                    median_n_TB = median(n_TB, na.rm = TRUE),
+                    sd_n_TB = sd(n_TB, na.rm = TRUE),
+                    q_05_n_TB = quantile(n_TB, probs = 0.05, na.rm = TRUE),
+                    q_25_n_TB = quantile(n_TB, probs = 0.25, na.rm = TRUE),
+                    q_75_n_TB = quantile(n_TB, probs = 0.75, na.rm = TRUE),
+                    q_95_n_TB = quantile(n_TB, probs = 0.95, na.rm = TRUE)
+                    )
+
+min_n_cycles = aggregate(n_cycles ~ BC + most_preval_clust , fraction_TB, min)
+colnames(min_n_cycles)[which(colnames(min_n_cycles) == "n_cycles" )] = "min_n_cycles"
+
+fraction_TB = fraction_TB[(!is.na(fraction_TB$most_preval_clust)) & (!is.na(fraction_TB$BC)),]
+fraction_TB = merge(fraction_TB, min_n_cycles, all = TRUE)
+fraction_TB = fraction_TB[,- which(colnames(fraction_TB) == "n_cycles")]
+
+save(fraction_TB, file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time.Rdata"))
+save(min_n_cycles, file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time_min_n_cycles.Rdata"))
+
+ggplot(fraction_TB, aes(x = cycle_nb_m, y = median_n_TB, col = most_preval_clust, fill = most_preval_clust)) + 
+  geom_line() + 
+  geom_line(aes(y = avg_n_TB), linetype = 3) + 
+  geom_ribbon(aes(ymin = q_05_n_TB , ymax = q_95_n_TB), alpha = 0.2, col = NA)+
+  geom_ribbon(aes(ymin = q_25_n_TB , ymax = q_75_n_TB), alpha = 0.2, col = NA)+
+  geom_text(data = min_n_cycles, aes(label = paste0("min # = ",min_n_cycles)), x = 5, y = 0.95*max(fraction_TB$q_95_n_TB), size = 3, vjust = 0, hjust = 0)+
+  facet_grid(BC  ~ most_preval_clust)+
+  #scale_color_manual(values = cols$clusters_6) + scale_fill_manual(values = cols$clusters_6)+ 
+  guides(col = FALSE, fill = FALSE) +
+  xlab("Cycle number") + ylab("# of reported TB")
+
+
+```
+
+

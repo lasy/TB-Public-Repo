@@ -32,12 +32,6 @@ options(scipen=999)
 ```{r data_prep_n_logs counting and saving n_logs}
 
 days_folder = paste0(IO$output_data,"days/")
-
-tmp_days_folder = paste0(IO$tmp_data,"days_before_n_logs/")
-file.copy(days_folder, IO$tmp_data, recursive=TRUE)
-file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
-
-
 filenames = list.files(days_folder)
 
 
@@ -75,6 +69,12 @@ foreach(filename = filenames) %dopar%
   
   save(days, file = paste0(days_folder, filename))
 }
+
+
+
+tmp_days_folder = paste0(IO$tmp_data,"days_after_n_logs/")
+file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
 
 
 ```

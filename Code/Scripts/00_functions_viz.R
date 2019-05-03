@@ -33,7 +33,7 @@ ggplot_user_example = function(d = days[1:10,], title = TRUE,size_factor = 1){
 
 
 
-ggplot_imputed_TB = function(sel_d, facet_grid = NULL, cycle_id = TRUE, col = NA, full_cycle_id = FALSE){
+ggplot_imputed_TB = function(sel_d, facet_grid = NULL, facet_grid_x = NULL, facet_grid_y = NULL, cycle_id = TRUE, col = NA, full_cycle_id = FALSE){
   
   mandatory_columns = c("tender_breasts","cycle_nb_m","cycleday_m_D", "user_id")
   if(!all(mandatory_columns  %in% colnames(sel_d))){
@@ -51,6 +51,9 @@ ggplot_imputed_TB = function(sel_d, facet_grid = NULL, cycle_id = TRUE, col = NA
   if(!is.na(col)){eval(parse(text = paste0("sel_d$color = as.factor(sel_d$",col,")")))}
   
   sel_d$short_user_id = paste0(substr(sel_d$user_id,1,4),"...",substr(sel_d$user_id ,37,40))
+  short_user_id_levels = paste0(substr(levels(sel_d$user_id),1,4),"...",substr(levels(sel_d$user_id) ,37,40))
+  sel_d$short_user_id = factor(sel_d$short_user_id, levels = short_user_id_levels)
+  
   
   
   #y axis (cycle_id or cycle_nb)
@@ -66,7 +69,7 @@ ggplot_imputed_TB = function(sel_d, facet_grid = NULL, cycle_id = TRUE, col = NA
       sel_d$short_cycle_ids =paste0(substr(cycle_ids,1,4),"...",substr(cycle_ids ,nchar(cycle_ids)-4,nchar(cycle_ids)))
       sel_d$y = factor(sel_d$short_cycle_ids, levels = levels_short)
     }
-  }else{sel_d$y = as.factor(sel_d$cycle_nb_m); ylab = "cycle number"}
+  }else{sel_d$y = factor(sel_d$cycle_nb_m, levels = sort(unique(sel_d$cycle_nb_m))); ylab = "cycle number"}
   
   g = ggplot(sel_d, 
              aes(x = cycleday_m_D, y = y, col = color, size = 1))+
@@ -78,12 +81,19 @@ ggplot_imputed_TB = function(sel_d, facet_grid = NULL, cycle_id = TRUE, col = NA
     xlab("cycleday from 1st day of menstruation") + ylab(ylab)+
     guides(col = FALSE, alpha = FALSE, size = FALSE)
   
+  
+  if((length(facet_grid) == 0) & ((length(facet_grid_x)>0)|(length(facet_grid_y)>0))){facet_grid = c(facet_grid_x,facet_grid_y)}
+  
   if(length(facet_grid)>0){
     if(typeof(facet_grid) != "character"){stop("facet_grid must be NULL or a character vector \n")}
     if(!all(facet_grid %in% colnames(sel_d))){stop("facet_grid must be colnames of sel_d \n")}
     if("user_id" %in% facet_grid){facet_grid[facet_grid == "user_id"] = "short_user_id"}
-    facet_grid = paste(facet_grid, collapse = " + ")
-    eval(parse(text = paste0("g = g + facet_grid(",facet_grid," ~ .,scales = 'free_y')")))
+    if((length(facet_grid_x)==0) & (length(facet_grid_y)==0)){facet_grid_y = facet_grid}
+    if((length(facet_grid_x)>0) & (length(facet_grid_y)==0)){facet_grid_y = "."}
+    if(length(facet_grid_x) == 0){facet_grid_x = "."}
+    facet_grid_x = paste(facet_grid_x, collapse = " + ")
+    facet_grid_y = paste(facet_grid_y, collapse = " + ")
+    eval(parse(text = paste0("g = g + facet_grid(",facet_grid_y," ~ ", facet_grid_x,",scales = 'free_y')")))
     #if(clusters_exist){g = g + facet_grid( cluster_num + short_user_id  ~ ., scales = "free_y")}else{g = g + facet_grid(short_user_id ~ ., scales = "free_y")}
   }
   

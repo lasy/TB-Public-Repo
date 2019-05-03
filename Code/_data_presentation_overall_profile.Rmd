@@ -171,7 +171,7 @@ if(sum(colnames(users) %in%  c("n_tender_breasts", "n_cycles")) != 2){
   
   save(users, file = paste0(IO$output_data, "users.Rdata"))
   file.copy(from = paste0(IO$output_data, "users.Rdata"), 
-            to = paste0(IO$output_data, "users_with_nTB_and_n_cycles.Rdata"), overwrite = TRUE)
+            to = paste0(IO$tmp_data, "users_with_nTB_and_n_cycles.Rdata"), overwrite = TRUE)
 }
 
 lim = 50

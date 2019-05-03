@@ -89,6 +89,7 @@ stopImplicitCluster()
 
 m = match(cycles_m$cycle_id_m, cycles$cycle_id)
 cycles_m$user_id = cycles$user_id[m]
+cycles_m$cycle_nb_m = cycles$cycle_nb[m]
 m = match(cycles_m$user_id, users$user_id)
 cycles_m$age = users$age[m]
 cycles_m$country = users$country[m]

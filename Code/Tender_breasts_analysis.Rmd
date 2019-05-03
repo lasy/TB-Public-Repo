@@ -44,14 +44,16 @@ source("Scripts/00_setup.R")
 ```
 
 
+```{r child = '_pill_transition_analysis.Rmd', cache=TRUE}
+```
+
+
+
+
 
 # To come
 
 - predict cluster & intensity of symptoms (after cycle clustering)
-
-- finish user description
-
-- pill transition analysis
 
 
 

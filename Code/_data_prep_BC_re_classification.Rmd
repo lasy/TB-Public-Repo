@@ -64,7 +64,6 @@ The best strategy seems to be
 Loading cycles
 
 ```{r data_prep_BC_re_class loading cycles}
-file.copy(paste0(IO$output_data, "cycles.Rdata"), paste0(IO$tmp_data, "cycles_before_BC_re_classification.Rdata"))
 load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
 
 cycles$birth_control_CLUE = factor(cycles$birth_control_CLUE, levels = c("none / condoms","pill","did not enter"))
@@ -87,12 +86,14 @@ inputs
 ```{r data_prep_BC_re_class visualization of input variables}
 # ,"score_n_days_obs","score_BC","score_CL"
 for(input in inputs[-which(inputs == "cycle_start")]){
-  eval(parse(text = paste0("cycles$v = cycles$",input)))
-  g =  ggplot(cycles, aes(x = v, col = birth_control_CLUE)) + geom_freqpoly(aes(y = ..density..),binwidth = 1) +
-    ggtitle(input) +
-    scale_color_manual(values = c(cols$BC,"gray")) + 
-    xlim(quantile(cycles$v,p = c(0.005,0.955), na.rm = TRUE)+c(-1,1))
-  print(g)
+  if(input %in% colnames(cycles)){
+    eval(parse(text = paste0("cycles$v = cycles$",input)))
+    g =  ggplot(cycles, aes(x = v, col = birth_control_CLUE)) + geom_freqpoly(aes(y = ..density..),binwidth = 1) +
+      ggtitle(input) +
+      scale_color_manual(values = c(cols$BC,"gray")) + 
+      xlim(quantile(cycles$v,p = c(0.005,0.955), na.rm = TRUE)+c(-1,1))
+    print(g)
+  }else{print(paste0(input," is not in cycles\n"))}
 }
 
 j = which(colnames(cycles)=="v")

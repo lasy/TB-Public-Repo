@@ -62,7 +62,6 @@ save(users, file = paste0(IO$output_data,"users.Rdata"))
 
 ```{r data_prep_format loading cycles, echo = FALSE}
 load(file = paste0(IO$output_data,"cycles.Rdata"), verbose = TRUE)
-save(cycles, file = paste0(IO$tmp_data,"cycles_before_data_prep_format.Rdata"))
 dim(cycles)
 ```
 
@@ -83,6 +82,8 @@ summary(cycles)
 
 ```{r data_prep_format saving cycles}
 save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
+file.copy(from = paste0(IO$output_data,"cycles.Rdata"), to = paste0(IO$tmp_data,"cycles_after_data_prep_format.Rdata"), overwrite = TRUE)
+
 ```
 
 
@@ -93,18 +94,10 @@ save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
 ```{r data_prep_format formating days}
 
 days_folder = paste0(IO$output_data,"days/")
-
-tmp_days_folder = paste0(IO$tmp_data,"days_before_data_prep/")
-file.copy(days_folder, IO$tmp_data, recursive=TRUE)
-file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
-
-
 filenames = list.files(days_folder)
-
 
 cl = makeCluster(par$n_cores)
 registerDoParallel(cl)
-
 
 foreach(filename = filenames) %dopar%{
   cat(filename,"\n")
@@ -115,13 +108,17 @@ foreach(filename = filenames) %dopar%{
   # cleaning weight? I'm also not using the weight variations at the moment >> might leave that for later!
   
   # dates
-  
   date = as.Date(days$date)
   days$date = date
   rm(date)
   
   save(days, file =paste0(days_folder, filename))
 }
+
+
+tmp_days_folder = paste0(IO$tmp_data,"days_after_data_prep/")
+file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
 
 ```
 

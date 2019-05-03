@@ -37,7 +37,6 @@ load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 
 
 ```{r data_prep_cycles_agg loading cycles}
-file.copy(paste0(IO$output_data, "cycles.Rdata"), paste0(IO$tmp_data, "cycles_before_cycles_agg.Rdata"), overwrite = TRUE)
 load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
 ```
 
@@ -114,41 +113,20 @@ head(cycles_aggregate)
 
 
 
-
 ```{r data_prep_cycles_agg augmenting cycles table with aggregates from days}
-cycles = merge(cycles, cycles_aggregate, by = c("cycle_id"), all.x = TRUE)
 
-dim(cycles)
-
-head(cycles)
-
-```
-
-
-```{r data_prep_cycles_agg removing NAs}
-
-
-column_names = c("n_days_obs","last_obs_day",
-                 "n_obs","n_days_obs_lut_D","n_days_obs_lut_7","n_days_obs_foll_Df",
-                 "n_pill","n_other_BC",
-                 "n_tot_sex","n_prot_sex","n_unprot_sex","n_withdrawal",
-                 "n_TB", "n_egg_white_fluid", "n_BBT")
-for(column_name in column_names){
-  eval(parse(text = paste0("cycles$",column_name,"[is.na(cycles$",column_name,")] = 0")))
+column_names = colnames(cycles_aggregate)
+column_names = column_names[-which(column_names == "cycle_id")]
+m = match(cycles$cycle_id, cycles_aggregate$cycle_id)
+for(column in column_names){
+  eval(parse(text = paste0("cycles$", column," = cycles_aggregate$",column,"[m]")))
+  eval(parse(text = paste0("cycles$",column,"[is.na(cycles$",column,")] = 0")))
 }
 
-```
-
-
-```{r augmenting cycles table with aggregates from days}
-cycles = merge(cycles, cycles_aggregate, by = c("cycle_id"), all.x = TRUE)
-
 dim(cycles)
-
 head(cycles)
 
 ```
-
 
 
 We will still augment the cycles table with some measure of local regularity.
@@ -194,6 +172,8 @@ cycles$diff_cl_median_3c = cycles$cycle_length - cycles$cl_median_3c
 
 ```{r data_prep_cycles_agg saving cycles}
 save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
+file.copy(paste0(IO$output_data, "cycles.Rdata"), paste0(IO$tmp_data, "cycles_after_cycles_agg.Rdata"), overwrite = TRUE)
+
 ```
 
 

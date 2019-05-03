@@ -57,6 +57,8 @@ par$reset = FALSE
 par$selected_countries = c("United States","United Kingdom", "Brazil","Germany","France", "Unknown")
 par$x.axis = seq(-14,7,by = 7)
 par$n_cores = detectCores() - 1
+par$max_batch_size = 5000
+par$min_n_batches = 10
 
 par$BC_dict = data.frame(name = c("none / condoms","pill"),
                          binary = c(0,1))

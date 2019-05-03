@@ -6,6 +6,14 @@ lu = function(x){
 }
 
 
+rle_min = function(x){
+  #rle_BC = rle(as.character(x))
+  #j = which(rle_BC$value %in% par$BC_dict$name)
+  rle_length = rle(as.numeric(x))$length
+  if(length(rle_length) == 1){return(0)}else{return(min(rle_length))}
+}
+
+
 replace_NAs_with_latest_value = function(x) {   # repeats the last non NA value. Keeps leading NA
   ind = which(!is.na(x))      # get positions of nonmissing values
   if(is.na(x[1]))             # if it begins with a missing, add the 
@@ -15,6 +23,31 @@ replace_NAs_with_latest_value = function(x) {   # repeats the last non NA value.
 }                               # they need to be repeated
 
 # copied from: https://stackoverflow.com/questions/7735647/replacing-nas-with-latest-non-na-value
+
+find_on_off_pill_transitions = function(x, n_cycles = 4){
+  x = as.character(x)
+  on_pill_pattern = c(rep("none / condoms",n_cycles),"on-pill",rep("pill",n_cycles))
+  off_pill_pattern = c(rep("pill",n_cycles), "off-pill",rep("none / condoms",n_cycles))
+  y = c()
+  for(i in 1:length(x)){
+    if((i <= n_cycles)|(i >(length(x)-n_cycles))){
+      new_y = NA
+    }else{
+      check = c(all(x[(i-n_cycles):(i+n_cycles)] == on_pill_pattern),
+                all(x[(i-n_cycles):(i+n_cycles)] == off_pill_pattern))
+      if(!any(is.na(check)) & any(check)){
+        new_y = c("on-pill","off-pill")[check]
+      }else{
+        new_y = NA
+      }
+    }
+    y = c(y, new_y)
+  } 
+  return(y)
+}
+
+
+
 
 
 #loadv = function(x){load(x, verbose = TRUE)}
@@ -63,15 +96,18 @@ impute = function(obs = c(-1,-1,-1,0,1,-1,0,1,-1,-1,-1,-1,1,-1,1,-1,-1,-1,1,-1,0
 
 
 reshape_and_impute = function(days){
-  #prepare
+  #prepare : only keep the rows with n_logs or TB
   row_keep = ((days$type == "n_logs") |  (days$type == "tender_breasts")) & (!is.na(days$cycleday_m_D))
   col_keep = c("user_id","cycle_nb","cycle_id","cycle_id_m","cycleday","cycleday_m_D","type","number")
   d = days[row_keep,col_keep]
+  
+  #
   d$day_id = paste0(d$cycle_id_m,"_",d$cycleday_m_D)
   dup = duplicated(d$day_id)
+  d_before_dup = d
   d = d[!dup,]
   d$n = 0
-  d$n[d$day_id %in% d$day_id[dup]]= 1
+  d$n[d$day_id %in% d_before_dup$day_id[dup]]= 1
   
   #reshape
   d_wide = reshape(d[,c("cycle_id_m","cycleday_m_D","n")],

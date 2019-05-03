@@ -30,13 +30,11 @@ options(scipen=999)
 
 
 ```{r data_prep_BC_user_pre_filtering loading users}
-file.copy(paste0(IO$output_data, "users.Rdata"), paste0(IO$tmp_data, "user_before_BC_pre_filtering.Rdata"))
 load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 ```
 
 
 ```{r data_prep_BC_user_pre_filtering loading cycles}
-file.copy(paste0(IO$output_data, "cycles.Rdata"), paste0(IO$tmp_data, "cycles_before_BC_pre_filtering.Rdata"))
 load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
 ```
 
@@ -51,7 +49,10 @@ if(length(users)>0){
 }
 
 save(cycles, file = paste0(IO$output_data, "cycles.Rdata") )
+file.copy(paste0(IO$output_data, "cycles.Rdata"), paste0(IO$tmp_data, "cycles_after_BC_pre_filtering.Rdata"))
+
 save(users, file = paste0(IO$output_data, "users.Rdata") )
+file.copy(paste0(IO$output_data, "users.Rdata"), paste0(IO$tmp_data, "user_after_BC_pre_filtering.Rdata"))
 ```
 
 

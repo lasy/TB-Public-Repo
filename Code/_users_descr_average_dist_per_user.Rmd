@@ -37,7 +37,7 @@ load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 We only compute the average distance for users that had as least 1 TB ever logged
 
 
-```{r users_descr_avg_dist average distance, cache = FALSE}
+```{r users_descr_avg_dist average distance, cache = TRUE}
 
 output_folder = paste0(IO$tmp_data,"avg_dist_per_user/")
 dir.create(output_folder)
@@ -98,25 +98,51 @@ save(avg_dist_per_user, file = paste0(IO$tmp_data,"avg_dist_per_user.Rdata"))
 
 ```
 
-```{r users_descr_avg_dist test viz, eval = FALSE}
 
-load(file = paste0(output_folder, "d_",n,".Rdata"), verbose = TRUE)
 
-avg_dist_per_user[which(avg_dist_per_user$user_id %in% unique(d$user_id)),]
+### Checking the median distance for 10 ordered users
+
+
+```{r users_descr_avg_dist prep test viz, cache = TRUE}
+
+load(file = paste0(output_folder, "d_1.Rdata"), verbose = TRUE)
+load(paste0(IO$tmp_data,"avg_dist_per_user.Rdata"), verbose = TRUE)
+
+avg_dist_per_user = avg_dist_per_user[which(avg_dist_per_user$user_id %in% unique(d$user_id)),]
+
+o  = order(avg_dist_per_user$median_d)
+user_ids =  as.character(avg_dist_per_user$user_id[o[seq(1,nrow(avg_dist_per_user),length.out = 10)]])
+
+avg_dist_per_user = avg_dist_per_user[match(user_ids,avg_dist_per_user$user_id),]
+avg_dist_per_user$user_id = factor(avg_dist_per_user$user_id, levels = user_ids)
+
 d = melt(d)
 d$cycleday_m_D = as.numeric(gsub("\\.","-",gsub("n\\.","",d$variable)))
 d$cycle_nb_m = unlist(strsplit(as.character(d$cycle_id_m), "_"))[(1:nrow(d))*2]
 d$tender_breasts = d$value
 
-g = ggplot_imputed_TB(sel_d = d, facet_grid = "user_id", cycle_id = FALSE)
-g
+d = d[,c("user_id","cycle_nb_m","cycleday_m_D","tender_breasts")]
 
+sel_d = d[d$user_id %in% user_ids ,]
+sel_d$user_id = factor(sel_d$user_id, levels = user_ids)
 
 
 ```
 
 
-```{r users_descr_avg_dist saving users, cache = FALSE}
+
+```{r users_descr_avg_dist test viz, fig.height=12, fig.width=6, cache = TRUE}
+g = ggplot_imputed_TB(sel_d = sel_d, facet_grid = "user_id", cycle_id = FALSE)
+g
+
+avg_dist_per_user
+```
+
+
+### Consistency metrics
+
+
+```{r users_descr_avg_dist saving users, cache = TRUE}
 
 load(file = paste0(IO$tmp_data,"avg_dist_per_user.Rdata"), verbose=  TRUE)
 load(paste0(IO$output_data, "users.Rdata"), verbose=  TRUE)
@@ -138,28 +164,28 @@ file.copy(from = paste0(IO$output_data, "users.Rdata"), to = paste0(IO$tmp_data,
 
 ggplot(users, aes(x = median_d, fill = factor(most_preval_clust))) +
   geom_histogram(position = "identity", col = NA) + 
-  facet_grid(most_preval_clust ~ ., scale = "free_y")+
-  scale_fill_manual(values = cols$clusters_6)
+  facet_grid(most_preval_clust ~ ., scale = "free_y")#+
+  #scale_fill_manual(values = cols$clusters_6)
 
 
 
 ggplot(users, aes(x = median_d, fill = factor(most_preval_clust))) +
   geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
-  facet_grid(most_preval_clust ~ ., scale = "free_y")+
-  scale_fill_manual(values = cols$clusters_6)
+  facet_grid(most_preval_clust ~ ., scale = "free_y")#+
+  #scale_fill_manual(values = cols$clusters_6)
 
 
 ggplot(users, aes(x = avg_d, fill = factor(most_preval_clust))) +
   geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
-  facet_grid(most_preval_clust ~ ., scale = "free_y")+
-  scale_fill_manual(values = cols$clusters_6)
+  facet_grid(most_preval_clust ~ ., scale = "free_y")#+
+  #scale_fill_manual(values = cols$clusters_6)
 
 
 
 ggplot(users, aes(x = sd_d, fill = factor(most_preval_clust))) +
   geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
-  facet_grid(most_preval_clust ~ ., scale = "free_y")+
-  scale_fill_manual(values = cols$clusters_6)
+  facet_grid(most_preval_clust ~ ., scale = "free_y")#+
+  #scale_fill_manual(values = cols$clusters_6)
 
 ```
 

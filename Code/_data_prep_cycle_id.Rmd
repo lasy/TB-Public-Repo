@@ -33,7 +33,6 @@ options(scipen=999)
 
 
 ```{r data_prep_cycle_id load cycle table}
-file.copy(paste0(IO$output_data,"cycles.Rdata"),paste0(IO$tmp_data,"cycles_before_cycle_id.Rdata"), overwrite = TRUE)
 load(paste0(IO$output_data,"cycles.Rdata"), verbose = TRUE)
 ```
 
@@ -45,9 +44,9 @@ cycles$cycle_id = paste0(cycles$user_id,"_", cycles$cycle_nb)
 
 ```{r data_prep_cycle_id saving cycles}
 save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
+file.copy(paste0(IO$output_data,"cycles.Rdata"),paste0(IO$tmp_data,"cycles_after_cycle_id.Rdata"), overwrite = TRUE)
+
 ```
-
-
 
 
 ### Linking the days with the cycles
@@ -56,11 +55,6 @@ save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
 ```{r data_prep_cycle_id linking the days with the cycles}
 
 days_folder = paste0(IO$output_data,"days/")
-
-tmp_days_folder = paste0(IO$tmp_data,"days_before_cycle_id/")
-file.copy(days_folder, IO$tmp_data, recursive=TRUE)
-file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
-
 filenames = list.files(days_folder)
 
 cl = makeCluster(par$n_cores)
@@ -98,6 +92,10 @@ foreach(filename = filenames) %dopar%
 }
 
 stopCluster(cl)
+
+tmp_days_folder = paste0(IO$tmp_data,"days_after_cycle_id/")
+file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
 
 ```
 
@@ -233,11 +231,6 @@ define_menstruation_centered_cycles = function(days = days, par = par){
 ```{r define menstruation-centered cycle_id, eval = TRUE}
 
 days_folder = paste0(IO$output_data,"days/")
-
-tmp_days_folder = paste0(IO$tmp_data,"days_before_menstruation_centered_cycles/")
-file.copy(days_folder, IO$tmp_data, recursive=TRUE)
-file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
-
 clue_file_list = list.files(days_folder)
 
 registerDoParallel(par$n_cores)
@@ -255,6 +248,11 @@ foreach(file = clue_file_list) %dopar%
 }
 toc()
 stopImplicitCluster()
+
+
+tmp_days_folder = paste0(IO$tmp_data,"days_after_menstruation_centered_cycles/")
+file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
 
 ```
 
