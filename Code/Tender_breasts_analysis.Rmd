@@ -40,6 +40,10 @@ source("Scripts/00_setup.R")
 ```
 
 
+```{r child = '_cycle_symptoms_predictions.Rmd', cache=TRUE}
+```
+
+
 ```{r child = '_users_description.Rmd', cache=TRUE}
 ```
 
