@@ -72,7 +72,7 @@ cycles_m$diff_cl_median_3c = cycles$diff_cl_median_3c[m]
 
 
 ```{r symtoms_pred add user and cycle info to d_wide}
-inputs = c("cycle_length","period_length","diff_cl_median_3c","BC","age","height","weight","bmi", "country")
+inputs = c("cycle_length","period_length","diff_cl_median_3c","BC","age","bmi", "country") #"height","weight",
 m = match(d_wide$cycle_id_m, cycles_m$cycle_id_m)
 
 for(input in inputs){
@@ -145,7 +145,6 @@ g = ggplot(pred[!grepl("country",pred$input),], aes(x = cycleday_m_D,col = input
   facet_wrap(input ~ .)+
   guides(col = FALSE)
 g
-
 
 ```
 
