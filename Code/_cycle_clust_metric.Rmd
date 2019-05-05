@@ -119,6 +119,7 @@ grid.arrange(g_examples, g_distances, nrow = 1)
 
 d_wide_sample = d_wide[j,]
 save(d_wide_sample, file = paste0(IO$tmp_data, "d_wide_sample.Rdata"))
+save(d, file = paste0(IO$tmp_data, "d_sample.Rdata"))
 
 
 ```
@@ -132,9 +133,15 @@ Consequently, we modified the C code from the CLARA function to implement the di
 
 The sources for the modified package can be found (here)(link to modified cluster package).
 
-```{r cycle_clust_metric checking the clara implementation}
+```{r cycle_clust_metric checking the clara implementation, fig.width=12}
+
+
+source("Scripts/00_setup.R")
+source("Scripts/00_functions_distance.R")
 
 load(paste0(IO$tmp_data, "d_wide_sample.Rdata"), verbose =  TRUE)
+load(paste0(IO$tmp_data, "d_sample.Rdata"), verbose =  TRUE)
+
 
 distance_Rcpp = TB_distance(M = d_wide_sample[,-1], r = par$r, w = par$w)
 
@@ -146,22 +153,73 @@ all(round(distance_Rcpp,4) == round(distance_clara,4))
 
 sum(abs(distance_Rcpp - distance_clara))/(nrow(distance_Rcpp) * (ncol(distance_Rcpp)))
 
-
-
 distance_Rcpp = reshape_distance_matrix_to_long(distance_Rcpp)
 distance_clara = reshape_distance_matrix_to_long(distance_clara)
 
-g_distances_Rcpp = ggplot(distance_Rcpp, aes(x = i, y = j, col = dist)) + geom_point(size = 10) + xlab("") + ylab("") + scale_color_gradient(low = "lightblue",high = "tomato", na.value = "transparent")
 
-g_distances_clara = ggplot(distance_clara, aes(x = i, y = j, col = dist)) + geom_point(size = 10) + xlab("") + ylab("") + scale_color_gradient(low = "lightblue",high = "tomato", na.value = "transparent")
+g_distances_Rcpp = ggplot(distance_Rcpp, aes(x = i, y = j, col = dist)) + geom_point(size = 10) + xlab("") + ylab("") + scale_color_gradient(breaks = seq(0,1,by = 0.1),low = "lightblue",high = "tomato", na.value = "transparent") + guides(col = FALSE)
+
+g_distances_clara = ggplot(distance_clara, aes(x = i, y = j, col = dist)) + geom_point(size = 10) + xlab("") + ylab("") + scale_color_gradient(breaks = seq(0,1,by = 0.1),low = "lightblue",high = "tomato", na.value = "transparent") + guides(col = FALSE)
 #g_distances
 
-grid.arrange(g_distances_Rcpp, g_distances_clara, nrow = 1)
+g_examples = ggplot_imputed_TB(d, col = "cycle_id_m")
 
+
+grid.arrange(g_examples, g_distances_Rcpp, g_distances_clara, nrow = 1)
 
 plot(distance_Rcpp$dist, distance_clara$dist, xlim = c(0,1),ylim = c(0,1)); abline(a = 0, b = 1)
 
 ```
+
+
+##### Instructions to modify the CLARA function in the Cluster package
+
+- download the cluster package, unzip and place the folder `cluster` where you see fit.
+
+- in RStudio: File > Open Project in New Session... ; Select the `cluster` folder (the one from step above)
+
+- modify the files:
+
+  * `clara.q` (R code calling the C function) [only need to change if function arguments are changed] ;
+
+  * `clara.c` (the main clara function, implemented in C) ;
+
+  * `clara.Rd` (documentation) ;
+
+  * `cluster.h` (C and Fortran function declaration) [only need to change if function arguments are changed] ;
+
+  * `init.c` (initialize the function ) [only need to change if function arguments are changed]
+  
+  
+- When done, in RStudio : Build > Clean and Rebuild
+
+- If there are errors, fix them ; if it builds properly, Yay!
+
+- To test the package, restart a new session and load the `cluster` package ( by typing `library(cluster)`) and use clara to check if the changes have been properly implemented. (The chunk above is written for this test).
+
+
+
+
+In `clara.c` the distance function is present in 3 places:
+
+- 1 x inside the `dysta2` function ( ~ lines 400)
+
+- 2 x inside the `selec` function ( ~ lines 700 and 750) [one if no missing data, one if missing data] 
+
+![](../Figures Tables Media/Media/Clara distance.JPG)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

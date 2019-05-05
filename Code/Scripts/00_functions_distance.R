@@ -6,22 +6,26 @@
 
 
 cppFunction(
-  'NumericMatrix TB_distance_Rccp(NumericMatrix M_symptoms, NumericMatrix M_any_log , double r) {
+  'NumericMatrix TB_distance_Rccp(NumericMatrix M_symptoms, NumericMatrix M_any_log , double r, NumericVector w) {
+
   int N = M_symptoms.nrow();
   NumericMatrix J(N,N);
   for(int i = 0; i < (N-1); i++){
   for(int j = i+1; j < (N); j++){
-  
-  double Tracking_binary = sum(M_any_log(i,_) == M_any_log(j,_));
-  double vector_size = (M_any_log(i,_).size());
-  double Tracking_index = Tracking_binary/vector_size;
+
+
+  NumericVector Tracking_same = wrap(M_any_log(i,_) == M_any_log(j,_));
+  double Tracking_same_sum =  sum(w*Tracking_same);
+  double Tracking_all = sum(w);
+  double Tracking_index = Tracking_same_sum/Tracking_all;
+
   
   NumericVector Symptom_overlap = pmin(M_symptoms(i,_),M_symptoms(j,_));
   NumericVector Symptom_union = pmax(M_symptoms(i,_),M_symptoms(j,_));
   double Symptom_index;
   if(sum(Symptom_union) == 0) {Symptom_index = Tracking_index/2;} 
   else{ Symptom_index = sum(Symptom_overlap) / sum(Symptom_union); }
-  
+
   double d  = 1 - r*Symptom_index - (1-r)*Tracking_index; 
   
   J(i,j) = d;
@@ -45,7 +49,6 @@ TB_distance = function(M, r = 0.75, w = NA, smooth = TRUE, filter = c(1/4,1/2,1/
   
   M_symptoms = M;
   M_symptoms[M_symptoms<0] = 0
-  M_symptoms = sweep(M_symptoms,MARGIN=2,w,`*`)
   
   if(smooth){
     M_tmp = cbind(M_symptoms[,1],M_symptoms,M_symptoms[,ncol(M_symptoms)])
@@ -53,7 +56,9 @@ TB_distance = function(M, r = 0.75, w = NA, smooth = TRUE, filter = c(1/4,1/2,1/
     M_symptoms = M_tmp
   }
   
-  J = TB_distance_Rccp(M_symptoms, M_any_log, r)
+  M_symptoms = sweep(M_symptoms,MARGIN=2,w,`*`)
+  
+  J = TB_distance_Rccp(M_symptoms, M_any_log, r, w)
   return(J)
 }
 

@@ -4,16 +4,16 @@
     "created" : 1545703531481.000,
     "dirty" : false,
     "encoding" : "UTF-8",
-    "folds" : "",
-    "hash" : "1303820733",
+    "folds" : "338|11|340|9|\n370|53|372|8|\n377|46|382|14|\n378|49|380|16|\n449|9|458|8|\n",
+    "hash" : "429920755",
     "id" : "8AA345A9",
-    "lastKnownWriteTime" : 1545712792,
-    "last_content_update" : 1545712792413,
-    "path" : "~/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/code/cluster_package/cluster/src/clara.c",
+    "lastKnownWriteTime" : 1557016736,
+    "last_content_update" : 1557016736795,
+    "path" : "~/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/TB-Public-Repo/Code/Scripts/cluster_package/cluster/src/clara.c",
     "project_path" : "src/clara.c",
     "properties" : {
-        "cursorPosition" : "694,16",
-        "scrollLine" : "0"
+        "cursorPosition" : "355,11",
+        "scrollLine" : "334"
     },
     "relative_order" : 2,
     "source_on_save" : false,

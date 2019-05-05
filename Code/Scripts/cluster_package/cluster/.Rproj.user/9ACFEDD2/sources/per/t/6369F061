@@ -9,13 +9,13 @@
     "id" : "6369F061",
     "lastKnownWriteTime" : 1545712936,
     "last_content_update" : 1545712936934,
-    "path" : "~/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/code/cluster_package/cluster/man/clara.Rd",
+    "path" : "~/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/TB-Public-Repo/Code/Scripts/cluster_package/cluster/man/clara.Rd",
     "project_path" : "man/clara.Rd",
     "properties" : {
         "cursorPosition" : "34,39",
-        "scrollLine" : "14"
+        "scrollLine" : "0"
     },
-    "relative_order" : 4,
+    "relative_order" : 3,
     "source_on_save" : false,
     "source_window" : "",
     "type" : "r_doc"
