@@ -101,3 +101,46 @@ ggplot_imputed_TB = function(sel_d, facet_grid = NULL, facet_grid_x = NULL, face
 }
 
 
+
+ggplot_user_history = function(d, pill_transition = c("no trans","on pill","off pill")){
+  
+  if(uniqueN(d$user_id)>1){stop("this function is only suited for a single user table\n")}
+  
+  pill_transition = pill_transition[1]
+  if(pill_transition == "on pill"){
+    ref_date = min(d$date[d$BC == "pill"])
+  }else if(pill_transition == "off pill"){
+    ref_date = min(d$date[d$BC == "none / condoms"])
+  }else{
+    ref_date = min(d$date)
+  }
+  d$rel_date = as.numeric(d$date - ref_date)
+  if(!is.na(pill_transition)){
+    d = d[d$rel_date %in% -180:180,]
+  }
+  
+  d = d[d$type %in% cols_feature$type,]
+  d$number[is.na(d$number)] = 3
+  d$number[d$type == "heavy"] = 4
+  d$number[d$type == "medium"] = 3
+  d$number[d$type == "light"] = 2
+  d$number[d$type == "spotting"] = 1
+  
+  d$type = factor(d$type, levels = cols_feature$type)
+  colors = cols_feature$col[cols_feature$type %in% unique(d$type)]
+  
+  g = ggplot(d, aes(x = rel_date, y = category, col = type, size = number)) + 
+    geom_vline(xintercept = d$rel_date[d$cycleday == 1], col = "gray90")+
+    geom_point(shape = "|")+
+    scale_color_manual(values = colors)+
+    theme(axis.ticks.x = element_blank(),
+          panel.grid.major.x = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          legend.position="bottom")+
+    ggtitle(unique(d$user_id))+
+    guides(size = FALSE, col = FALSE)
+
+  return(g)
+}
+
+

@@ -44,6 +44,17 @@ cols$age_x_BC <- c(scales::seq_gradient_pal(cols$NC, "black")(seq(0,1,length.out
                    scales::seq_gradient_pal("gray", "black")(seq(0,1,length.out=6))[1:5])
 
 
+cols_feature = data.frame(type = c("heavy","medium","light","spotting",
+                                   "tender_breasts",
+                                   "taken","late","missed","double",
+                                   "n_logs"),
+                          col = c("tomato4","tomato3","tomato2","tomato1",
+                                  "lightblue",
+                                  "steelblue3","orange","red","black",
+                                  "gray70"),
+                          stringsAsFactors = FALSE)
+
+
 
 cols$pill_trans = c("gray40","royalblue1")
 

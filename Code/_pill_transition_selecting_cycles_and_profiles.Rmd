@@ -78,6 +78,8 @@ cycles_m$cycle_nb_m_from_off_pill = cycles_m$cycle_nb_m -  cycle_nb_off_pill
 ```
 
 
+## Looking at users that experiences an INcrease or DEcrease of their symptoms
+
 ```{r pill_trans_select increase vs decrease}
 
 # on-pill transition
@@ -148,6 +150,7 @@ days$cycle_nb_m_from_off_pill = cycles_m$cycle_nb_m_from_off_pill[match(days$cyc
 
 ```
 
+## Pre- and post-transition profiles
 
 
 ```{r pill_trans_select TB profiles at pill transitions}
@@ -231,11 +234,13 @@ file.copy(from = paste0(IO$output_data,"users.Rdata"), to = paste0(IO$tmp_data,"
 save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
 file.copy(from = paste0(IO$output_data,"cycles_m.Rdata"), to = paste0(IO$tmp_data,"cycles_m_with_pill_transitions.Rdata"), overwrite = TRUE)
 
+save(days, file = paste0(IO$tmp_data, "days_pill_trans.Rdata"))
+
+
 save(transition_profiles, file = paste0(IO$out_Rdata,"transition_profiles.Rdata"))
 save(transition_profiles_with_inc_dec, file = paste0(IO$out_Rdata,"transition_profiles_with_inc_dec.Rdata"))
 
 ```
-
 
 
 

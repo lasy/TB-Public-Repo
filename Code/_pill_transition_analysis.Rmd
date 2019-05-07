@@ -20,3 +20,7 @@ output:
 ```{r child = '_pill_transition_selecting_cycles_and_profiles.Rmd', cache=TRUE}
 ```
 
+
+```{r child = '_pill_transition_selecting_user_for_examples.Rmd', cache=TRUE}
+```
+
