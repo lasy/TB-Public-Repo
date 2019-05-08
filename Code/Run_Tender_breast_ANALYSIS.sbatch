@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-#SBATCH --job-name=ExampleSbatch
-#SBATCH --output=ExampleSbatch.out
-#SBATCH --error=ExampleSbatch.err
-#SBATCH --partition=normal
+#SBATCH --job-name=Tender_breasts_ANALYSIS
+#SBATCH --output=Tender_breasts_ANALYSIS.out
+#SBATCH --error=Tender_breasts_ANALYSIS.err
+#SBATCH --partition=hns,stat,normal
 #SBATCH --qos=normal
-#SBATCH --time=10:00:00
+#SBATCH --time=3:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=20G
 
