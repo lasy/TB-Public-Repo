@@ -70,7 +70,7 @@ foreach(filename = filenames) %dopar%
   save(days, file = paste0(days_folder, filename))
 }
 
-
+stopImplicitCluster()
 
 tmp_days_folder = paste0(IO$tmp_data,"days_after_n_logs/")
 file.copy(days_folder, IO$tmp_data, recursive=TRUE)
