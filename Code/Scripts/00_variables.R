@@ -1,3 +1,7 @@
+par = list()
+par$subset = TRUE
+par$local_user = Sys.getenv("LOGNAME")
+
 source("Scripts/00_variables_IO.R")
 
 TB = "tender_breasts"
@@ -63,7 +67,7 @@ viz$scale = 1.1
 viz$full_width = 12
 
 
-par = list()
+
 par$reset = FALSE
 par$selected_countries = c("United States","United Kingdom", "Brazil","Germany","France", "Unknown")
 par$x.axis = seq(-14,7,by = 7)

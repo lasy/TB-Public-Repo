@@ -67,12 +67,16 @@ cycles_m$cycle_length = cycles$cycle_length[m]
 cycles_m$period_length = cycles$period_length[m]
 cycles_m$diff_cl_median_3c = cycles$diff_cl_median_3c[m]
 
+
+cycles_m$bmi_cat = cut(cycles_m$bmi, breaks = c(-Inf, 18.5, 25, 30, Inf), labels = c("underweight","normal","overweight","obese"))
+cycles_m$bmi_cat = factor(cycles_m$bmi_cat, levels =  c("normal","underweight","overweight","obese"))
+
 ```
 
 
 
 ```{r symtoms_pred add user and cycle info to d_wide}
-inputs = c("cycle_length","period_length","diff_cl_median_3c","BC","age","bmi", "country") #"height","weight",
+inputs = c("cycle_length","period_length","diff_cl_median_3c","BC","age","bmi_cat", "country") #"height","weight",
 m = match(d_wide$cycle_id_m, cycles_m$cycle_id_m)
 
 for(input in inputs){
@@ -91,7 +95,7 @@ for(d in (-par$D):(par$Df) ){
   cat(d,"\n")
   eval(parse(text = paste0("d_wide$y = d_wide$day_",ifelse(d<0,"m",""),abs(d))))
   eval(parse(text = paste0("mod_d = glm( round(y) ~ ",paste(inputs, collapse = " + ")," ,
-                            data = d_wide,
+                            data = d_wide[d_wide$BC %in% par$BC_dict$name,],
                             family = 'binomial')")))
   
   this_day_pred = data.frame(cycleday_m_D = d,
@@ -113,6 +117,12 @@ rownames(pred) = 1:nrow(pred)
 
 pred$q_value = p.adjust(pred$p_value, method = "BH")
 
+save(pred, file = paste0(IO$out_Rdata,"symptoms_predictors.Rdata"))
+
+```
+
+```{r symtoms_pred viz}
+
 g = ggplot(pred[!grepl("country",pred$input),], aes(x = cycleday_m_D, y = z_value, col = input)) + 
   geom_vline(xintercept = 0, size = 2, col = "gray90")+
   geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
@@ -122,17 +132,6 @@ g = ggplot(pred[!grepl("country",pred$input),], aes(x = cycleday_m_D, y = z_valu
   facet_wrap(input ~ .)+
   guides(col = FALSE)
 g
-
-g = ggplot(pred[grepl("country",pred$input),], aes(x = cycleday_m_D, y = z_value, col = input)) + 
-  geom_vline(xintercept = 0, size = 2, col = "gray90")+
-  geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
-  geom_hline(yintercept = 0, size = 0.1)+
-  geom_line() + 
-  scale_x_continuous(breaks = par$x.axis)+
-  facet_wrap(input ~ .)+
-  guides(col = FALSE)
-g
-
 
 
 g = ggplot(pred[!grepl("country",pred$input),], aes(x = cycleday_m_D,col = input)) + 
@@ -146,8 +145,32 @@ g = ggplot(pred[!grepl("country",pred$input),], aes(x = cycleday_m_D,col = input
   guides(col = FALSE)
 g
 
-```
 
+
+g = ggplot(pred[grepl("country",pred$input),], aes(x = cycleday_m_D, y = z_value, col = input)) + 
+  geom_vline(xintercept = 0, size = 2, col = "gray90")+
+  geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
+  geom_hline(yintercept = 0, size = 0.1)+
+  geom_line() + 
+  scale_x_continuous(breaks = par$x.axis)+
+  facet_wrap(input ~ .)+
+  guides(col = FALSE)
+g
+
+
+g = ggplot(pred[grepl("country",pred$input),], aes(x = cycleday_m_D,col = input)) + 
+  geom_vline(xintercept = 0, size = 2, col = "gray90")+
+  geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
+  geom_hline(yintercept = 0, size = 0.1)+
+  geom_line(aes(y = -log(q_value))) + 
+  geom_line(aes(y = -log(p_value)), linetype = 2) + 
+  scale_x_continuous(breaks = par$x.axis)+
+  facet_wrap(input ~ .)+
+  guides(col = FALSE)
+g
+
+
+```
 
 
 
