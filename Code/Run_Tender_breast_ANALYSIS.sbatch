@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 #SBATCH --job-name=Tender_breasts_ANALYSIS
-#SBATCH --output=Tender_breasts_ANALYSIS.out
-#SBATCH --error=Tender_breasts_ANALYSIS.err
+#SBATCH --output=sbatch_output_Tender_breasts_ANALYSIS.out
+#SBATCH --error=sbatch_output_Tender_breasts_ANALYSIS.err
 #SBATCH --partition=hns,stat,normal
 #SBATCH --qos=normal
 #SBATCH --time=3:00:00
