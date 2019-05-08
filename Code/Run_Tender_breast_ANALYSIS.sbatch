@@ -11,4 +11,4 @@
 
 module load R/3.5.1
 
-R -e "rmarkdown::render('Tender_breasts_ANALYSIS.Rmd')"
+R -e "rmarkdown::render('TB/TB-Public-Repo/Code/Tender_breasts_ANALYSIS.Rmd')"
