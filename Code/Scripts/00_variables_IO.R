@@ -13,7 +13,7 @@ if(!dir.exists(IO$out_csv)){dir.create(IO$out_csv)}
 if(par$local_user == "laurasymul"){
   source("../../TB-Restricted-Access-Repo/Scripts/00_variables_restricted_IO.R")
 }else{
-  IO$r_Data = "../../TB-Data"
+  IO$r_Data = "../../TB-Data/"
 }
 
 
