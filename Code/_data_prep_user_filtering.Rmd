@@ -141,6 +141,8 @@ users_original_files = foreach(filename = filenames, .combine = rbind) %dopar%
 
 stopImplicitCluster()
 
+save(users_original_files, file = paste0(IO$tmp_data, "users_original_files.Rdata"))
+
 
 ```
 
