@@ -139,6 +139,12 @@ users_original_files = foreach(filename = filenames, .combine = rbind) %dopar%
   return(users_original_file)
 }
 
+stopImplicitCluster()
+
+
+```
+
+```{r user_filt saving the original file ids}
 
 users_o_f = aggregate(original_file_id ~ user_id ,users_original_files, paste0, collapse = ",")
 users$original_files = users_o_f$original_file_id[match(users$user_id, users_o_f$user_id)]
@@ -146,8 +152,9 @@ users$original_files = users_o_f$original_file_id[match(users$user_id, users_o_f
 save(users, file = paste0(IO$output_data,"users.Rdata"))
 file.copy(paste0(IO$output_data,"users.Rdata"), paste0(IO$tmp_data,"users_after_filtering_days.Rdata"), overwrite = TRUE)
 
-
 ```
+
+
 
 
 ```{r user_filt re-assembling batches}
