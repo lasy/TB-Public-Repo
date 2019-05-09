@@ -99,7 +99,7 @@ filenames = list.files(days_folder)
 cl = makeCluster(par$n_cores)
 registerDoParallel(cl)
 
-foreach(filename = filenames) %dopar%{
+foreach(filename = filenames) %do%{
   cat(filename,"\n")
   load(paste0(days_folder, filename), verbose = TRUE)
   
@@ -115,6 +115,7 @@ foreach(filename = filenames) %dopar%{
   save(days, file =paste0(days_folder, filename))
 }
 
+stopImplicitCluster()
 
 tmp_days_folder = paste0(IO$tmp_data,"days_after_data_prep/")
 file.copy(days_folder, IO$tmp_data, recursive=TRUE)
