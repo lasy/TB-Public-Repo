@@ -7,7 +7,7 @@
 #SBATCH --qos=normal
 #SBATCH --time=3:00:00
 #SBATCH --nodes=1
-#SBATCH --mem=20G
+#SBATCH --mem=32G
 
 module load R/3.5.1
 
