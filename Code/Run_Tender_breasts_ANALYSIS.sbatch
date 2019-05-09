@@ -9,6 +9,8 @@
 #SBATCH --nodes=1
 #SBATCH --mem=32G
 
+rm sbatch_output_Tender_breasts_ANALYSIS.*
+
 module load R/3.5.1
 
 R -e "rmarkdown::render('Tender_breasts_ANALYSIS.Rmd')"
