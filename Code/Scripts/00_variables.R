@@ -1,5 +1,5 @@
 par = list()
-par$subset = TRUE
+par$data_type = "synthetic" # "subset" "full
 par$local_user = Sys.getenv("LOGNAME")
 
 source("Scripts/00_variables_IO.R")
