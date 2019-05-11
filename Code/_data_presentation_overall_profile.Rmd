@@ -45,23 +45,24 @@ agg$counts_per_cycle = agg$counts / agg$n_cycles
 agg = agg[order(agg$counts_per_cycle, decreasing = TRUE),]
 
 j = which((agg$n_cycles == 10) & (agg$counts_per_cycle > 2) & (agg$counts_per_cycle < 10))
-user_ids = agg$user_id[j[11:20]]
-user_ids
-for(user_id in user_ids){
-  j = which((days$user_id == user_id)&(!is.na(days$cycle_id_m)) & (days$category != "pill_hbc"))
-  d = days[j,]
-  d$cycle_number = factor(d$cycle_nb_m, levels = min(d$cycle_nb_m, na.rm = TRUE):max(d$cycle_nb_m, na.rm = TRUE))
-  d$number[d$type == "tender_breasts"] = 4
-  d$type = factor(d$type, levels = unique(d$type[order(d$category)]))
-
-  g = ggplot(d, aes(x = cycleday_m, y = category, col = type, shape = type)) + 
-    geom_point(alpha = 0.7)+ 
-    facet_grid(cycle_number ~.)+ 
-    ggtitle(d$user_id[1]) + 
-    scale_shape_manual(values=1:nlevels(d$type))
-  print(g) 
+if(length(j)>0){
+  user_ids = agg$user_id[j[11:20]]
+  user_ids
+  for(user_id in user_ids){
+    j = which((days$user_id == user_id)&(!is.na(days$cycle_id_m)) & (days$category != "pill_hbc"))
+    d = days[j,]
+    d$cycle_number = factor(d$cycle_nb_m, levels = min(d$cycle_nb_m, na.rm = TRUE):max(d$cycle_nb_m, na.rm = TRUE))
+    d$number[d$type == "tender_breasts"] = 4
+    d$type = factor(d$type, levels = unique(d$type[order(d$category)]))
+    
+    g = ggplot(d, aes(x = cycleday_m, y = category, col = type, shape = type)) + 
+      geom_point(alpha = 0.7)+ 
+      facet_grid(cycle_number ~.)+ 
+      ggtitle(d$user_id[1]) + 
+      scale_shape_manual(values=1:nlevels(d$type))
+    print(g) 
+  }
 }
-
 
 rm(agg, agg2, j, d)
 
@@ -89,9 +90,11 @@ for(user_id in user_ids){
   g = ggplot_user_example(d = d)
   print(g)
   
+  rm(j,d,g)
+  
 }
 
-rm(user_id, user_ids, g, d, j)
+rm(user_id, user_ids)
 
 
 ```
@@ -127,8 +130,10 @@ stopImplicitCluster()
 a = aggregate(agg[,c("n_tender_breasts","n_cycles")] , by = list(cycleday_m_D = agg$cycleday_m_D, age_cat = agg$age_cat, BC = agg$BC), FUN = sum)
 a$perc_tender_breasts = a$n_tender_breasts/a$n_cycles
 
-a = a[-which(a$age_cat %in% par$age_cat_exclude),]
-a = a[-which((a$age_cat == "(35,40]") & (a$BC == "pill")),]
+j = which(a$age_cat %in% par$age_cat_exclude)
+if(length(j)>0){a = a[-j,]}
+j = which((a$age_cat == "(35,40]") & (a$BC == "pill"))
+if(length(j)>0){a = a[-j,]}
 
 a$SE = sqrt(a$perc_tender_breasts*(1-a$perc_tender_breasts)/a$n_cycles)
 

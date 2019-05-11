@@ -45,6 +45,7 @@ load(paste0(IO$tmp_data,"d_imputed.Rdata"), verbose = TRUE)
 #sample_size= 100000
 #if(nrow(d_wide)>sample_size){d_wide_sample = d_wide[sample(1:nrow(d_wide),sample_size),]}else{d_wide_sample = d_wide}
 
+if(par$run_optimal_nb_of_cluster){
 
 n_centers = 2:15
 df = data.frame()
@@ -64,7 +65,7 @@ for(r in c(0,1/2,2/3,0.75,5/6,1)){
     
     silh = as.data.frame(clara_n$silinfo$widths)
     silh$x = 1:nrow(silh)
-    silh$rows = as.numeric(rownames(silh))
+    silh$rows = as.numeric(rownames(clara_n$silinfo$widths))
     
     d$cluster_num = clara_n$clustering[match(d$cycle_id_m, d_wide$cycle_id_m)]
     
@@ -74,7 +75,7 @@ for(r in c(0,1/2,2/3,0.75,5/6,1)){
     m = which(!is.na(match( d$cycle_id_m, cycle_ids_silh)))
     d_subset = d[m,]
     d_subset = d_subset[order(d_subset$cluster_num),]
-    d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = rev(cycle_ids_silh))
+    d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = rev(unique(cycle_ids_silh)))
     g_samples = ggplot_imputed_TB(d_subset, facet_grid = NULL)+scale_size(range = c(2,2)) + ggtitle(paste0("r = ",r))
     
     g_silh = ggplot(silh, aes(fill = factor(cluster),x = factor(x, levels =rev(x)), y = sil_width)) + coord_flip()+
@@ -98,12 +99,13 @@ for(r in c(0,1/2,2/3,0.75,5/6,1)){
       geom_text(label = 1:nrow(mds))+
       guides(color = FALSE)+ggtitle("MDS")+xlab("")+ylab("")
     
-    grid.arrange(g_samples, g_silh, g_mds, nrow = 1, widths = c(2,1,2.2))
+    #grid.arrange(g_samples, g_silh, g_mds, nrow = 1, widths = c(2,1,2.2))
   }
 }
 tictoc::toc()
 
 save(df, file = paste0(IO$tmp_data,"silhouette_score_summary.Rdata"))
+}
 
 rm(d_subset, n_center, n_centers)
 ```
@@ -112,8 +114,11 @@ rm(d_subset, n_center, n_centers)
 
 ```{r cycle_clust_optimal_number silhouette summary, cache = TRUE, eval = TRUE}
 
+if(par$run_optimal_nb_of_cluster){
+
 df$n_clusters = factor(df$n_clust)
 ggplot(df, aes(x = n_clusters, y = avg_silhouette_score, fill = avg_silhouette_score)) + geom_bar(stat = "identity")+ facet_grid(r ~ .)
+}
 
 ```
 

@@ -111,7 +111,7 @@ load(paste0(IO$tmp_data,"avg_dist_per_user.Rdata"), verbose = TRUE)
 avg_dist_per_user = avg_dist_per_user[which(avg_dist_per_user$user_id %in% unique(d$user_id)),]
 
 o  = order(avg_dist_per_user$median_d)
-user_ids =  as.character(avg_dist_per_user$user_id[o[seq(1,nrow(avg_dist_per_user),length.out = 10)]])
+user_ids =  as.character(avg_dist_per_user$user_id[o[seq(1,nrow(avg_dist_per_user),length.out = min(nrow(avg_dist_per_user), 10))]])
 
 avg_dist_per_user = avg_dist_per_user[match(user_ids,avg_dist_per_user$user_id),]
 avg_dist_per_user$user_id = factor(avg_dist_per_user$user_id, levels = user_ids)

@@ -1,6 +1,8 @@
 par = list()
 par$data_type = "synthetic" # "subset" "full
 par$local_user = Sys.getenv("LOGNAME")
+par$run_optimal_nb_of_cluster = FALSE #ifelse(par$data_type == "synthetic",FALSE,TRUE)
+#par$run_pill_transition = ifelse(par$data_type == "synthetic",FALSE,TRUE)
 
 source("Scripts/00_variables_IO.R")
 
@@ -69,6 +71,7 @@ viz$full_width = 12
 
 
 par$reset = FALSE
+par$n_cluster_default = 2
 par$selected_countries = c("United States","United Kingdom", "Brazil","Germany","France", "Unknown")
 par$x.axis = seq(-14,7,by = 7)
 par$n_cores = detectCores() - 1

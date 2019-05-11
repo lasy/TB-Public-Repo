@@ -130,18 +130,20 @@ summary(glm_fit)
 ```{r data_prep_BC_re_class svm training subset size}
 subset_perc = 5
 sample_size = round(subset_perc*nrow(cycles)/100)
+min_sample_size = 1000
+sample_size = max(sample_size, min(nrow(cycles),min_sample_size))
 sample_size
 ```
 
-We will only use a subset (`r subset_perc`%) of the data to train the model.
+We will only use a subset (`r subset_perc`% or at least `r min_sample_size` cycles) of the data to train the model.
 
 This represents `r sample_size` cycles.
 
 And we only train on cycles of users that indicated `pill`, `none` or `condoms` and exclude users that `did not enter` their birth control in the settings
 
 ```{r data_prep_BC_re_class svm training, warning=FALSE}
-
-j = sample( which(cycles$birth_control_CLUE %in% c("pill", "none / condoms")), sample_size)
+j =  which(cycles$birth_control_CLUE %in% c("pill", "none / condoms"))
+j = sample(j, min(length(j),sample_size))
 cycles_training_set = cycles[j , ]
 
 # fit
@@ -201,7 +203,7 @@ g_svm = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = SVM_prob)) + g
 
 grid.arrange(g_svm, nrow = 1)
 
-rm(sub_cy,g_svm)
+rm(sub_cycles,g_svm)
 
 ```
 
@@ -469,6 +471,8 @@ rm(sub_cycles, g_BC, g_svm, g_vit_init, g_conf)
 agg = aggregate(BC ~ user_id_n, cycles[cycles$BC != "unclear",], lu)
 sum(agg$BC > 1)
 
+if(sum(agg$BC > 1)>0){
+
 sub_cycles = cycles[cycles$user_id_n %in% agg$user_id_n[which(agg$BC>1)[1:80]],]
 sub_cycles$user_id_n = factor(sub_cycles$user_id_n, levels = unique(sub_cycles$user_id_n[order(sub_cycles$birth_control_CLUE)]))
 sub_cycles$BC = factor(sub_cycles$BC, levels = c(as.character(par$BC_dict$name),"unclear"))
@@ -490,6 +494,7 @@ grid.arrange(g_BC, g_vit_init, g_svm, g_conf, nrow = 1)
 
 rm(sub_cycles, g_BC, g_svm, g_vit_init, g_conf)
 
+}
 
 sub_cycles = cycles[cycles$user_id_n %in% agg$user_id_n[which(agg$BC==1)[1:80]],]
 sub_cycles$user_id_n = factor(sub_cycles$user_id_n, levels = unique(sub_cycles$user_id_n[order(sub_cycles$birth_control_CLUE)]))
@@ -512,6 +517,7 @@ grid.arrange(g_BC, g_vit_init, g_svm, g_conf, nrow = 1)
 
 rm(sub_cycles, g_BC, g_svm, g_vit_init, g_conf)
 rm(agg)
+
 
 ```
 

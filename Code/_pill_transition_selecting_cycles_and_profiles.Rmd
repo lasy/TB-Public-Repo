@@ -48,32 +48,37 @@ user_ids = users$user_id[
   (users$BC %in% c("on pill","off pill","off-on pill","on-off pill")) & 
     (users$n_TB >= 2)]
 
-
-# selecting users that have a least 4 cycles of each BC
-users_sub = users[users$user_id %in% user_ids, c("user_id","n_cycles_m","BC")]
-users_exp = as.data.frame(lapply(users_sub, rep, users_sub$n_cycles_m))
-colnames(users_exp)[colnames(users_exp)== "BC"] = "user_BC"
-users_exp$cycle_nb_m = ave(rep(1,nrow(users_exp)), users_exp$user_id, FUN =cumsum)
-users_exp$cycle_id_m = paste0(users_exp$user_id, "_",users_exp$cycle_nb_m)
-users_exp$BC = cycles_m$BC[match(users_exp$cycle_id_m, cycles_m$cycle_id_m)]
-
-users_exp$valid_trans = ave(as.character(users_exp$BC), users_exp$user_id, FUN = find_on_off_pill_transitions)
-cycles_m$valid_trans = users_exp$valid_trans[match(cycles_m$cycle_id_m, users_exp$cycle_id_m)]
-
-user_ids = unique(cycles_m$user_id[!is.na(cycles_m$valid_trans)])
+if(length(user_ids)>0){
+  
+  # selecting users that have a least 4 cycles of each BC
+  users_sub = users[users$user_id %in% user_ids, c("user_id","n_cycles_m","BC")]
+  users_exp = as.data.frame(lapply(users_sub, rep, users_sub$n_cycles_m))
+  colnames(users_exp)[colnames(users_exp)== "BC"] = "user_BC"
+  users_exp$cycle_nb_m = ave(rep(1,nrow(users_exp)), users_exp$user_id, FUN =cumsum)
+  users_exp$cycle_id_m = paste0(users_exp$user_id, "_",users_exp$cycle_nb_m)
+  users_exp$BC = cycles_m$BC[match(users_exp$cycle_id_m, cycles_m$cycle_id_m)]
+  
+  users_exp$valid_trans = ave(as.character(users_exp$BC), users_exp$user_id, FUN = find_on_off_pill_transitions)
+  cycles_m$valid_trans = users_exp$valid_trans[match(cycles_m$cycle_id_m, users_exp$cycle_id_m)]
+  
+  user_ids = unique(cycles_m$user_id[!is.na(cycles_m$valid_trans)])
+}
 ```
 
 ```{r pill_trans_select numbering cycles_m from a pill transition}
 
-# from an on-pill transition
-agg = aggregate(cycle_nb_m ~ user_id, cycles_m[(cycles_m$valid_trans == "on-pill") & (cycles_m$user_id %in% user_ids),], max)
-cycle_nb_on_pill = agg$cycle_nb_m[match(cycles_m$user_id, agg$user_id)]
-cycles_m$cycle_nb_m_from_on_pill =  cycles_m$cycle_nb_m - cycle_nb_on_pill 
-
-# from an off-pill transition
-agg = aggregate(cycle_nb_m ~ user_id, cycles_m[(cycles_m$valid_trans == "off-pill") & (cycles_m$user_id %in% user_ids),], max)
-cycle_nb_off_pill = agg$cycle_nb_m[match(cycles_m$user_id, agg$user_id)]
-cycles_m$cycle_nb_m_from_off_pill = cycles_m$cycle_nb_m -  cycle_nb_off_pill 
+if(length(user_ids)>0){
+  
+  # from an on-pill transition
+  agg = aggregate(cycle_nb_m ~ user_id, cycles_m[(cycles_m$valid_trans == "on-pill") & (cycles_m$user_id %in% user_ids),], max)
+  cycle_nb_on_pill = agg$cycle_nb_m[match(cycles_m$user_id, agg$user_id)]
+  cycles_m$cycle_nb_m_from_on_pill =  cycles_m$cycle_nb_m - cycle_nb_on_pill 
+  
+  # from an off-pill transition
+  agg = aggregate(cycle_nb_m ~ user_id, cycles_m[(cycles_m$valid_trans == "off-pill") & (cycles_m$user_id %in% user_ids),], max)
+  cycle_nb_off_pill = agg$cycle_nb_m[match(cycles_m$user_id, agg$user_id)]
+  cycles_m$cycle_nb_m_from_off_pill = cycles_m$cycle_nb_m -  cycle_nb_off_pill 
+}
 
 ```
 
@@ -82,35 +87,38 @@ cycles_m$cycle_nb_m_from_off_pill = cycles_m$cycle_nb_m -  cycle_nb_off_pill
 
 ```{r pill_trans_select increase vs decrease}
 
-# on-pill transition
-cycles_m$on_pill = c(NA, "pre-pill","trans","on-pill",NA)[as.numeric(cut(cycles_m$cycle_nb_m_from_on_pill, breaks = c(-Inf,-4.5,-0.5,0.5,4.5,Inf)))]
-
-agg = aggregate(n_TB ~  on_pill + user_id ,cycles_m, mean)
-agg = reshape(agg, direction = "wide", idvar = "user_id", timevar = "on_pill")
-agg$n_TB_diff_on_pill = agg$`n_TB.on-pill` - agg$`n_TB.pre-pill`
-head(agg)
-
-users$n_TB_diff_on_pill = agg$n_TB_diff_on_pill[match(users$user_id, agg$user_id)]
-users$TB_diff_on_pill = c("increase","decrease")[1+(users$n_TB_diff_on_pill<0)]
-
-# off-pill transition
-cycles_m$off_pill = c(NA, "on-pill","trans","off-pill",NA)[as.numeric(cut(cycles_m$cycle_nb_m_from_off_pill, breaks = c(-Inf,-4.5,-0.5,0.5,4.5,Inf)))]
-
-agg = aggregate(n_TB ~  off_pill + user_id ,cycles_m, mean)
-agg = reshape(agg, direction = "wide", idvar = "user_id", timevar = "off_pill")
-agg$n_TB_diff_off_pill = agg$`n_TB.off-pill` - agg$`n_TB.on-pill`
-head(agg)
-
-users$n_TB_diff_off_pill = agg$n_TB_diff_off_pill[match(users$user_id, agg$user_id)]
-users$TB_diff_off_pill = c("increase","decrease")[1+(users$n_TB_diff_off_pill<0)]
-
-
-hist(users$n_TB_diff_on_pill, breaks = 20)
-hist(users$n_TB_diff_off_pill, breaks = 20)
-
-table(users$TB_diff_on_pill)
-table(users$TB_diff_off_pill)
-
+if(length(user_ids)>0){
+  
+  # on-pill transition
+  cycles_m$on_pill = c(NA, "pre-pill","trans","on-pill",NA)[as.numeric(cut(cycles_m$cycle_nb_m_from_on_pill, breaks = c(-Inf,-4.5,-0.5,0.5,4.5,Inf)))]
+  
+  agg = aggregate(n_TB ~  on_pill + user_id ,cycles_m, mean)
+  agg = reshape(agg, direction = "wide", idvar = "user_id", timevar = "on_pill")
+  agg$n_TB_diff_on_pill = agg$`n_TB.on-pill` - agg$`n_TB.pre-pill`
+  head(agg)
+  
+  users$n_TB_diff_on_pill = agg$n_TB_diff_on_pill[match(users$user_id, agg$user_id)]
+  users$TB_diff_on_pill = c("increase","decrease")[1+(users$n_TB_diff_on_pill<0)]
+  
+  # off-pill transition
+  cycles_m$off_pill = c(NA, "on-pill","trans","off-pill",NA)[as.numeric(cut(cycles_m$cycle_nb_m_from_off_pill, breaks = c(-Inf,-4.5,-0.5,0.5,4.5,Inf)))]
+  
+  agg = aggregate(n_TB ~  off_pill + user_id ,cycles_m, mean)
+  agg = reshape(agg, direction = "wide", idvar = "user_id", timevar = "off_pill")
+  agg$n_TB_diff_off_pill = agg$`n_TB.off-pill` - agg$`n_TB.on-pill`
+  head(agg)
+  
+  users$n_TB_diff_off_pill = agg$n_TB_diff_off_pill[match(users$user_id, agg$user_id)]
+  users$TB_diff_off_pill = c("increase","decrease")[1+(users$n_TB_diff_off_pill<0)]
+  
+  
+  hist(users$n_TB_diff_on_pill, breaks = 20)
+  hist(users$n_TB_diff_off_pill, breaks = 20)
+  
+  table(users$TB_diff_on_pill)
+  table(users$TB_diff_off_pill)
+  
+}
 
 ```
 
@@ -120,33 +128,38 @@ table(users$TB_diff_off_pill)
 
 
 ```{r pill_trans_select selecting days from these cycles}
-
-input_folder = paste0(IO$output_data,"days/")
-files = list.files(input_folder)
-
-
-cl = makeCluster(par$n_cores)
-registerDoParallel(cl)
-
-days_trans = foreach(file = files, .combine = rbind) %dopar%{
-  load(paste0(input_folder, file), verbose=  TRUE)
-  days = days[days$user_id %in% user_ids,]
-  return(days)
+if(length(user_ids)>0){
+  
+  
+  input_folder = paste0(IO$output_data,"days/")
+  files = list.files(input_folder)
+  
+  
+  cl = makeCluster(par$n_cores)
+  registerDoParallel(cl)
+  
+  days_trans = foreach(file = files, .combine = rbind) %dopar%{
+    load(paste0(input_folder, file), verbose=  TRUE)
+    days = days[days$user_id %in% user_ids,]
+    return(days)
+  }
+  
+  stopCluster(cl)
+  
+  days = days_trans
+  save(days, file = paste0(IO$tmp_data, "days_pill_trans.Rdata"))
 }
-
-stopCluster(cl)
-
-days = days_trans
-save(days, file = paste0(IO$tmp_data, "days_pill_trans.Rdata"))
 
 ```
 
 
 
 ```{r pill_trans_select adding cycle_nb from pill transitions}
-
-days$cycle_nb_m_from_on_pill = cycles_m$cycle_nb_m_from_on_pill[match(days$cycle_id_m, cycles_m$cycle_id_m)]
-days$cycle_nb_m_from_off_pill = cycles_m$cycle_nb_m_from_off_pill[match(days$cycle_id_m, cycles_m$cycle_id_m)]
+if(length(user_ids)>0){
+  
+  days$cycle_nb_m_from_on_pill = cycles_m$cycle_nb_m_from_on_pill[match(days$cycle_id_m, cycles_m$cycle_id_m)]
+  days$cycle_nb_m_from_off_pill = cycles_m$cycle_nb_m_from_off_pill[match(days$cycle_id_m, cycles_m$cycle_id_m)]
+}
 
 ```
 
@@ -154,91 +167,98 @@ days$cycle_nb_m_from_off_pill = cycles_m$cycle_nb_m_from_off_pill[match(days$cyc
 
 
 ```{r pill_trans_select TB profiles at pill transitions}
-
-days$n_tender_breasts = 1
-
-transitions = c("on-pill","off-pill")
-n_users_trans = table(cycles_m$valid_trans)
-
-
-transition_profiles = data.frame()
-
-for(transition in transitions){
-  if(transition == transitions[1]){ days$cycle_nb_from_trans = days$cycle_nb_m_from_on_pill}else{days$cycle_nb_from_trans = days$cycle_nb_m_from_off_pill}
-  j = (days$cycle_nb_from_trans %in% (-4:4)) &
-    (days$type == TB)
-  
-  agg = aggregate(n_tender_breasts ~ cycle_nb_from_trans + cycleday_m_D + BC, days[j, ], sum)
-  agg$transition = transition
+if(length(user_ids)>0){
   
   
-  agg$frac_tender_breasts = agg$n_tender_breasts / n_users_trans[which(names(n_users_trans) == transition)]
+  days$n_tender_breasts = 1
   
-
-  transition_profiles = rbind(transition_profiles, agg)
+  transitions = c("on-pill","off-pill")
+  n_users_trans = table(cycles_m$valid_trans)
   
-}
-
- g = ggplot(transition_profiles, aes(x = cycleday_m_D, y = frac_tender_breasts, col = BC)) + geom_line()+ facet_grid(transition ~ cycle_nb_from_trans) 
+  
+  transition_profiles = data.frame()
+  
+  for(transition in transitions){
+    if(transition == transitions[1]){ days$cycle_nb_from_trans = days$cycle_nb_m_from_on_pill}else{days$cycle_nb_from_trans = days$cycle_nb_m_from_off_pill}
+    j = (days$cycle_nb_from_trans %in% (-4:4)) &
+      (days$type == TB)
+    
+    agg = aggregate(n_tender_breasts ~ cycle_nb_from_trans + cycleday_m_D + BC, days[j, ], sum)
+    agg$transition = transition
+    
+    
+    agg$frac_tender_breasts = agg$n_tender_breasts / n_users_trans[which(names(n_users_trans) == transition)]
+    
+    
+    transition_profiles = rbind(transition_profiles, agg)
+    
+  }
+  
+  g = ggplot(transition_profiles, aes(x = cycleday_m_D, y = frac_tender_breasts, col = BC)) + geom_line()+ facet_grid(transition ~ cycle_nb_from_trans) 
   print(g)
   
-
-
+  
+}
 ```
 
 
 
 ```{r pill_trans_select TB profiles at pill transitions for users with increased or decreased symptoms}
-
-days$TB_diff_on_pill = users$TB_diff_on_pill[match(days$user_id, users$user_id)]
-days$TB_diff_off_pill = users$TB_diff_off_pill[match(days$user_id, users$user_id)]
-
-transition_profiles_with_inc_dec = data.frame()
-
-for(transition in transitions){
-  if(transition == transitions[1]){ 
-    days$cycle_nb_from_trans = days$cycle_nb_m_from_on_pill
-    days$TB_diff = days$TB_diff_on_pill
-    n_users_trans = table(users$TB_diff_on_pill)
-  }else{
-    days$cycle_nb_from_trans = days$cycle_nb_m_from_off_pill
-    days$TB_diff = days$TB_diff_off_pill
-    n_users_trans = table(users$TB_diff_off_pill)
+if(length(user_ids)>0){
+  
+  
+  days$TB_diff_on_pill = users$TB_diff_on_pill[match(days$user_id, users$user_id)]
+  days$TB_diff_off_pill = users$TB_diff_off_pill[match(days$user_id, users$user_id)]
+  
+  transition_profiles_with_inc_dec = data.frame()
+  
+  for(transition in transitions){
+    if(transition == transitions[1]){ 
+      days$cycle_nb_from_trans = days$cycle_nb_m_from_on_pill
+      days$TB_diff = days$TB_diff_on_pill
+      n_users_trans = table(users$TB_diff_on_pill)
+    }else{
+      days$cycle_nb_from_trans = days$cycle_nb_m_from_off_pill
+      days$TB_diff = days$TB_diff_off_pill
+      n_users_trans = table(users$TB_diff_off_pill)
+    }
+    j = (days$cycle_nb_from_trans %in% (-4:4)) &
+      (days$type == TB)
+    
+    agg = aggregate(n_tender_breasts ~ cycle_nb_from_trans + cycleday_m_D + BC + TB_diff, days[j, ], sum)
+    agg$transition = transition
+    agg$n_users = n_users_trans[match(agg$TB_diff, names(n_users_trans))]
+    
+    agg$frac_tender_breasts = agg$n_tender_breasts / agg$n_users 
+    
+    
+    transition_profiles_with_inc_dec = rbind(transition_profiles_with_inc_dec, agg)
+    
   }
-  j = (days$cycle_nb_from_trans %in% (-4:4)) &
-    (days$type == TB)
   
-  agg = aggregate(n_tender_breasts ~ cycle_nb_from_trans + cycleday_m_D + BC + TB_diff, days[j, ], sum)
-  agg$transition = transition
-  agg$n_users = n_users_trans[match(agg$TB_diff, names(n_users_trans))]
-  
-  agg$frac_tender_breasts = agg$n_tender_breasts / agg$n_users 
-  
-  
-  transition_profiles_with_inc_dec = rbind(transition_profiles_with_inc_dec, agg)
-  
-}
-
- g = ggplot(transition_profiles_with_inc_dec, aes(x = cycleday_m_D, y = frac_tender_breasts, col = BC)) + geom_line()+ facet_grid(transition + TB_diff  ~ cycle_nb_from_trans) 
+  g = ggplot(transition_profiles_with_inc_dec, aes(x = cycleday_m_D, y = frac_tender_breasts, col = BC)) + geom_line()+ facet_grid(transition + TB_diff  ~ cycle_nb_from_trans) 
   print(g)
   
-
+}
 
 ```
 
 ```{r pill_trans_select save tables}
-
-save(users, file = paste0(IO$output_data,"users.Rdata"))
-file.copy(from = paste0(IO$output_data,"users.Rdata"), to = paste0(IO$tmp_data,"users_with_pill_transitions.Rdata"), overwrite = TRUE)
-
-save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
-file.copy(from = paste0(IO$output_data,"cycles_m.Rdata"), to = paste0(IO$tmp_data,"cycles_m_with_pill_transitions.Rdata"), overwrite = TRUE)
-
-save(days, file = paste0(IO$tmp_data, "days_pill_trans.Rdata"))
-
-
-save(transition_profiles, file = paste0(IO$out_Rdata,"transition_profiles.Rdata"))
-save(transition_profiles_with_inc_dec, file = paste0(IO$out_Rdata,"transition_profiles_with_inc_dec.Rdata"))
+if(length(user_ids)>0){
+  
+  
+  save(users, file = paste0(IO$output_data,"users.Rdata"))
+  file.copy(from = paste0(IO$output_data,"users.Rdata"), to = paste0(IO$tmp_data,"users_with_pill_transitions.Rdata"), overwrite = TRUE)
+  
+  save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
+  file.copy(from = paste0(IO$output_data,"cycles_m.Rdata"), to = paste0(IO$tmp_data,"cycles_m_with_pill_transitions.Rdata"), overwrite = TRUE)
+  
+  save(days, file = paste0(IO$tmp_data, "days_pill_trans.Rdata"))
+  
+  
+  save(transition_profiles, file = paste0(IO$out_Rdata,"transition_profiles.Rdata"))
+  save(transition_profiles_with_inc_dec, file = paste0(IO$out_Rdata,"transition_profiles_with_inc_dec.Rdata"))
+}
 
 ```
 

@@ -30,15 +30,22 @@ options(scipen=999)
 ```{r pill_trans_users_selection loading data}
 
 load(file = paste0(IO$output_data,"users.Rdata"), verbose = TRUE)
-load(file = paste0(IO$tmp_data, "days_pill_trans.Rdata"), verbose = TRUE)
-
 dim(users)
-dim(days)
+
+days_pill_trans_file = paste0(IO$tmp_data, "days_pill_trans.Rdata")
+if(file.exists(days_pill_trans_file)){
+load(file = days_pill_trans_file , verbose = TRUE)
+  dim(days)
+}
+
+
+
 
 ```
 
 
 ```{r  pill_trans_users_selection  selecting specific examples}
+if(file.exists(days_pill_trans_file)){
 
 pill_trans_users = users[users$user_id %in% unique(days$user_id),]
 
@@ -72,7 +79,7 @@ for(trans in c("on pill","off pill")){
 
 
 
-
+}
 ```
 
 
@@ -80,7 +87,8 @@ for(trans in c("on pill","off pill")){
 
 ```{r pill_trans_users_selection selected users plots and save}
 
-
+if(file.exists(days_pill_trans_file)){
+  
 user_ids = c("1e373dfaa7f3f5ddba01073bccc2c1fd566dfded", # on-pill increase
              "77ee91ac45472d126f2582b6fc5899768ee501be", # on-pill decrease
              "1e54913ee421d364f831da6ace198d2e8deff7d9", # off-pill increase
@@ -111,6 +119,8 @@ selected_users_days$user_id = paste0("user_", as.numeric(selected_users_days$use
 selected_users_days$user_BC = users$BC[match(selected_users_days$user_id, users$user_id)]
 
 save(selected_users_days, file = paste0(IO$tmp_data,"days_selected_users_for_pill_transition_examples.Rdata"))
+
+}
       
 ```
 

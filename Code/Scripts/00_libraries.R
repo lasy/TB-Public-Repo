@@ -2,7 +2,7 @@
 package_list = c('knitr',
                  'data.table',
                  'MASS',
-                 'hexbin','ggthemes','ggplot2','ggmap','mapdata','gridExtra','quantreg',
+                 'hexbin','ggthemes','ggplot2','mapdata','gridExtra','quantreg',
                  # 'plotly',
                  'scales','reshape',
                  'HMM',

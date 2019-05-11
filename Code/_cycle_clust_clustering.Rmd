@@ -38,24 +38,25 @@ load(paste0(IO$output_data, "cycles_m.Rdata"), verbose = TRUE)
 ```
 
 
+```{r cycle_clust_clustering config}
+
+r = par$r
+cycle_ids = unique(d$cycle_id_m)
+
+```
+
 
 ```{r cycle_clust_clustering load silhouette summary}
-load(file = paste0(IO$tmp_data,"silhouette_score_summary.Rdata"), verbose = TRUE)
-```
 
-```{r cycle_clust_clustering silhouette summary}
+if(par$run_optimal_nb_of_cluster){
+load(file = paste0(IO$tmp_data,"silhouette_score_summary.Rdata"), verbose = TRUE)
+
 df$n_clusters = factor(df$n_clust)
 ggplot(df, aes(x = n_clusters, y = avg_silhouette_score, fill = avg_silhouette_score)) + geom_bar(stat = "identity")+ facet_grid(r ~ .)
-```
 
-
-
-```{r cycle_clust_clustering finding N}
-r = par$r
-
-cycle_ids = unique(d$cycle_id_m)
 n_center = df$n_clust[which((df$r == r) & (df$avg_silhouette_score == max(df$avg_silhouette_score[df$r == r])))]
 rm(df)
+}else{n_center = par$n_cluster_default}
 ```
 
 The ideal number of cluster is `r n_center`
@@ -123,7 +124,7 @@ d_subset = d[d$cycle_id_m %in% random_cycle_ids,]
 d_subset = d_subset[order(d_subset$cluster_num),]
 d_subset$cycle_id_m = factor(d_subset$cycle_id_m, levels = unique(d_subset$cycle_id_m))
 print(ggplot_imputed_TB(d_subset, facet_grid = NULL)+scale_size(range = c(2,2)))
-rm(random_cycle_ids, sd_subset)
+rm(random_cycle_ids, d_subset)
 
 # show the samples chosen by clara FOR SILHOUETTE
 m = match(silh$rows, rownames(d_wide))

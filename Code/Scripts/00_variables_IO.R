@@ -1,14 +1,7 @@
 
 IO = list()
 
-IO$public_output_data = "../Data/"
-IO$out_Rdata = paste0(IO$public_output_data, "Rdata/")
-IO$out_csv = paste0(IO$public_output_data, "CSV/")
-
-if(!dir.exists(IO$public_output_data)){dir.create(IO$public_output_data)}
-if(!dir.exists(IO$out_Rdata)){dir.create(IO$out_Rdata)}
-if(!dir.exists(IO$out_csv)){dir.create(IO$out_csv)}
-
+# INPUT AND OUTPUT DATA
 
 if((par$local_user == "laurasymul") & (par$data_type != "synthetic")){
   source("../../TB-Restricted-Access-Repo/Scripts/00_variables_restricted_IO.R")
@@ -17,17 +10,34 @@ if((par$local_user == "laurasymul") & (par$data_type != "synthetic")){
 }
 
 
-if(par$data_type == "subset"){
-  IO$input_data = paste0(IO$r_Data,"input_data/Clue_20180119_subset/")
-}else if(par$data_type == "synthetic"){
-  IO$input_data = paste0(IO$r_Data,"input_data/synthetic")
+if(par$data_type == "synthetic"){
+  folder_name = "synthetic/"
+}else if(par$data_type ==  "subset"){
+  folder_name = "Clue_20180119_subset/"
 }else{
-  IO$input_data = paste0(IO$r_Data,"input_data/Clue_20180119")
+  folder_name = "Clue_20180119"
 }
 
-IO$tmp_data = paste0(IO$r_Data, "tmp_data/")
-IO$output_data = paste0(IO$r_Data,"output_data/")
+IO$input_data = paste0(IO$r_Data,"input_data/",folder_name)
+IO$tmp_data = paste0(IO$r_Data, "tmp_data/",folder_name)
+IO$output_data = paste0(IO$r_Data,"output_data/",folder_name)
+if(!dir.exists(IO$tmp_data)){dir.create(IO$tmp_data, recursive = TRUE)}
+if(!dir.exists(IO$output_data)){dir.create(IO$output_data, recursive = TRUE)}
+
+
+# PUBLIC OUTPUT FIGURES AND DATA
+
+
+IO$panels = paste0("../Figures Tables Media/Figures/panels/",folder_name)
+if(!dir.exists(IO$panels)){dir.create(IO$panels, recursive = TRUE)}
 
 
 
-IO$panels = "../Figures Tables Media/Figures/panels/"
+IO$public_output_data = paste0("../Data/",folder_name)
+IO$out_Rdata = paste0(IO$public_output_data, "Rdata/")
+IO$out_csv = paste0(IO$public_output_data, "CSV/")
+
+if(!dir.exists(IO$public_output_data)){dir.create(IO$public_output_data, recursive = TRUE)}
+if(!dir.exists(IO$out_Rdata)){dir.create(IO$out_Rdata)}
+if(!dir.exists(IO$out_csv)){dir.create(IO$out_csv)}
+

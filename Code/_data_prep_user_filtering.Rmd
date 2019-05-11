@@ -33,11 +33,12 @@ Clue's setting allow users to declare themselves as on one of these birth contro
 ```{r user_filt loading users, echo = FALSE}
 load(file = paste0(IO$input_data,"users_filtered.Rdata"), verbose = TRUE)
 dim(users)
+colnames(users)
 ```
 
 
 ```{r user_filt possible BCs, echo = FALSE}
-unique(users$birth_control)
+table(users$birth_control)
 ```
 
 
@@ -54,7 +55,9 @@ We will later re-classify cycles into the following BC: `pill`, `none / condoms`
 
 ```{r user_filt renaming the BC columns, echo = FALSE}
 users$birth_control_o = users$birth_control
+users$birth_control = as.character(users$birth_control)
 users$birth_control[users$birth_control %in% c("none","condoms")] = "none / condoms"
+table(users$birth_control)
 ```
 
 

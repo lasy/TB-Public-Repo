@@ -60,11 +60,19 @@ d_wide = foreach(filename = filenames, .combine = rbind) %dopar%
   d_TB = d[d$type == TB,]
   d_TB$tender_breasts = 1
   
+  
   d_wide_TB = reshape(d_TB[,c("cycle_id_m","cycleday_m_D","tender_breasts")],
                         idvar = "cycle_id_m",timevar = "cycleday_m_D",
                         direction = "wide")
   
   d_wide_TB[is.na(d_wide_TB)] = 0
+  
+  # make sure to add at least one 0 reccord for every cycleday
+  colnames_full = paste0("tender_breasts.",-par$D:par$Df)
+  for(colname in colnames_full[!(colnames_full %in% colnames(d_wide_TB))]){
+    eval(parse(text = paste0("d_wide_TB$`",colname,"` = 0")))
+  }
+  
   
   # re-order the columns by cycleday_m_D
   o = order(as.numeric(sapply(strsplit(colnames(d_wide_TB)[2:ncol(d_wide_TB)],"\\."), "[[", 2)))

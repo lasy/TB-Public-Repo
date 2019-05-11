@@ -56,7 +56,7 @@ for(n in 1:N){
   o = order(sub_users$median_d, decreasing = FALSE)
   sub_users[o[1],]
   
-  N_users_n = min(N_users, floor(nrow(sub_users)/2))
+  N_users_n = min(N_users, ceiling(nrow(sub_users)/2))
   if(N_users_n >= 1){
     consistent_users = rbind(consistent_users, sub_users[o[1:N_users_n],])
     inconsistent_users = rbind(inconsistent_users, sub_users[o[(length(o)-N_users_n+1) : length(o)],])
@@ -96,22 +96,31 @@ sel_d = sel_d[,c("user_id","cycle_nb_m","cycleday_m_D","tender_breasts","consist
 sel_d_consistent = sel_d[sel_d$consistent, ]
 sel_d_inconsistent = sel_d[!sel_d$consistent, ]
 
-
-
-g_consistent = ggplot_imputed_TB(sel_d = sel_d_consistent, 
-                                 facet_grid = c("most_preval_cluster","user_id"), cycle_id = FALSE, col = "cluster_num")#+
-  #scale_color_manual(values = cols$clusters_6)
-
-
-g_inconsistent = ggplot_imputed_TB(sel_d = sel_d_inconsistent, 
+if(nrow(sel_d_inconsistent)>0){
+  
+  g_consistent = ggplot_imputed_TB(sel_d = sel_d_consistent, 
                                    facet_grid = c("most_preval_cluster","user_id"), cycle_id = FALSE, col = "cluster_num")#+
   #scale_color_manual(values = cols$clusters_6)
-
-grid.arrange(g_consistent, g_inconsistent, nrow = 1)
-
-
+  
+  
+  g_inconsistent = ggplot_imputed_TB(sel_d = sel_d_inconsistent, 
+                                     facet_grid = c("most_preval_cluster","user_id"), cycle_id = FALSE, col = "cluster_num")#+
+  #scale_color_manual(values = cols$clusters_6)
+  
+  grid.arrange(g_consistent, g_inconsistent, nrow = 1)
+  
+}else{
+  
+  g_consistent = ggplot_imputed_TB(sel_d = sel_d_consistent, 
+                                   facet_grid = c("most_preval_cluster","user_id"), cycle_id = FALSE, col = "cluster_num")#+
+  #scale_color_manual(values = cols$clusters_6)
+  g_consistent
+}
 
 ```
+
+
+
 ```{r users_descr_examples save sel_d}
 save(sel_d, file = paste0(IO$out_Rdata,"selected_users_for_TB_consistency.Rdata"))
 ```

@@ -128,9 +128,11 @@ aggregate(fraction_cycles_with_logs ~ age_cat + BC, agg, max)
 
 agg$avg_n_logs = agg$n_logs/agg$tot_n_cycles
 
+j = which(agg$age_cat %in% par$age_cat_exclude)
+if(length(j)>0){agg = agg[-j,]}
+j = which((agg$age_cat == "(35,40]") & (agg$BC == "pill"))
+if(length(j)>0){agg = agg[-j,]}
 
-agg = agg[-which(agg$age_cat %in% par$age_cat_exclude),]
-agg = agg[-which((agg$age_cat == "(35,40]") & (agg$BC == "pill")),]
 
 agg$SE = sqrt(agg$fraction_cycles_with_logs*(1-agg$fraction_cycles_with_logs)/agg$tot_n_cycles)
 

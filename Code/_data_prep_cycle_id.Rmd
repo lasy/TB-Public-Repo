@@ -95,7 +95,8 @@ stopCluster(cl)
 
 tmp_days_folder = paste0(IO$tmp_data,"days_after_cycle_id/")
 file.copy(days_folder, IO$tmp_data, recursive=TRUE)
-file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
+unlink(tmp_days_folder, recursive = TRUE)
+file.rename(from = paste0(IO$tmp_data,"days"),to = tmp_days_folder)
 
 ```
 
@@ -107,13 +108,15 @@ head(days)
 summary(days)
 ```
 
-
 Checking for duplicates in the original dataset that Clue provided.
 
-```{r data_prep_cycle_id MISC checking if there are duplicates in the original data}
+```{r data_prep_cycle_id MISC checking if there are duplicates in the original data, eval = FALSE}
+
+
 
 # suspecting for example a duplicate on light period for user # 00147343bfdb6aff66efe58308b606d20959d8c4 on the 2017-06-04
 
+if(par$data_type != "synthetic"){
 files=  list.files(paste0(IO$tmp_data, "tracking_raw_batches/"))
 j = grep("_batch_1.Rdata", files)
 files = files[j]
@@ -137,7 +140,7 @@ TRACKING = rbind(TRACKING, tracking[which(tracking$user_id == "00147343bfdb6aff6
 TRACKING[TRACKING$date == "2017-06-04",]
 
 rm(TRACKING, tracking, files, file, j)
-
+}
 
 ```
 

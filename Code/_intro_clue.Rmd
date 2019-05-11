@@ -72,7 +72,9 @@ colnames(cycles)
 
 
 ```{r intro_Clue_app loading one tracking table, echo = FALSE}
-load(paste0(IO$input_data,"tracking_filtered/tracking_filtered_split_aa.Rdata"), verbose = TRUE)
+filenames = list.files(paste0(IO$input_data,"tracking_filtered/"))
+filename = filenames[1]
+load(paste0(IO$input_data,"tracking_filtered/",filename), verbose = TRUE)
 ```
 
 ```{r intro_Clue_app tracking}
