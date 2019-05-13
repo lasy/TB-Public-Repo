@@ -1,5 +1,5 @@
 par = list()
-par$data_type = "synthetic" # "subset" "full
+par$data_type = "full" # "synthetic" "subset" "full"
 par$local_user = Sys.getenv("LOGNAME")
 par$run_optimal_nb_of_cluster = FALSE #ifelse(par$data_type == "synthetic",FALSE,TRUE)
 #par$run_pill_transition = ifelse(par$data_type == "synthetic",FALSE,TRUE)

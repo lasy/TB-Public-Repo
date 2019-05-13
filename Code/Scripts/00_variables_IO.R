@@ -15,7 +15,7 @@ if(par$data_type == "synthetic"){
 }else if(par$data_type ==  "subset"){
   folder_name = "Clue_20180119_subset/"
 }else{
-  folder_name = "Clue_20180119"
+  folder_name = "Clue_20180119/"
 }
 
 IO$input_data = paste0(IO$r_Data,"input_data/",folder_name)
