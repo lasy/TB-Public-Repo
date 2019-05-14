@@ -1,9 +1,13 @@
 # ignore all folders that are caches from the .Rmd
 *_cache/
+*_files/
 
 # ignore all html files in "Code old" folder
 Code old/*.html
 
-#ignore big html files
+#ignore big files
 Tender_breasts_ANALYSIS.html
 .Rproj.user
+
+
+
