@@ -127,6 +127,7 @@ filenames = list.files(tracking_folder)
 cl = makeCluster(par$n_cores)
 registerDoParallel(cl)
 
+tic()
 users_original_files = foreach(filename = filenames, .combine = rbind) %dopar% 
 {
   load(paste0(tracking_folder, filename), verbose = TRUE)
@@ -141,7 +142,7 @@ users_original_files = foreach(filename = filenames, .combine = rbind) %dopar%
   users_original_file = data.frame(user_id = unique(tracking$user_id), original_file_id = original_file_id)
   return(users_original_file)
 }
-
+toc()
 stopImplicitCluster()
 
 save(users_original_files, file = paste0(IO$tmp_data, "users_original_files.Rdata"))
