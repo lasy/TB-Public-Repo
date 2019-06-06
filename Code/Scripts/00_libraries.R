@@ -1,6 +1,6 @@
 
 package_list = c('knitr',
-                 'tidyverse',
+                 'tidyverse','readr',
                  'data.table',
                  'MASS',
                  'hexbin','ggthemes','ggplot2','mapdata','gridExtra','quantreg',
