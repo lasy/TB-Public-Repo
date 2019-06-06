@@ -7,7 +7,7 @@
 #SBATCH --qos=normal
 #SBATCH --time=3:00:00
 #SBATCH --nodes=1
-#SBATCH --mem=32G
+#SBATCH --mem=48G
 
 
 

@@ -163,7 +163,7 @@ file.copy(paste0(IO$output_data,"users.Rdata"), paste0(IO$tmp_data,"users_after_
 
 
 
-```{r user_filt re-assembling batches}
+```{r user_filt re-assembling batches, eval = FALSE}
 
 filenames = list.files(raw_batches_folder)
 
@@ -173,6 +173,8 @@ registerDoParallel(cl)
 foreach(b = unique(users$batch)) %dopar% {
   cat(b,"\n")
   j = grep(paste0("_batch_",b,".Rdata"), filenames)
+  j
+  filenames[j]
   DAYS = data.frame()
   for(i in j){
     cat("\t",i,"\n")
@@ -181,8 +183,12 @@ foreach(b = unique(users$batch)) %dopar% {
   }
   days = DAYS
   rm(DAYS)
+  dim(days)
   save(days, file = paste0(days_output, "days_",b,".Rdata"))
+  
 }
+
+stopImplicitCluster()
 ```
 
 
