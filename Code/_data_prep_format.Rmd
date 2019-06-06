@@ -34,7 +34,6 @@ We need to do some cleaning and make sure that the variables are in the right fo
 
 ```{r data_prep_format loading users, echo = FALSE}
 load(file = paste0(IO$output_data,"users.Rdata"), verbose = TRUE)
-save(users, file = paste0(IO$tmp_data,"users_before_data_prep_format.Rdata"))
 dim(users)
 ```
 
@@ -54,6 +53,7 @@ summary(users)
 
 ```{r data_prep_format saving users}
 save(users, file = paste0(IO$output_data,"users.Rdata"))
+file.copy(paste0(IO$output_data,"users.Rdata"), paste0(IO$tmp_data,"users_after_formatting.Rdata"), overwrite = TRUE)
 ```
 
 
@@ -96,7 +96,7 @@ file.copy(from = paste0(IO$output_data,"cycles.Rdata"), to = paste0(IO$tmp_data,
 csv_batches_folder = paste0(IO$tmp_data,"tracking_csv_batches/")
 
 output_days_folder = paste0(IO$output_data,"days/")
-dir.create(days_output)
+dir.create(output_days_folder)
 
 filenames = list.files(csv_batches_folder)
 load(paste0(IO$tmp_data,"tracking_colnames.Rdata"), verbose = TRUE)
@@ -104,12 +104,14 @@ load(paste0(IO$tmp_data,"tracking_colnames.Rdata"), verbose = TRUE)
 cl = makeCluster(par$n_cores)
 registerDoParallel(cl)
 
-foreach(filename = filenames) %do%{
+tic()
+foreach(filename = filenames, .packages = "readr") %dopar%{
   cat(filename,"\n")
   days = read_csv(paste0(csv_batches_folder, filename),  progress = F, col_types = "cDccdi", col_names = FALSE)
   colnames(days) = tracking_colnames
-  save(days, file =paste0(days_folder, filename))
+  save(days, file =paste0(output_days_folder, filename))
 }
+toc()
 
 stopImplicitCluster()
 

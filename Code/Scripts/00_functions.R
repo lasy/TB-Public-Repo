@@ -1,6 +1,19 @@
 source("Scripts/00_functions_viz.R")
 
 
+is_file_open <- function(path) {
+  suppressWarnings(
+    "try-error" %in% class(
+      try(file(path, 
+               open = "w"), 
+          silent = TRUE
+      )
+    )
+  )
+}
+
+
+
 lu = function(x){
   length(unique(x))
 }

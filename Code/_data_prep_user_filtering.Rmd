@@ -105,27 +105,26 @@ save(users, file = paste0(IO$output_data,"users.Rdata"))
 ```
 
 
-
-```{r user_filt create directory for the csv with the triaged tracking tables}
-
-csv_batches_folder = paste0(IO$tmp_data,"tracking_csv_batches/")
-dir.create(csv_batches_folder)
-
-
-```
-
-
 ```{r user_filt triaging days and saving as csv}
 
+
+# input
 tracking_folder = paste0(IO$input_data,"tracking_filtered/")
 filenames = list.files(tracking_folder)
 
-cl = makeCluster(par$n_cores)
-registerDoParallel(cl)
+# output
+csv_batches_folder = paste0(IO$tmp_data,"tracking_csv_batches/")
+if(dir.exists(csv_batches_folder)){unlink(csv_batches_folder, recursive = TRUE)}
+dir.create(csv_batches_folder)
+
+
+#cl = makeCluster(par$n_cores)
+#registerDoParallel(cl)
 
 tic()
-users_original_files = foreach(filename = filenames, .combine = rbind) %dopar% 
+users_original_files = foreach(filename = filenames, .combine = rbind, .packages = "readr") %do% #%dopar% the problem with par is that several nodes with try to write on the csv at the same time and that creates weird lines in the csv files
 {
+  cat(filename,"\n")
   # load file
   load(paste0(tracking_folder, filename), verbose = TRUE)
   # save the colnames of the table for later
@@ -139,7 +138,12 @@ users_original_files = foreach(filename = filenames, .combine = rbind) %dopar%
   # write records for each users according to the batch they belong
   for(b in unique(tracking$batch)){
     days = tracking[which(tracking$batch == b),]
-    write_csv(days, path = paste0(csv_batches_folder,"days_",b,".csv"), append = TRUE,  col_names = FALSE)
+    csv_filename = paste0(csv_batches_folder,"days_",b,".csv")
+    write_csv(days, path = csv_filename, append = TRUE,  col_names = FALSE)
+    #while(is_file_open(csv_filename)){Sys.sleep(0.5)}
+    #con = file(csv_filename, open = "w")
+    #write_csv(days, path = con, append = TRUE,  col_names = FALSE)
+    #close(con)
   }
   
   # keep in the users table the original file ID for each user
@@ -149,7 +153,7 @@ users_original_files = foreach(filename = filenames, .combine = rbind) %dopar%
   return(users_original_file)
 }
 toc()
-stopImplicitCluster()
+#stopImplicitCluster()
 
 save(users_original_files, file = paste0(IO$tmp_data, "users_original_files.Rdata"))
 
