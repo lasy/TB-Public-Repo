@@ -93,25 +93,21 @@ file.copy(from = paste0(IO$output_data,"cycles.Rdata"), to = paste0(IO$tmp_data,
 
 ```{r data_prep_format formating days}
 
-days_folder = paste0(IO$output_data,"days/")
-filenames = list.files(days_folder)
+csv_batches_folder = paste0(IO$tmp_data,"tracking_csv_batches/")
+
+output_days_folder = paste0(IO$output_data,"days/")
+dir.create(days_output)
+
+filenames = list.files(csv_batches_folder)
+load(paste0(IO$tmp_data,"tracking_colnames.Rdata"), verbose = TRUE)
 
 cl = makeCluster(par$n_cores)
 registerDoParallel(cl)
 
 foreach(filename = filenames) %do%{
   cat(filename,"\n")
-  load(paste0(days_folder, filename), verbose = TRUE)
-  
-  #cleaning temperature ? I'm tempted to leave them as is given that I do not need them for this project. If I need later I'll clean them later or compute relative changes per cycle first.
-  
-  # cleaning weight? I'm also not using the weight variations at the moment >> might leave that for later!
-  
-  # dates
-  date = as.Date(days$date)
-  days$date = date
-  rm(date)
-  
+  days = read_csv(paste0(csv_batches_folder, filename),  progress = F, col_types = "cDccdi", col_names = FALSE)
+  colnames(days) = tracking_colnames
   save(days, file =paste0(days_folder, filename))
 }
 
@@ -123,12 +119,10 @@ file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
 
 ```
 
+
+
 ```{r data_prep_format checking formating days}
-
-
 load(file =paste0(days_folder, filenames[1]), verbose = TRUE)
 summary(days)
-
-
 ```
 

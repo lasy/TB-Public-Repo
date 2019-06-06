@@ -106,23 +106,19 @@ save(users, file = paste0(IO$output_data,"users.Rdata"))
 
 
 
-```{r user_filt create tmp tracking dir}
+```{r user_filt create directory for the csv with the triaged tracking tables}
 
-raw_batches_folder = paste0(IO$tmp_data,"tracking_raw_batches/")
-dir.create(raw_batches_folder)
+csv_batches_folder = paste0(IO$tmp_data,"tracking_csv_batches/")
+dir.create(csv_batches_folder)
 
-days_output = paste0(IO$output_data,"days/")
-dir.create(days_output)
 
 ```
 
 
-```{r user_filt filtering days}
-
+```{r user_filt triaging days and saving as csv}
 
 tracking_folder = paste0(IO$input_data,"tracking_filtered/")
 filenames = list.files(tracking_folder)
-
 
 cl = makeCluster(par$n_cores)
 registerDoParallel(cl)
@@ -130,16 +126,26 @@ registerDoParallel(cl)
 tic()
 users_original_files = foreach(filename = filenames, .combine = rbind) %dopar% 
 {
+  # load file
   load(paste0(tracking_folder, filename), verbose = TRUE)
-  original_file_id = substr(filename,25,26)
+  # save the colnames of the table for later
+  if(filename == filenames[1]){tracking_colnames = colnames(tracking); save(tracking_colnames, file = paste0(IO$tmp_data,"tracking_colnames.Rdata"))}
+  
+  # filter users (to only keep those in the users table)
   j = which(tracking$user_id %in% users$user_id)
   tracking = tracking[j,]
   tracking$batch =  users$batch[match(tracking$user_id, users$user_id)]
+  
+  # write records for each users according to the batch they belong
   for(b in unique(tracking$batch)){
     days = tracking[which(tracking$batch == b),]
-    save(days, file = paste0(raw_batches_folder,"days_", original_file_id,"_batch_",b,".Rdata"))
+    write_csv(days, path = paste0(csv_batches_folder,"days_",b,".csv"), append = TRUE,  col_names = FALSE)
   }
+  
+  # keep in the users table the original file ID for each user
+  original_file_id = substr(filename,25,26)
   users_original_file = data.frame(user_id = unique(tracking$user_id), original_file_id = original_file_id)
+  
   return(users_original_file)
 }
 toc()
@@ -160,36 +166,6 @@ file.copy(paste0(IO$output_data,"users.Rdata"), paste0(IO$tmp_data,"users_after_
 
 ```
 
-
-
-
-```{r user_filt re-assembling batches, eval = FALSE}
-
-filenames = list.files(raw_batches_folder)
-
-cl = makeCluster(par$n_cores)
-registerDoParallel(cl)
-
-foreach(b = unique(users$batch)) %dopar% {
-  cat(b,"\n")
-  j = grep(paste0("_batch_",b,".Rdata"), filenames)
-  j
-  filenames[j]
-  DAYS = data.frame()
-  for(i in j){
-    cat("\t",i,"\n")
-    load(paste0(raw_batches_folder,filenames[i]), verbose = TRUE)
-    DAYS = rbind(DAYS, days)
-  }
-  days = DAYS
-  rm(DAYS)
-  dim(days)
-  save(days, file = paste0(days_output, "days_",b,".Rdata"))
-  
-}
-
-stopImplicitCluster()
-```
 
 
 

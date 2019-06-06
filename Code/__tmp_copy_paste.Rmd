@@ -6,3 +6,124 @@ output: html_document
 ---
 
 
+
+```{r user_filt create tmp tracking dir}
+
+raw_batches_folder = paste0(IO$tmp_data,"tracking_raw_batches/")
+dir.create(raw_batches_folder)
+
+days_output = paste0(IO$output_data,"days/")
+dir.create(days_output)
+
+```
+
+
+```{r user_filt filtering days}
+
+tracking_folder = paste0(IO$input_data,"tracking_filtered/")
+filenames = list.files(tracking_folder)
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+tic()
+users_original_files = foreach(filename = filenames, .combine = rbind) %dopar% 
+{
+  load(paste0(tracking_folder, filename), verbose = TRUE)
+  original_file_id = substr(filename,25,26)
+  j = which(tracking$user_id %in% users$user_id)
+  tracking = tracking[j,]
+  tracking$batch =  users$batch[match(tracking$user_id, users$user_id)]
+  for(b in unique(tracking$batch)){
+    days = tracking[which(tracking$batch == b),]
+    save(days, file = paste0(raw_batches_folder,"days_", original_file_id,"_batch_",b,".Rdata"))
+  }
+  users_original_file = data.frame(user_id = unique(tracking$user_id), original_file_id = original_file_id)
+  return(users_original_file)
+}
+toc()
+stopImplicitCluster()
+
+save(users_original_files, file = paste0(IO$tmp_data, "users_original_files.Rdata"))
+
+
+```
+
+```{r user_filt saving the original file ids}
+
+users_o_f = aggregate(original_file_id ~ user_id ,users_original_files, paste0, collapse = ",")
+users$original_files = users_o_f$original_file_id[match(users$user_id, users_o_f$user_id)]
+
+save(users, file = paste0(IO$output_data,"users.Rdata"))
+file.copy(paste0(IO$output_data,"users.Rdata"), paste0(IO$tmp_data,"users_after_filtering_days.Rdata"), overwrite = TRUE)
+
+```
+
+
+
+
+```{r user_filt re-assembling batches, eval = FALSE}
+
+filenames = list.files(raw_batches_folder)
+
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+
+foreach(b = unique(users$batch)) %dopar% {
+  cat(b,"\n")
+  j = grep(paste0("_batch_",b,".Rdata"), filenames)
+  j
+  filenames[j]
+  DAYS = data.frame()
+  for(i in j){
+    cat("\t",i,"\n")
+    load(paste0(raw_batches_folder,filenames[i]), verbose = TRUE)
+    DAYS = rbind(DAYS, days)
+  }
+  days = DAYS
+  rm(DAYS)
+  dim(days)
+  save(days, file = paste0(days_output, "days_",b,".Rdata"))
+  
+}
+
+stopImplicitCluster()
+```
+
+```{r microbenchmark}
+
+library(tidyverse)
+library(sqldf)
+library(microbenchmark)
+
+# Generate an example dataset with two numeric columns and 5 million rows
+data_frame(
+  norm = rnorm(5e6, mean = 5000, sd = 1000),
+  unif = runif(5e6, min = 0, max = 10000)
+) %>%
+write_csv('medium.csv')
+
+microbenchmark(
+  read_csv  = read_csv("medium.csv",col_types = 'dd',  progress = F ),
+  read.csv  = read.csv("medium.csv",stringsAsFactors = FALSE),
+  times  = 10L
+)
+
+tic()
+read_csv  = read_csv("medium.csv", progress = F )
+toc()
+
+
+tic()
+read.csv  = read.csv("medium.csv",stringsAsFactors = FALSE)
+toc()
+
+```
+
+
+
+
+
+
+
+
