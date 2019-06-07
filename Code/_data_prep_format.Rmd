@@ -115,8 +115,13 @@ toc()
 
 stopImplicitCluster()
 
+```
+
+
+```{r data_prep_format copying days in tmp folder}
+
 tmp_days_folder = paste0(IO$tmp_data,"days_after_data_prep/")
-file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.copy(output_days_folder, IO$tmp_data, recursive=TRUE)
 file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
 
 ```
@@ -124,7 +129,7 @@ file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
 
 
 ```{r data_prep_format checking formating days}
-load(file =paste0(days_folder, filenames[1]), verbose = TRUE)
+load(file =paste0(output_days_folder, filenames[1]), verbose = TRUE)
 summary(days)
 ```
 
