@@ -127,7 +127,7 @@ dir.create(output_days_folder)
 
 
 
-cl = makeCluster(par$n_cores)
+cl = makeCluster(min(length(filenames),par$n_cores), outfile="")
 registerDoParallel(cl)
 
 foreach(filename = filenames) %dopar%
