@@ -130,6 +130,8 @@ file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
 
 
 ```{r data_prep_format checking formating days}
+
+filenames = list.files(output_days_folder)
 load(file =paste0(output_days_folder, filenames[1]), verbose = TRUE)
 summary(days)
 ```
