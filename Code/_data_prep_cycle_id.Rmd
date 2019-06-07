@@ -58,7 +58,7 @@ tic()
 days_folder = paste0(IO$output_data,"days/")
 filenames = list.files(days_folder)
 
-cl = makeCluster(par$n_cores, outfile="")
+cl = makeCluster(min(length(filenames),par$n_cores), outfile="")
 registerDoParallel(cl)
 
 foreach(filename = filenames) %dopar% 
