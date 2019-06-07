@@ -1,6 +1,20 @@
 source("Scripts/00_functions_viz.R")
 
 
+
+tac = function(chunck_name = "chunk_name"){
+  elapsed = toc()
+  df = data.frame(datetime = Sys.time(),
+                  local_user = par$local_user,
+                  chunck_name = chunck_name,
+                  duration_sec = round(elapsed$toc - elapsed$tic),
+                  duration_min = round((elapsed$toc - elapsed$tic)/60,2),
+                  duration_hour = round((elapsed$toc - elapsed$tic)/60/60,4))
+  
+  write_csv(df, path = "time_log.csv", append = TRUE,col_names = FALSE)
+}
+
+
 is_file_open <- function(path) {
   suppressWarnings(
     "try-error" %in% class(

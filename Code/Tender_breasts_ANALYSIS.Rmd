@@ -23,6 +23,12 @@ knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 source("Scripts/00_setup.R")
 ```
 
+```{r setup initial initialization ^^, include = FALSE, eval = TRUE}
+source("Scripts/00_init_0.R")
+```
+
+
+
 
 ```{r child = '_intro_clue.Rmd', cache=TRUE}
 ```

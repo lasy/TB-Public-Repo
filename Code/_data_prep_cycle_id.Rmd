@@ -54,10 +54,11 @@ file.copy(paste0(IO$output_data,"cycles.Rdata"),paste0(IO$tmp_data,"cycles_after
 
 ```{r data_prep_cycle_id linking the days with the cycles}
 
+tic()
 days_folder = paste0(IO$output_data,"days/")
 filenames = list.files(days_folder)
 
-cl = makeCluster(par$n_cores)
+cl = makeCluster(par$n_cores, outfile="")
 registerDoParallel(cl)
 
 foreach(filename = filenames) %dopar% 
@@ -92,13 +93,20 @@ foreach(filename = filenames) %dopar%
 }
 
 stopCluster(cl)
+tac()
+
+```
+```{r data_prep_cycle_id copying days in tmp folder}
 
 tmp_days_folder = paste0(IO$tmp_data,"days_after_cycle_id/")
 file.copy(days_folder, IO$tmp_data, recursive=TRUE)
 unlink(tmp_days_folder, recursive = TRUE)
 file.rename(from = paste0(IO$tmp_data,"days"),to = tmp_days_folder)
 
+
 ```
+
+
 
 ```{r data_prep_cycle_id checking linking the days with the cycles}
 
@@ -232,13 +240,17 @@ define_menstruation_centered_cycles = function(days = days, par = par){
 
 
 ```{r define menstruation-centered cycle_id, eval = TRUE}
+tic()
+
 
 days_folder = paste0(IO$output_data,"days/")
 clue_file_list = list.files(days_folder)
 
-registerDoParallel(par$n_cores)
 
-tic()
+cl = makeCluster(par$n_cores, outfile="")
+registerDoParallel(cl)
+
+
 foreach(file = clue_file_list) %dopar%
 {
   cat(file,"\n")
@@ -249,13 +261,16 @@ foreach(file = clue_file_list) %dopar%
   save(days, file = paste0(days_folder,file))
   rm(days)
 }
-toc()
+
 stopImplicitCluster()
 
+tac()
 
 tmp_days_folder = paste0(IO$tmp_data,"days_after_menstruation_centered_cycles/")
 file.copy(days_folder, IO$tmp_data, recursive=TRUE)
 file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
+
+
 
 ```
 
