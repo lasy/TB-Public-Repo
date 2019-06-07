@@ -55,8 +55,16 @@ file.copy(paste0(IO$output_data,"cycles.Rdata"),paste0(IO$tmp_data,"cycles_after
 ```{r data_prep_cycle_id linking the days with the cycles}
 
 tic()
-days_folder = paste0(IO$output_data,"days/")
-filenames = list.files(days_folder)
+
+#input
+input_days_folder = paste0(IO$tmp_data,"days_with_n_logs/")
+filenames = list.files(input_days_folder)
+
+#output
+output_days_folder = paste0(IO$tmp_data,"days_with_cycle_ids/")
+if(dir.exists(output_days_folder)){unlink(output_days_folder, recursive = TRUE)}
+dir.create(output_days_folder)
+
 
 cl = makeCluster(min(length(filenames),par$n_cores), outfile="")
 registerDoParallel(cl)
@@ -64,7 +72,7 @@ registerDoParallel(cl)
 foreach(filename = filenames) %dopar% 
 {
   cat(filename,"\n")
-  load(paste0(days_folder, filename), verbose = TRUE)
+  load(paste0(input_days_folder, filename), verbose = TRUE)
   
    # take the part of cycles that matches with the days users
   j = which(cycles$user_id %in% unique(days$user_id))
@@ -88,13 +96,7 @@ foreach(filename = filenames) %dopar%
   
   cat(filename, " : days table has cycle_id \n")
 
-  
-  d = duplicated(days[,c("user_id","date","category","type","cycleday")])
-  if(sum(d)>0){days = days[-which(d),]}
-  cat(filename, " : days table : duplicated rows removed \n")
-
-
-  save(days, file = paste0(days_folder, filename))
+  save(days, file = paste0(output_days_folder, filename))
   cat(filename, " : days table saved \n")
 }
 
@@ -103,60 +105,18 @@ tac()
 
 ```
 ```{r data_prep_cycle_id copying days in tmp folder}
-
-tmp_days_folder = paste0(IO$tmp_data,"days_after_cycle_id/")
-file.copy(days_folder, IO$tmp_data, recursive=TRUE)
-unlink(tmp_days_folder, recursive = TRUE)
-file.rename(from = paste0(IO$tmp_data,"days"),to = tmp_days_folder)
-
-
+copy_days_tmp2out(output_days_folder)
 ```
 
 
 
 ```{r data_prep_cycle_id checking linking the days with the cycles}
-
-load(paste0(days_folder, filenames[length(filenames)]), verbose = TRUE)
-
+filenames = list.files(output_days_folder)
+load(paste0(output_days_folder, filenames[length(filenames)]), verbose = TRUE)
 head(days)
 summary(days)
 ```
 
-Checking for duplicates in the original dataset that Clue provided.
-
-```{r data_prep_cycle_id MISC checking if there are duplicates in the original data, eval = FALSE}
-
-
-
-# suspecting for example a duplicate on light period for user # 00147343bfdb6aff66efe58308b606d20959d8c4 on the 2017-06-04
-
-if(par$data_type != "synthetic"){
-files=  list.files(paste0(IO$tmp_data, "tracking_raw_batches/"))
-j = grep("_batch_1.Rdata", files)
-files = files[j]
-
-for(file in files){
-  cat(file,"\n")
-  load(file = paste0(IO$tmp_data, 'tracking_raw_batches/',file), verbose = TRUE)
-  print(which(days$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4"))
-}
-
-load(file = paste0(IO$input_data, 'tracking_filtered/tracking_filtered_split_cq.Rdata'))
-which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4")
-
-TRACKING = tracking[which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4"),]
-
-load(file = paste0(IO$input_data, 'tracking_filtered/tracking_filtered_split_cr.Rdata'))
-which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4")
-
-
-TRACKING = rbind(TRACKING, tracking[which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4"),])
-TRACKING[TRACKING$date == "2017-06-04",]
-
-rm(TRACKING, tracking, files, file, j)
-}
-
-```
 
 
 
@@ -245,47 +205,54 @@ define_menstruation_centered_cycles = function(days = days, par = par){
 
 
 
-```{r define menstruation-centered cycle_id, eval = TRUE}
+```{r data_prep_cycle_id define menstruation-centered cycle_id, eval = TRUE}
 tic()
 
 
-days_folder = paste0(IO$output_data,"days/")
-clue_file_list = list.files(days_folder)
+
+#input
+input_days_folder = paste0(IO$tmp_data,"days_with_cycle_ids/")
+filenames = list.files(input_days_folder)
+
+#output
+output_days_folder = paste0(IO$tmp_data,"days_with_m_centered_cycle_ids/")
+if(dir.exists(output_days_folder)){unlink(output_days_folder, recursive = TRUE)}
+dir.create(output_days_folder)
 
 
 cl = makeCluster(min(par$n_cores, length(clue_file_list)), outfile="")
 registerDoParallel(cl)
 
 
-foreach(file = clue_file_list) %dopar%
+foreach(file = filenames) %dopar%
 {
   cat(file,"\n")
-  load(paste0(days_folder,file), verbose = TRUE)
+  load(paste0(input_days_folder,file), verbose = TRUE)
   cat(dim(days),"\n")
   days  = define_menstruation_centered_cycles(days = days, par = par)
   cat(dim(days),"\n")
-  save(days, file = paste0(days_folder,file))
+  save(days, file = paste0(output_days_folder,file))
   rm(days)
 }
 
 stopImplicitCluster()
 
 tac()
-
-tmp_days_folder = paste0(IO$tmp_data,"days_after_menstruation_centered_cycles/")
-file.copy(days_folder, IO$tmp_data, recursive=TRUE)
-file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
+```
 
 
-
+```{r data_prep_cycle_id define menstruation-centered cycle_id copy to output folder}
+copy_days_tmp2out(output_days_folder)
 ```
 
 
 
 ```{r define checking menstruation-centered cycle_id, eval = TRUE}
+
+filenames = list.files(output_days_folder)
+load(paste0(output_days_folder, filenames[length(filenames)]), verbose = TRUE)
+summary(days)
+head(days)
   
-load(paste0(days_folder,clue_file_list[1]), verbose = TRUE)
-
 head(days[days$cycle_nb == 2, ])
-
 ```

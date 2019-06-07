@@ -1,6 +1,16 @@
 source("Scripts/00_functions_viz.R")
 
 
+copy_days_tmp2out = function(dir_path){
+  # remove the days folder that is in the output_data
+  day_folder_output = paste0(IO$output_data,"days/")
+  if(dir.exists(day_folder_output)){unlink(day_folder_output, recursive = TRUE)}
+  folder_name = gsub("^.*/", "", substr(dir_path, 1, nchar(dir_path)-1) )
+  file.copy(from = dir_path, to = IO$output_data, recursive=TRUE)
+  file.rename(paste0(IO$output_data,"folder_name"),day_folder_output)
+}
+
+
 
 tac = function(chunck_name = "chunk_name"){
   elapsed = toc()

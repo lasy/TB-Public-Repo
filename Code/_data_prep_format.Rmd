@@ -121,7 +121,7 @@ stopImplicitCluster()
 
 ```{r data_prep_format copying days in tmp folder}
 
-tmp_days_folder = paste0(IO$tmp_data,"days_after_data_prep/")
+tmp_days_folder = paste0(IO$tmp_data,"days_after_data_prep_format/")
 file.copy(output_days_folder, IO$tmp_data, recursive=TRUE)
 file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
 

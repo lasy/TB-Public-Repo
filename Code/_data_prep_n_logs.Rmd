@@ -26,13 +26,105 @@ options(scipen=999)
 ```
 
 
+
+Checking for duplicates in the original dataset that Clue provided.
+
+```{r data_prep_cycle_id MISC checking if there are duplicates in the original data, eval = FALSE}
+
+# suspecting for example a duplicate on light period for user # 00147343bfdb6aff66efe58308b606d20959d8c4 on the 2017-06-04
+
+if(par$data_type != "synthetic"){
+files=  list.files(paste0(IO$tmp_data, "tracking_raw_batches/"))
+j = grep("_batch_1.Rdata", files)
+files = files[j]
+
+for(file in files){
+  cat(file,"\n")
+  load(file = paste0(IO$tmp_data, 'tracking_raw_batches/',file), verbose = TRUE)
+  print(which(days$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4"))
+}
+
+load(file = paste0(IO$input_data, 'tracking_filtered/tracking_filtered_split_cq.Rdata'))
+which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4")
+
+TRACKING = tracking[which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4"),]
+
+load(file = paste0(IO$input_data, 'tracking_filtered/tracking_filtered_split_cr.Rdata'))
+which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4")
+
+
+TRACKING = rbind(TRACKING, tracking[which(tracking$user_id == "00147343bfdb6aff66efe58308b606d20959d8c4"),])
+TRACKING[TRACKING$date == "2017-06-04",]
+
+rm(TRACKING, tracking, files, file, j)
+}
+
+```
+
+
+## First we need to remove the duplicated rows in the tracking tables
+
+
+
+
+```{r data_prep_n_logs remove duplicated rows}
+
+tic()
+
+#input
+input_days_folder = paste0(IO$tmp_data,"days_after_data_prep_format/")
+filenames = list.files(input_days_folder)
+
+#output
+output_days_folder = paste0(IO$tmp_data,"days_duplicated_rows_removed/")
+if(dir.exists(output_days_folder)){unlink(output_days_folder, recursive = TRUE)}
+dir.create(output_days_folder)
+
+# start parallel processing
+cl = makeCluster(min(length(filenames),par$n_cores), outfile="")
+registerDoParallel(cl)
+
+foreach(filename = filenames) %dopar% 
+{
+  cat(filename,"\n")
+  load(paste0(input_days_folder, filename), verbose = TRUE)
+  
+  d = duplicated(days[,c("user_id","date","category","type")])
+  if(sum(d)>0){days = days[-which(d),]}
+  cat(filename, " : days table : duplicated rows removed \n")
+
+  save(days, file = paste0(output_days_folder, filename))
+  cat(filename, " : days table saved \n")
+}
+
+stopCluster(cl)
+tac()
+
+```
+
+
+
+```{r data_prep_n_logs remove duplicated rows copy to output folder}
+copy_days_tmp2out(output_days_folder)
+```
+
+
+
 ## Counting the number of logs per day of observation (and adding these rows to the tables)
 
 
 ```{r data_prep_n_logs counting and saving n_logs}
 
-days_folder = paste0(IO$output_data,"days/")
-filenames = list.files(days_folder)
+
+#input
+input_days_folder = paste0(IO$tmp_data,"days_duplicated_rows_removed/")
+filenames = list.files(input_days_folder)
+
+#output
+output_days_folder = paste0(IO$tmp_data,"days_with_n_logs/")
+if(dir.exists(output_days_folder)){unlink(output_days_folder, recursive = TRUE)}
+dir.create(output_days_folder)
+
 
 
 cl = makeCluster(par$n_cores)
@@ -41,7 +133,7 @@ registerDoParallel(cl)
 foreach(filename = filenames) %dopar%
 {
   cat(filename,"\n")
-  load(paste0(days_folder, filename), verbose = TRUE)
+  load(paste0(input_days_folder, filename), verbose = TRUE)
   
   # defining a unique identifier for each day of observation (user_id + date)
   days$day_id = paste0(days$user_id, "_", days$date)
@@ -67,22 +159,21 @@ foreach(filename = filenames) %dopar%
   o = order(days$user_id, days$date)
   days = days[o,]; rm(o)
   
-  save(days, file = paste0(days_folder, filename))
+  save(days, file = paste0(output_days_folder, filename))
 }
 
 stopImplicitCluster()
+```
 
-tmp_days_folder = paste0(IO$tmp_data,"days_after_n_logs/")
-file.copy(days_folder, IO$tmp_data, recursive=TRUE)
-file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
-
-
+```{r data_prep_n_logs counting and saving n_logs copying to output folder}
+copy_days_tmp2out(output_days_folder)
 ```
 
 
 
 ```{r data_prep_n_logs checking counting and saving n_logs}
-load(paste0(days_folder, filenames[length(filenames)]), verbose = TRUE)
+filenames = list.files(output_days_folder)
+load(paste0(output_days_folder, filenames[length(filenames)]), verbose = TRUE)
 summary(days)
 head(days)
 ```
