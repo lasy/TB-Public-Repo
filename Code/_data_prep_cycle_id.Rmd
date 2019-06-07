@@ -75,7 +75,7 @@ foreach(filename = filenames) %dopar%
   cycles_sub_exp$cycleday = ave(rep(1,nrow(cycles_sub_exp)), cycles_sub_exp$cycle_id, FUN =cumsum)
   cycles_sub_exp$date = cycles_sub_exp$cycle_start + (cycles_sub_exp$cycleday - 1)
   cycles_sub_exp$day_id = paste0(cycles_sub_exp$user_id, "_", cycles_sub_exp$date)
-  
+  cat(filename, " : cycle_sub_exp : done\n")
   
   # match days and cycles_sub_exp
   m = match(days$day_id, cycles_sub_exp$day_id)
@@ -86,10 +86,16 @@ foreach(filename = filenames) %dopar%
   
   days$cycleday_from_end = days$cycleday - days$cycle_length - 1
   
+  cat(filename, " : days table has cycle_id \n")
+
+  
   d = duplicated(days[,c("user_id","date","category","type","cycleday")])
   if(sum(d)>0){days = days[-which(d),]}
+  cat(filename, " : days table : duplicated rows removed \n")
+
 
   save(days, file = paste0(days_folder, filename))
+  cat(filename, " : days table saved \n")
 }
 
 stopCluster(cl)
@@ -247,7 +253,7 @@ days_folder = paste0(IO$output_data,"days/")
 clue_file_list = list.files(days_folder)
 
 
-cl = makeCluster(par$n_cores, outfile="")
+cl = makeCluster(min(par$n_cores, length(clue_file_list)), outfile="")
 registerDoParallel(cl)
 
 
