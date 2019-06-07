@@ -109,7 +109,8 @@ foreach(filename = filenames, .packages = "readr") %dopar%{
   cat(filename,"\n")
   days = read_csv(paste0(csv_batches_folder, filename),  progress = F, col_types = "cDccdi", col_names = FALSE)
   colnames(days) = tracking_colnames
-  save(days, file =paste0(output_days_folder, filename))
+  Rdata_filename = gsub("csv","Rdata",filename)
+  save(days, file =paste0(output_days_folder, Rdata_filename))
 }
 toc()
 

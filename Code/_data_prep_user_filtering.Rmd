@@ -127,13 +127,14 @@ users_original_files = foreach(filename = filenames, .combine = rbind, .packages
   cat(filename,"\n")
   # load file
   load(paste0(tracking_folder, filename), verbose = TRUE)
-  # save the colnames of the table for later
-  if(filename == filenames[1]){tracking_colnames = colnames(tracking); save(tracking_colnames, file = paste0(IO$tmp_data,"tracking_colnames.Rdata"))}
-  
+
   # filter users (to only keep those in the users table)
   j = which(tracking$user_id %in% users$user_id)
   tracking = tracking[j,]
   tracking$batch =  users$batch[match(tracking$user_id, users$user_id)]
+  
+  # save the colnames of the table for later
+  if(filename == filenames[1]){tracking_colnames = colnames(tracking); save(tracking_colnames, file = paste0(IO$tmp_data,"tracking_colnames.Rdata"))}
   
   # write records for each users according to the batch they belong
   for(b in unique(tracking$batch)){
