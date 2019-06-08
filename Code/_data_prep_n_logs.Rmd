@@ -114,7 +114,7 @@ copy_days_tmp2out(output_days_folder)
 
 
 ```{r data_prep_n_logs counting and saving n_logs}
-
+tic()
 
 #input
 input_days_folder = paste0(IO$tmp_data,"days_duplicated_rows_removed/")
@@ -163,6 +163,7 @@ foreach(filename = filenames) %dopar%
 }
 
 stopImplicitCluster()
+tac()
 ```
 
 ```{r data_prep_n_logs counting and saving n_logs copying to output folder}

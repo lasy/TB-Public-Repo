@@ -220,7 +220,7 @@ if(dir.exists(output_days_folder)){unlink(output_days_folder, recursive = TRUE)}
 dir.create(output_days_folder)
 
 
-cl = makeCluster(min(par$n_cores, length(clue_file_list)), outfile="")
+cl = makeCluster(min(par$n_cores, length(filenames)), outfile="")
 registerDoParallel(cl)
 
 
