@@ -134,7 +134,7 @@ impute = function(obs = c(-1,-1,-1,0,1,-1,0,1,-1,-1,-1,-1,1,-1,1,-1,-1,-1,1,-1,0
 
 reshape_and_impute = function(days){
   #prepare : only keep the rows with n_logs or TB
-  row_keep = ((days$type == "n_logs") |  (days$type == "tender_breasts")) & (!is.na(days$cycleday_m_D))
+  row_keep = which(((days$type == "n_logs") |  (days$type == "tender_breasts")) & (!is.na(days$cycleday_m_D)))
   col_keep = c("user_id","cycle_nb","cycle_id","cycle_id_m","cycleday","cycleday_m_D","type","number")
   d = days[row_keep,col_keep]
   
@@ -147,7 +147,7 @@ reshape_and_impute = function(days){
   d$n[d$day_id %in% d_before_dup$day_id[dup]]= 1
   
   #reshape
-  d_wide = reshape(d[,c("cycle_id_m","cycleday_m_D","n")],
+  d_wide = reshape(as.data.frame(d[,c("cycle_id_m","cycleday_m_D","n")]),
                           idvar = "cycle_id_m", timevar = "cycleday_m_D",
                           direction = "wide")
   d_wide[is.na(d_wide)] = -1

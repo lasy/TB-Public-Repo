@@ -46,7 +46,10 @@ days_files = list.files(input_folder)
 days_files = days_files
 N = length(days_files)
 
-registerDoParallel(par$n_cores)
+
+cl = makeCluster(min(par$n_cores, N), outfile="")
+registerDoParallel(cl)
+
 tic()
 foreach(n = 1:N)%dopar%{
   output_file = paste0(output_folder, "d_",n,".Rdata")
