@@ -7,7 +7,7 @@ copy_days_tmp2out = function(dir_path){
   if(dir.exists(day_folder_output)){unlink(day_folder_output, recursive = TRUE)}
   folder_name = gsub("^.*/", "", substr(dir_path, 1, nchar(dir_path)-1) )
   file.copy(from = dir_path, to = IO$output_data, recursive=TRUE)
-  file.rename(paste0(IO$output_data,"folder_name"),day_folder_output)
+  file.rename(paste0(IO$output_data,folder_name),day_folder_output)
 }
 
 
