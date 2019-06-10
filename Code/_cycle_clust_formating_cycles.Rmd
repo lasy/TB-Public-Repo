@@ -133,7 +133,7 @@ head(d_wide)
 
 save(d_wide, file = paste0(IO$tmp_data,"d_wide.Rdata"))
 
-tac(opts_chunk$get("label"))
+tac("cycle_clust_formating_cycles creating d_wide and filtering days")
 ```
 
 
