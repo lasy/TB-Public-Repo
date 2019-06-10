@@ -36,7 +36,8 @@ We want:
 
 We can make everything fit in one table (no need to split the files anymore)
 
-```{r cycle_clust_formating_cycles filtering days}
+```{r cycle_clust_formating_cycles creating d_wide and filtering days}
+tic()
 
 days_folder = paste0(IO$output_data,"days/")
 
@@ -54,10 +55,10 @@ d_wide = foreach(filename = filenames, .combine = rbind) %dopar%
   load(paste0(days_folder, filename), verbose = TRUE)
   
   # first only taking cycledays that are within the limits we are interested in
-  d = days[!is.na(days$cycleday_m_D),]
+  d = days[which((!is.na(days$cycleday_m_D))&(!is.na(days$cycle_id_m))),]
   
   # d_wide for TB
-  d_TB = d[d$type == TB,]
+  d_TB = d[which(d$type == TB),]
   d_TB$tender_breasts = 1
   
   
@@ -82,7 +83,7 @@ d_wide = foreach(filename = filenames, .combine = rbind) %dopar%
   colnames(d_wide_TB) = gsub("tender_breasts\\.","day_", colnames(d_wide_TB))
   
   # d_wide for n_logs
-  d_n_logs = d[d$type == "n_logs",]
+  d_n_logs = d[which(d$type == "n_logs"),]
   d_n_logs$n_logs = 1
   
   d_wide_n_logs = reshape(d_n_logs[,c("cycle_id_m","cycleday_m_D","n_logs")],
@@ -132,6 +133,7 @@ head(d_wide)
 
 save(d_wide, file = paste0(IO$tmp_data,"d_wide.Rdata"))
 
+tac(opts_chunk$get("label"))
 ```
 
 

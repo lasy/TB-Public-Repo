@@ -1,0 +1,22 @@
+---
+output: html_document
+---
+
+```{r setup}
+library(knitr)
+eval_chunks <- c('chunk1', 'chunk3')
+```
+
+```{r chunk1, eval=opts_current$get("label") %in% eval_chunks}
+print(opts_current$get("label"))
+```
+
+
+```{r chunk2, eval=opts_current$get("label") %in% eval_chunks}
+print(opts_current$get("label"))
+```
+
+
+```{r chunk3, eval=opts_current$get("label") %in% eval_chunks}
+print(opts_current$get("label"))
+```

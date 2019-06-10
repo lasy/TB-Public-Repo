@@ -93,6 +93,7 @@ d = reshape(d_wide,
             varying = list(2:ncol(d_wide)), 
             new.row.names = 1:(nrow(d_wide)*(par$Df+par$D+1)),
             direction = "long")
+
 colnames(d) = c("cycle_id_m","cycleday_m_D","tender_breasts")
 d$cycleday_m_D = d$cycleday_m_D - par$D - 1
 m = match(d$cycle_id_m, cycles$cycle_id)
