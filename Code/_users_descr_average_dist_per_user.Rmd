@@ -76,7 +76,7 @@ cl = makeCluster(min(par$n_cores, N), outfile="")
 registerDoParallel(cl)
 
 tic()
-foreach(n = 1:N)%dopar%{
+foreach(n = 1:N,.packages = "foreach")%dopar%{
   output_file = paste0(output_folder,"users_with_avg_distance_",n,".Rdata")
   if(!file.exists(output_file)){
     load(file = paste0(output_folder, "d_",n,".Rdata"), verbose = TRUE)
