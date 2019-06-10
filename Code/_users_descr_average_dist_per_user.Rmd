@@ -37,7 +37,7 @@ load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 We only compute the average distance for users that had as least 1 TB ever logged
 
 
-```{r users_descr_avg_dist average distance, cache = TRUE}
+```{r users_descr_avg_dist reshape d, cache = TRUE}
 
 output_folder = paste0(IO$tmp_data,"avg_dist_per_user/")
 dir.create(output_folder)
@@ -62,14 +62,19 @@ foreach(n = 1:N)%dopar%{
     save(d, file = output_file)
   }
 }
-toc()
+tac("users_descr_avg_dist reshape d")
 stopImplicitCluster()
 
+```
 
+
+```{r users_descr_avg_dist average distance}
 
 source("Scripts/00_functions_distance.R")
 
-registerDoParallel(par$n_cores)
+cl = makeCluster(min(par$n_cores, N), outfile="")
+registerDoParallel(cl)
+
 tic()
 foreach(n = 1:N)%dopar%{
   output_file = paste0(output_folder,"users_with_avg_distance_",n,".Rdata")
@@ -77,13 +82,13 @@ foreach(n = 1:N)%dopar%{
     load(file = paste0(output_folder, "d_",n,".Rdata"), verbose = TRUE)
     # compute average distance
     users_with_avg_distance = foreach(u = unique(d$user_id), .combine = rbind) %do% {
-      dist_summary = compute_average_distance(d = d[d$user_id == u,])
+      dist_summary = compute_average_distance(d = d[which(d$user_id == u),])
       return(data.frame(user_id = u, avg_d = dist_summary$mean, median_d = dist_summary$median, sd_d = dist_summary$sd, file = n))
     }
     save(users_with_avg_distance, file = output_file)
   }
 }
-toc()
+tac("users_descr_avg_dist average distance 1")
 stopImplicitCluster()
 
 
@@ -93,11 +98,10 @@ avg_dist_per_user = foreach(n = 1:N,.combine = rbind)%dopar%{
   load(file = paste0(output_folder,"users_with_avg_distance_",n,".Rdata"), verbose = TRUE)
   return(users_with_avg_distance)
 }
-toc()
+tac("users_descr_avg_dist average distance 2")
 stopImplicitCluster()
 
 save(avg_dist_per_user, file = paste0(IO$tmp_data,"avg_dist_per_user.Rdata"))
-
 
 ```
 

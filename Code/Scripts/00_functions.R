@@ -134,7 +134,7 @@ impute = function(obs = c(-1,-1,-1,0,1,-1,0,1,-1,-1,-1,-1,1,-1,1,-1,-1,-1,1,-1,0
 
 reshape_and_impute = function(days){
   #prepare : only keep the rows with n_logs or TB
-  row_keep = which(((days$type == "n_logs") |  (days$type == "tender_breasts")) & (!is.na(days$cycleday_m_D)))
+  row_keep = which(((days$type == "n_logs") |  (days$type == "tender_breasts")) & (!is.na(days$cycleday_m_D)) & (!is.na(days$cycle_id_m)))
   col_keep = c("user_id","cycle_nb","cycle_id","cycle_id_m","cycleday","cycleday_m_D","type","number")
   d = days[row_keep,col_keep]
   
