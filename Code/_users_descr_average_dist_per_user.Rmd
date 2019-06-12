@@ -82,7 +82,9 @@ foreach(n = 1:N,.packages = "foreach")%dopar%{
     load(file = paste0(output_folder, "d_",n,".Rdata"), verbose = TRUE)
     # compute average distance
     users_with_avg_distance = foreach(u = unique(d$user_id), .combine = rbind) %do% {
+      cat("user: ",u,"\n")
       dist_summary = compute_average_distance(d = d[which(d$user_id == u),])
+      cat("\tdist_summary: ",dist_summary$mean,"\n")
       return(data.frame(user_id = u, avg_d = dist_summary$mean, median_d = dist_summary$median, sd_d = dist_summary$sd, file = n))
     }
     cat(n," : users_with_avg_distance computed\n")
