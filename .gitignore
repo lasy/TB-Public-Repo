@@ -9,5 +9,8 @@ Code old/*.html
 Tender_breasts_ANALYSIS.html
 .Rproj.user
 
+#ignore compiled modified cluster package
+cluster_*.tar.gz
+
 
 
