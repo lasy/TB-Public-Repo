@@ -85,6 +85,7 @@ foreach(n = 1:N,.packages = "foreach")%dopar%{
       dist_summary = compute_average_distance(d = d[which(d$user_id == u),])
       return(data.frame(user_id = u, avg_d = dist_summary$mean, median_d = dist_summary$median, sd_d = dist_summary$sd, file = n))
     }
+    cat(n," : users_with_avg_distance computed\n")
     save(users_with_avg_distance, file = output_file)
   }
 }
