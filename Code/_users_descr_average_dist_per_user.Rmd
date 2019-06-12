@@ -70,13 +70,13 @@ stopImplicitCluster()
 
 ```{r users_descr_avg_dist average distance}
 
-source("Scripts/00_functions_distance.R")
 
 cl = makeCluster(min(par$n_cores, N), outfile="")
 registerDoParallel(cl)
 
 tic()
-foreach(n = 1:N,.packages = "foreach",.noexport = TB_distance_Rccp)%dopar%{
+foreach(n = 1:N,.packages = c("foreach","Rcpp"),.noexport = "TB_distance_Rccp")%dopar%{
+  source("Scripts/00_functions_distance.R")
   output_file = paste0(output_folder,"users_with_avg_distance_",n,".Rdata")
   if(!file.exists(output_file)){
     load(file = paste0(output_folder, "d_",n,".Rdata"), verbose = TRUE)
