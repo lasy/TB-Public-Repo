@@ -89,7 +89,11 @@ foreach(filename = filenames) %dopar%
   cat(filename,"\n")
   load(paste0(input_days_folder, filename), verbose = TRUE)
   
-  d = duplicated(days[,c("user_id","date","type")])
+  # defining a unique identifier for each day of observation (user_id + date)
+  days$day_id = paste0(days$user_id, "_", days$date)
+  
+  # removing duplicated rows
+  d = duplicated(days[,c("day_id","type")])
   if(sum(d)>0){days = days[-which(d),]}
   cat(filename, " : days table : ",sum(d)," duplicated rows removed \n")
 
@@ -135,8 +139,7 @@ foreach(filename = filenames) %dopar%
   cat(filename,"\n")
   load(paste0(input_days_folder, filename), verbose = TRUE)
   
-  # defining a unique identifier for each day of observation (user_id + date)
-  days$day_id = paste0(days$user_id, "_", days$date)
+
   # counting the number of logs on that day
   days_n_logs = aggregate(type ~ day_id, days, lu)
   # formating the dataframe
