@@ -64,6 +64,36 @@ rm(TRACKING, tracking, files, file, j)
 
 ## First we need to remove the duplicated rows in the tracking tables
 
+```{r data_prep_n_logs remove duplicated rows function}
+
+remove_duplicates = function(filename = filenames[1]){
+  cat(filename,"\n")
+  load(paste0(input_days_folder, filename), verbose = TRUE)
+  
+  
+  # defining a unique identifier for each day of observation (user_id + date)
+  days$day_id = paste0(days$user_id, "_", days$date)
+  cat(filename, " : day_id created \n")
+  
+  
+  # defining a unique key to check for duplicates
+  days$key = paste0(days$day_id, "_",days$category, "_", days$type)
+  
+  # removing duplicated rows
+  d = duplicated(days$key)
+  
+  if(sum(d)>0){days = days[-which(d),]}
+  cat(filename, " : days table : ",sum(d)," duplicated rows removed \n")
+  
+  days = days[,-which(colnames(days) == "key")]
+  
+  save(days, file = paste0(output_days_folder, filename))
+  cat(filename, " : days table saved \n")
+}
+
+```
+
+
 
 ```{r data_prep_n_logs remove duplicated rows}
 
@@ -82,22 +112,7 @@ dir.create(output_days_folder)
 cl = makeCluster(min(length(filenames),par$n_cores), outfile="")
 registerDoParallel(cl)
 
-foreach(filename = filenames) %dopar% 
-{
-  cat(filename,"\n")
-  load(paste0(input_days_folder, filename), verbose = TRUE)
-  
-  # defining a unique identifier for each day of observation (user_id + date)
-  days$day_id = paste0(days$user_id, "_", days$date)
-  
-  # removing duplicated rows
-  d = duplicated(days[,c("day_id","type")])
-  if(sum(d)>0){days = days[-which(d),]}
-  cat(filename, " : days table : ",sum(d)," duplicated rows removed \n")
-
-  save(days, file = paste0(output_days_folder, filename))
-  cat(filename, " : days table saved \n")
-}
+foreach(filename = filenames) %dopar% {remove_duplicates(filename = filename)}
 
 stopCluster(cl)
 tac()
