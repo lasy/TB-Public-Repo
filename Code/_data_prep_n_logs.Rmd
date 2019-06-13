@@ -89,9 +89,9 @@ foreach(filename = filenames) %dopar%
   cat(filename,"\n")
   load(paste0(input_days_folder, filename), verbose = TRUE)
   
-  d = duplicated(days[,c("user_id","date","category","type")])
+  d = duplicated(days[,c("user_id","date","type")])
   if(sum(d)>0){days = days[-which(d),]}
-  cat(filename, " : days table : duplicated rows removed \n")
+  cat(filename, " : days table : ",sum(d)," duplicated rows removed \n")
 
   save(days, file = paste0(output_days_folder, filename))
   cat(filename, " : days table saved \n")
