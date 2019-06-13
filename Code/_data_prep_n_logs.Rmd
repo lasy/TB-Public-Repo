@@ -97,7 +97,7 @@ remove_duplicates = function(filename = filenames[1]){
 
 ```{r data_prep_n_logs remove duplicated rows}
 
-tic()
+
 
 #input
 input_days_folder = paste0(IO$tmp_data,"days_after_data_prep_format/")
@@ -108,12 +108,11 @@ output_days_folder = paste0(IO$tmp_data,"days_duplicated_rows_removed/")
 if(dir.exists(output_days_folder)){unlink(output_days_folder, recursive = TRUE)}
 dir.create(output_days_folder)
 
-# start parallel processing
+# parallel processing
+tic()
 cl = makeCluster(min(length(filenames),par$n_cores), outfile="")
 registerDoParallel(cl)
-
 foreach(filename = filenames) %dopar% {remove_duplicates(filename = filename)}
-
 stopCluster(cl)
 tac()
 
