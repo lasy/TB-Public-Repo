@@ -65,8 +65,6 @@ rm(TRACKING, tracking, files, file, j)
 ## First we need to remove the duplicated rows in the tracking tables
 
 
-
-
 ```{r data_prep_n_logs remove duplicated rows}
 
 tic()
