@@ -8,6 +8,7 @@
 #SBATCH --time=3:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=48G
+#SBATCH --mail-type=ALL
 
 
 
