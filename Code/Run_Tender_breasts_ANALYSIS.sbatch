@@ -5,9 +5,9 @@
 #SBATCH --error=sbatch_output_Tender_breasts_ANALYSIS.err
 #SBATCH --partition=hns,stat,normal
 #SBATCH --qos=normal
-#SBATCH --time=1:00:00
+#SBATCH --time=3:00:00
 #SBATCH --nodes=1
-#SBATCH --mem=96G
+#SBATCH --mem=48G
 #SBATCH --mail-type=ALL
 
 
