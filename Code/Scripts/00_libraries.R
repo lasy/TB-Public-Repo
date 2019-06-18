@@ -14,9 +14,9 @@ package_list = c('knitr',
                  'tictoc',
                  'styler',
                  'bookdown',
-                 'klaR', 'cluster',
+                 'klaR', 'cluster','factoextra',
                  'Rcpp',
-                 'e1071', 'parallelSVM', 'randomForest',
+                 'e1071', 'parallelSVM', 'randomForest','SwarmSVM',
                  'ggalluvial'
 )
 

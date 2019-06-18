@@ -170,7 +170,39 @@ file.copy(from = paste0(IO$output_data, "users.Rdata"), to = paste0(IO$tmp_data,
 ```
 
 
+
 ```{r users_descr_avg_dist dist_viz}
+
+user_selection = which(
+  (users$tracking_consistency >= 0.75)&
+  (users$BC %in% par$BC_dict$name) &
+    (users$perc_cycles_with_TB >= 0.5)
+)
+
+users$TB_freq = users$n_TB/users$n_cycles_m
+users$high_TB_freq = users$TB_freq>=2.5
+
+ggplot(users[user_selection,], aes(x = median_d, fill = BC)) +
+  geom_histogram(position = "identity", col = NA)+
+  facet_grid(BC ~. )
+
+
+ggplot(users[user_selection,], aes(x = avg_d, fill = BC)) +
+  geom_histogram(position = "identity", col = NA)+
+  facet_grid(BC ~ high_TB_freq)
+
+
+ggplot(users[user_selection,], aes(x = sd_d, fill = BC)) +
+  geom_histogram(position = "identity", col = NA)+
+  facet_grid(BC ~ ((users$n_TB/users$n_cycles_m)>=1) )
+
+```
+
+
+
+
+
+```{r users_descr_avg_dist dist_viz_old, eval = FALSE}
 
 
 ggplot(users, aes(x = median_d, fill = factor(most_preval_clust))) +

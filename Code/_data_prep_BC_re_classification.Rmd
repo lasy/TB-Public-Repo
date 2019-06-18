@@ -65,6 +65,7 @@ Loading cycles
 
 ```{r data_prep_BC_re_class loading cycles}
 load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+dim(cycles)
 
 cycles$birth_control_CLUE = factor(cycles$birth_control_CLUE, levels = c("none / condoms","pill","did not enter"))
 cycles$user_id_n = as.numeric(factor(cycles$user_id))
@@ -128,7 +129,7 @@ summary(glm_fit)
 
 
 ```{r data_prep_BC_re_class svm training subset size}
-subset_perc = 5
+subset_perc = 1
 sample_size = round(subset_perc*nrow(cycles)/100)
 min_sample_size = 1000
 sample_size = max(sample_size, min(nrow(cycles),min_sample_size))
@@ -137,7 +138,7 @@ sample_size
 
 We will only use a subset (`r subset_perc`% or at least `r min_sample_size` cycles) of the data to train the model.
 
-This represents `r sample_size` cycles.
+This represents `r sample_size` cycles, selected randomly.
 
 And we only train on cycles of users that indicated `pill`, `none` or `condoms` and exclude users that `did not enter` their birth control in the settings
 
@@ -145,13 +146,21 @@ And we only train on cycles of users that indicated `pill`, `none` or `condoms` 
 j =  which(cycles$birth_control_CLUE %in% c("pill", "none / condoms"))
 j = sample(j, min(length(j),sample_size))
 cycles_training_set = cycles[j , ]
+cycles_training_set$birth_control_CLUE = factor(as.character(cycles_training_set$birth_control_CLUE), levels = c("pill", "none / condoms"))
 
 # fit
 tic()
-eval(parse(text = paste0("svm_fit = parallelSVM(birth_control_CLUE ~ ",paste(inputs, collapse = " + "),", data = cycles_training_set , probability = TRUE)")))
-toc()
+eval(parse(text = paste0("svm_fit = alphasvm(birth_control_CLUE ~ ",paste(inputs, collapse = " + "),", 
+                         data = cycles_training_set , 
+                         probability = TRUE)")))
+tac(chunck_name = "data_prep_BC_re_class svm training")
 summary(svm_fit)
+save(svm_fit, file = paste0(IO$tmp_data, "svm_fit.Rdata"))
 ```
+
+The SVM training scales as $O(n^2)$.
+
+
 
 
 
@@ -164,16 +173,18 @@ j = 1:nrow(cycles)
 
 tic()
 SVM_prob = predict(svm_fit, newdata = cycles[j,inputs], decision.value = TRUE, probability = TRUE)
-toc()
+tac(chunck_name = "data_prep_BC_re_class svm predictions")
 SVM_prob_p = attr(SVM_prob, "probabilities")
 head(SVM_prob_p, 20)
 
 cycles$SVM_prob[j] = SVM_prob_p[,which(colnames(SVM_prob_p) == "pill")]
 
 ```
+The SVM prediction scales as $O(n)$.
 
 
-```{r data_prep_BC_re_class svm comparisons}
+
+```{r data_prep_BC_re_class svm comparisons with original logs}
 
 #comparison
 table_cont = table(cycles$SVM_prob<0.5, cycles$birth_control_CLUE)
@@ -191,7 +202,6 @@ rm(SVM_prob, table_cont, svm_fit)
 ```{r data_prep_BC_re_class save svm}
 save(cycles, file = paste0(IO$tmp_data, "cycles_SVM.Rdata"))
 ```
-
 
 
 ```{r data_prep_BC_re_class vizualization with svm, fig.height= 9, fig.width=10}

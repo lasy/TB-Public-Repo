@@ -17,10 +17,6 @@ output:
 # Users description in terms of symptoms occurence, consistenty and evolution
 
 
-```{r child = '_users_descr_cluster_info.Rmd', cache=TRUE}
-```
-
-
 ```{r child = '_users_descr_average_dist_per_user.Rmd', cache=TRUE}
 ```
 

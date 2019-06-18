@@ -57,7 +57,7 @@ d_wide_full = rbind(d_wide, d_wide_empty)
 ```
 
 
-```{r symtoms_pred compute BMI }
+```{r symtoms_pred prepare input variables }
 
 cycles_m$cycle_id_m_prev = paste0(cycles_m$user_id,"_" ,cycles_m$cycle_nb_m - 1)
 m = match(cycles_m$cycle_id_m_prev, cycles$cycle_id)
@@ -71,17 +71,21 @@ cycles_m$diff_cl_median_3c = cycles$diff_cl_median_3c[m]
 cycles_m$bmi_cat = cut(cycles_m$bmi, breaks = c(-Inf, 18.5, 25, 30, Inf), labels = c("underweight","normal","overweight","obese"))
 cycles_m$bmi_cat = factor(cycles_m$bmi_cat, levels =  c("normal","underweight","overweight","obese"))
 
+cycles_m$age_cat = cut(cycles_m$age, breaks = breaks$age)
+
 ```
 
 
 
 ```{r symtoms_pred add user and cycle info to d_wide}
-inputs = c("cycle_length","period_length","diff_cl_median_3c","BC","age","bmi_cat", "country") #"height","weight",
-m = match(d_wide$cycle_id_m, cycles_m$cycle_id_m)
+inputs = c("tracking_group","cycle_length","period_length","diff_cl_median_3c","BC","age","bmi_cat", "country") #"height","weight",
+m = match(d_wide_full$cycle_id_m, cycles_m$cycle_id_m)
 
 for(input in inputs){
-  eval(parse(text = paste0("d_wide$",input," = cycles_m$",input,"[m]")))
+  eval(parse(text = paste0("d_wide_full$",input," = cycles_m$",input,"[m]")))
 }
+
+d_wide_full = d_wide_full[which(d_wide_full$BC %in% par$BC_dict$name),]
 ```
 
 
@@ -91,19 +95,127 @@ for(input in inputs){
 
 pred = data.frame()
 
+for(tracking_group in c("regular tracking","pre-menstrual tracking","menstrual tracking")){
+  
+  for(d in (-par$D):(par$Df) ){
+    cat(d,"\n")
+    eval(parse(text = paste0("d_wide_full$y = d_wide_full$day_",ifelse(d<0,"m",""),abs(d))))
+    eval(parse(text = paste0("mod_d = glm( round(y) ~ ",paste(inputs[-1], collapse = " + ")," ,
+                            data = d_wide_full[which(d_wide_full$tracking_group == tracking_group),],
+                            family = 'binomial')")))
+    
+    this_day_pred = data.frame(tracking_cluster = tracking_group,
+                               cycleday_m_D = d,
+                               input = names(coef(summary(mod_d))[,1]),
+                               est = coef(summary(mod_d))[,1],
+                               z_value = coef(summary(mod_d))[,3],
+                               p_value = coef(summary(mod_d))[,4]
+    )
+    
+    pred = rbind(pred, this_day_pred)
+    
+    if(d == 0){
+      mod_d_0 = mod_d
+      print(summary(mod_d))
+    }
+  }
+}
+rownames(pred) = 1:nrow(pred)
+
+pred$q_value = p.adjust(pred$p_value, method = "BH")
+
+pred$country_name = gsub("country","",pred$input)
+pred$country_name[!grepl("country",pred$input)] = NA
+
+save(pred, file = paste0(IO$out_Rdata,"symptoms_predictors.Rdata"))
+```
+
+
+## Visualizations
+
+```{r symtoms_pred viz}
+
+g = ggplot(pred[!grepl("country",pred$input),], aes(x = cycleday_m_D, y = z_value, col = input, linetype = tracking_cluster)) + 
+  geom_vline(xintercept = 0, size = 2, col = "gray90")+
+  geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
+  geom_hline(yintercept = 0, size = 0.1)+
+  geom_line() + 
+  scale_x_continuous(breaks = par$x.axis)+
+  facet_wrap(input ~ .)+
+  guides(col = FALSE)
+g
+
+
+g = ggplot(pred[!grepl("country",pred$input),], aes(x = cycleday_m_D, y = -log10(q_value), col = input, linetype = tracking_cluster)) + 
+  geom_vline(xintercept = 0, size = 2, col = "gray90")+
+  geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
+  geom_hline(yintercept = 0, size = 0.1)+
+  geom_line() + 
+  scale_x_continuous(breaks = par$x.axis)+
+  facet_wrap(input ~ .)+
+  guides(col = FALSE)
+g
+
+
+
+g = ggplot(pred[grep("country",pred$input),], aes(x = cycleday_m_D, y = z_value, col = input, linetype = tracking_cluster)) + 
+  geom_vline(xintercept = 0, size = 2, col = "gray90")+
+  geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
+  geom_hline(yintercept = 0, size = 0.1)+
+  geom_line() + 
+  scale_x_continuous(breaks = par$x.axis)+
+  facet_wrap(country_name ~ .)+
+  guides(col = FALSE)
+g
+
+
+g = ggplot(pred[grep("country",pred$input),], aes(x = cycleday_m_D, y = -log10(q_value), col = input, linetype = tracking_cluster)) + 
+  geom_vline(xintercept = 0, size = 2, col = "gray90")+
+  geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
+  geom_hline(yintercept = 0, size = 0.1)+
+  geom_line() + 
+  scale_x_continuous(breaks = par$x.axis)+
+  facet_wrap(country_name ~ .)+
+  guides(col = FALSE)
+g
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r symtoms_pred prediction no tracking group, eval = FALSE}
+
+pred = data.frame()
+
+
 for(d in (-par$D):(par$Df) ){
   cat(d,"\n")
-  eval(parse(text = paste0("d_wide$y = d_wide$day_",ifelse(d<0,"m",""),abs(d))))
+  eval(parse(text = paste0("d_wide_full$y = d_wide_full$day_",ifelse(d<0,"m",""),abs(d))))
   eval(parse(text = paste0("mod_d = glm( round(y) ~ ",paste(inputs, collapse = " + ")," ,
-                            data = d_wide[d_wide$BC %in% par$BC_dict$name,],
+                            data = d_wide_full,
                             family = 'binomial')")))
   
   this_day_pred = data.frame(cycleday_m_D = d,
-                   input = names(coef(summary(mod_d))[,1]),
-                   est = coef(summary(mod_d))[,1],
-                   z_value = coef(summary(mod_d))[,3],
-                   p_value = coef(summary(mod_d))[,4]
-                   )
+                             input = names(coef(summary(mod_d))[,1]),
+                             est = coef(summary(mod_d))[,1],
+                             z_value = coef(summary(mod_d))[,3],
+                             p_value = coef(summary(mod_d))[,4]
+  )
   
   pred = rbind(pred, this_day_pred)
   
@@ -121,7 +233,7 @@ save(pred, file = paste0(IO$out_Rdata,"symptoms_predictors.Rdata"))
 
 ```
 
-```{r symtoms_pred viz}
+```{r symtoms_pred viz no tracking group , eval = FALSE }
 
 g = ggplot(pred[!grepl("country",pred$input),], aes(x = cycleday_m_D, y = z_value, col = input)) + 
   geom_vline(xintercept = 0, size = 2, col = "gray90")+
@@ -171,8 +283,6 @@ g
 
 
 ```
-
-
 
 
 
