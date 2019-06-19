@@ -97,8 +97,6 @@ remove_duplicates = function(filename = filenames[1]){
 
 ```{r data_prep_n_logs remove duplicated rows}
 
-
-
 #input
 input_days_folder = paste0(IO$tmp_data,"days_after_data_prep_format/")
 filenames = list.files(input_days_folder)
@@ -114,7 +112,7 @@ cl = makeCluster(min(length(filenames),par$n_cores), outfile="")
 registerDoParallel(cl)
 foreach(filename = filenames) %dopar% {remove_duplicates(filename = filename)}
 stopCluster(cl)
-tac()
+tac(chunck_name = "data_prep_n_logs remove duplicated rows")
 
 ```
 

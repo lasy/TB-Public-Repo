@@ -46,7 +46,7 @@ agg = agg[order(agg$counts_per_cycle, decreasing = TRUE),]
 
 j = which((agg$n_cycles == 10) & (agg$counts_per_cycle > 2) & (agg$counts_per_cycle < 10))
 if(length(j)>0){
-  user_ids = agg$user_id[j[11:20]]
+  user_ids = agg$user_id[sample(j, min(length(j),10))]
   user_ids
   for(user_id in user_ids){
     j = which((days$user_id == user_id)&(!is.na(days$cycle_id_m)) & (days$category != "pill_hbc"))
@@ -107,12 +107,8 @@ rm(user_id, user_ids)
 
 ```{r data_presentation_overall_profile profile by BC and age cat}
 
-days_filenames = list.files(paste0(IO$output_data, "days/"))
 
-registerDoParallel(par$n_cores)
-
-tic()
-agg = foreach(days_filename = days_filenames, .combine = rbind)%dopar%{
+symptom_profile = function(days_filename = days_filename){
   load(paste0(IO$output_data,"days/",days_filename), verbose = TRUE)
   days$n_tender_breasts = 1
   days$age_cat = cut(days$age, breaks = breaks$age)
@@ -123,8 +119,18 @@ agg = foreach(days_filename = days_filenames, .combine = rbind)%dopar%{
   rm(agg_n_cycles)
   return(agg)
 }
-toc()
+
+
+days_filenames = list.files(paste0(IO$output_data, "days/"))
+
+tic()
+cl = makeCluster(min(length(days_filenames),par$n_cores), outfile="")
+registerDoParallel(cl)
+agg = foreach(days_filename = days_filenames, .combine = rbind)%dopar%{symptom_profile(days_filename = days_filename)}
 stopImplicitCluster()
+tac(chunck_name = "data_presentation_overall_profile profile by BC and age cat")
+
+save(agg, file = paste0(IO$tmp_data, "agg_overall_profile_TB.Rdata"))
 
 
 a = aggregate(agg[,c("n_tender_breasts","n_cycles")] , by = list(cycleday_m_D = agg$cycleday_m_D, age_cat = agg$age_cat, BC = agg$BC), FUN = sum)

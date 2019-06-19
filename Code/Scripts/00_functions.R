@@ -19,7 +19,8 @@ tac = function(chunck_name = "chunk_name"){
                   chunck_name = chunck_name,
                   duration_sec = round(elapsed$toc - elapsed$tic),
                   duration_min = round((elapsed$toc - elapsed$tic)/60,2),
-                  duration_hour = round((elapsed$toc - elapsed$tic)/60/60,4))
+                  duration_hour = round((elapsed$toc - elapsed$tic)/60/60,4),
+                  dataset = par$data_type)
   
   write_csv(df, path = "time_log.csv", append = TRUE,col_names = FALSE)
 }
