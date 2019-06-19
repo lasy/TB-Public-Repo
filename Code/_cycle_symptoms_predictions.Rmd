@@ -22,7 +22,6 @@ source("Scripts/00_setup.R")
 ```
 
 
-
 ```{r symtoms_pred load d_wide, cycles_m and cycles}
 load(paste0(IO$tmp_data,"d_wide_imputed.Rdata"), verbose = TRUE)
 colnames(d_wide)

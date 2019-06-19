@@ -15,12 +15,12 @@ output:
 
 
 
-```{r cycle_clust_imputing_logs librairies and stuff, include = FALSE, eval = TRUE}
+```{r cycle_prep_imputing_logs librairies and stuff, include = FALSE, eval = TRUE}
 source("Scripts/00_setup.R")
 ```
 
 
-```{r cycle_clust_imputing_logs setup, include=FALSE}
+```{r cycle_prep_imputing_logs setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 options(scipen=999)
 ```
@@ -66,12 +66,14 @@ $F_i$ of the shape of an hyperbolic cosine could be a good option that respect t
 
 
 
-```{r cycle_clust_imputing_logs loading d_wide}
+```{r cycle_prep_imputing_logs loading d_wide}
 
 load(file = paste0(IO$tmp_data,"d_wide.Rdata"), verbose = TRUE)
 
 ```
-```{r cycle_clust_imputing_logs imputing logs}
+
+
+```{r cycle_prep_imputing_logs imputing logs}
 
 d_wide_imputed =  t(apply(d_wide[,-1], 1, impute))
 d_wide_imputed_df = data.frame(cycle_id_m = d_wide$cycle_id_m, d_wide_imputed)
@@ -83,7 +85,7 @@ rm(d_wide_imputed, d_wide_imputed_df)
 ```
 
 
-```{r cycle_clust_imputing_logs creating d}
+```{r cycle_prep_imputing_logs creating d}
 
 load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
 

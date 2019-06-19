@@ -14,22 +14,16 @@ output:
 ---
 
 
-# Cycle clustering
+# Cycle data preparation (formating and imputing)
 
 
-```{r child = '_cycle_clust_metric.Rmd', cache=TRUE}
+```{r child = '_cycle_prep_formating_cycles.Rmd', cache=TRUE}
 ```
 
 
-```{r child = '_cycle_clust_optimal_cluster_number.Rmd', cache=TRUE}
+```{r child = '_cycle_prep_imputing_logs.Rmd', cache=TRUE}
 ```
 
 
-```{r child = '_cycle_clust_clustering.Rmd', cache=TRUE}
-```
-
-
-```{r child = '_cycle_clust_users_descr_cluster_info.Rmd', cache=TRUE}
-```
 
 

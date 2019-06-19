@@ -15,12 +15,12 @@ output:
 
 
 
-```{r cycle_clust_formating_cycles librairies and stuff, include = FALSE, eval = TRUE}
+```{r cycle_prep_formating_cycles librairies and stuff, include = FALSE, eval = TRUE}
 source("Scripts/00_setup.R")
 ```
 
 
-```{r cycle_clust_formating_cycles setup, include=FALSE}
+```{r cycle_prep_formating_cycles setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 options(scipen=999)
 ```
@@ -36,21 +36,10 @@ We want:
 
 We can make everything fit in one table (no need to split the files anymore)
 
-```{r cycle_clust_formating_cycles creating d_wide and filtering days}
-tic()
 
-days_folder = paste0(IO$output_data,"days/")
+```{r cycle_prep_formating_cycles creating d_wide and filtering days - function}
 
-tmp_output_d_wide_no_TB = paste0(IO$tmp_data,"d_wide_no_TB/")
-dir.create(tmp_output_d_wide_no_TB)
-
-filenames = list.files(days_folder)
-
-cl = makeCluster(par$n_cores)
-registerDoParallel(cl)
-
-d_wide = foreach(filename = filenames, .combine = rbind) %dopar%
-{
+days_to_d_wide = function(filename = filename){
   cat(filename,"\n")
   load(paste0(days_folder, filename), verbose = TRUE)
   
@@ -63,8 +52,8 @@ d_wide = foreach(filename = filenames, .combine = rbind) %dopar%
   
   
   d_wide_TB = reshape(d_TB[,c("cycle_id_m","cycleday_m_D","tender_breasts")],
-                        idvar = "cycle_id_m",timevar = "cycleday_m_D",
-                        direction = "wide")
+                      idvar = "cycle_id_m",timevar = "cycleday_m_D",
+                      direction = "wide")
   
   d_wide_TB[is.na(d_wide_TB)] = 0
   
@@ -87,8 +76,8 @@ d_wide = foreach(filename = filenames, .combine = rbind) %dopar%
   d_n_logs$n_logs = 1
   
   d_wide_n_logs = reshape(d_n_logs[,c("cycle_id_m","cycleday_m_D","n_logs")],
-                        idvar = "cycle_id_m",timevar = "cycleday_m_D",
-                        direction = "wide")
+                          idvar = "cycle_id_m",timevar = "cycleday_m_D",
+                          direction = "wide")
   
   d_wide_n_logs[is.na(d_wide_n_logs)] = 0
   d_wide_n_logs[,-1] = d_wide_n_logs[,-1] - 1
@@ -99,7 +88,7 @@ d_wide = foreach(filename = filenames, .combine = rbind) %dopar%
   rm(o)
   colnames(d_wide_n_logs) = gsub("n_logs\\.\\.","day_m", colnames(d_wide_n_logs))
   colnames(d_wide_n_logs) = gsub("n_logs\\.","day_", colnames(d_wide_n_logs))
-
+  
   # putting the two together
   
   d_wide_TB$cycle_id_m = as.character(d_wide_TB$cycle_id_m)
@@ -111,7 +100,7 @@ d_wide = foreach(filename = filenames, .combine = rbind) %dopar%
   # image(t(as.matrix(head(d_wide_TB[,-1]))))
   # image(t(as.matrix(head(d_wide_n_logs[m,-1]))))
   # image(t(as.matrix(head(d_wide_TB[,-1] + d_wide_n_logs[m,-1] ))))
- 
+  
   d_wide_combined_values = d_wide_TB[,-1] + d_wide_n_logs[m,-1] 
   
   d_wide = data.frame(cycle_id_m = d_wide_TB$cycle_id_m)
@@ -122,18 +111,39 @@ d_wide = foreach(filename = filenames, .combine = rbind) %dopar%
   d_wide_no_TB = d_wide_n_logs[-j,]
   
   save(d_wide_no_TB, file = paste0(tmp_output_d_wide_no_TB,"d_wide_no_TB_",gsub("days_","",filename)))
-
+  
   return(d_wide)
 }
 
+```
+
+
+```{r cycle_prep_formating_cycles creating d_wide and filtering days}
+tic()
+
+days_folder = paste0(IO$output_data,"days/")
+
+tmp_output_d_wide_no_TB = paste0(IO$tmp_data,"d_wide_no_TB/")
+dir.create(tmp_output_d_wide_no_TB)
+
+filenames = list.files(days_folder)
+
+tic()
+cl = makeCluster(min(length(filenames),par$n_cores), outfile="")
+registerDoParallel(cl)
+
+d_wide = foreach(filename = filenames, .combine = rbind) %dopar%{days_to_d_wide(filename = filename)}
+
 stopImplicitCluster()
+tac(chunck_name = "cycle_prep_formating_cycles creating d_wide and filtering days")
+
 
 dim(d_wide)
 head(d_wide)
 
 save(d_wide, file = paste0(IO$tmp_data,"d_wide.Rdata"))
 
-tac("cycle_clust_formating_cycles creating d_wide and filtering days")
+tac("cycle_prep_formating_cycles creating d_wide and filtering days")
 ```
 
 
