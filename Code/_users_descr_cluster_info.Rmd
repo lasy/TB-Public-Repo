@@ -110,14 +110,14 @@ users = merge(users, agg2, all.x = TRUE)
 
 j = grep("n_cl_",colnames(users))
 
-users$n_cycles_with_TB = apply(users[,j],1,sum)
+users$n_cycles_with_TB_m = apply(users[,j],1,sum)
 
 cycles_m$cycle_id_m = as.character(cycles_m$cycle_id_m)
 agg = aggregate(cycle_id_m ~ user_id, cycles_m, lu)
 colnames(agg) = c("user_id","n_cycles_m")
-users = merge(users, agg, all.x = TRUE)
+users$n_cycles_m = agg$n_cycles_m[match(users$user_id, agg$user_id)]
 
-users$perc_cycles_with_TB = users$n_cycles_with_TB / users$n_cycles_m
+users$perc_cycles_with_TB_m = users$n_cycles_with_TB_m / users$n_cycles_m
 
 
 

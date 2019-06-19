@@ -179,7 +179,7 @@ user_selection = which(
     (users$perc_cycles_with_TB >= 0.5)
 )
 
-users$TB_freq = users$n_TB/users$n_cycles_m
+users$TB_freq = users$n_tender_breasts/users$n_cycles
 users$high_TB_freq = users$TB_freq>=2.5
 
 ggplot(users[user_selection,], aes(x = median_d, fill = BC)) +
@@ -194,7 +194,7 @@ ggplot(users[user_selection,], aes(x = avg_d, fill = BC)) +
 
 ggplot(users[user_selection,], aes(x = sd_d, fill = BC)) +
   geom_histogram(position = "identity", col = NA)+
-  facet_grid(BC ~ ((users$n_TB/users$n_cycles_m)>=1) )
+  facet_grid(BC ~ high_TB_freq )
 
 ```
 
