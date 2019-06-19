@@ -1,0 +1,58 @@
+---
+title: "Augmenting the users table with aggregates from the cycles table"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r data_prep_users_agg librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r data_prep_users_agg setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Augmenting the users table
+
+
+
+```{r data_prep_users_agg loading users}
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+```
+
+
+
+```{r data_prep_users_agg loading cycles}
+load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+```
+
+
+```{r data_prep_users_agg aggregates from days}
+
+users_agg = aggregate( cycle_id ~ user_id,cycles[which(cycles$n_TB >0),], lu)
+users$n_cycles_with_TB = users_agg$cycle_id[match(users$user_id,users_agg$user_id)]
+users$n_cycles_with_TB[is.na(users$n_cycles_with_TB )] = 0
+
+users$perc_cycles_with_TB = users$n_cycles_with_TB/users$n_cycles
+
+
+save(users, file = paste0(IO$output_data, "users.Rdata"))
+file.copy(from =  paste0(IO$output_data, "users.Rdata"), to =  paste0(IO$tmp_data, "users_with_agg.Rdata"), overwrite = TRUE)
+
+```
+
+
