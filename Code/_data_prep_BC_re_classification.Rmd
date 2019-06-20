@@ -485,8 +485,8 @@ j = which(colnames(cycles) %in% c("ok","long_stretch"))
 if(length(j)>0){cycles = cycles[,-j]}
 
 #saving
-save(cycles, file = paste0(IO$tmp_data,"cycles_BC_re_classification_final.Rdata"))
-file.copy(from = , to = , overwrite = TRUE)
+save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
+file.copy(from = paste0(IO$output_data,"cycles.Rdata"), to = paste0(IO$tmp_data,"cycles_BC_re_classification_final.Rdata"), overwrite = TRUE)
 ```
 
 
