@@ -386,66 +386,112 @@ g + geom_vline(xintercept = confidence_thres, size = 0.3, linetype = 2)
 
 ```
 
+```{r data_prep_BC_re_class confidence score viz examples, fig.height= 9, fig.width=14}
+
+sub_cycles = cycles[cycles$user_id %in% unique(cycles$user_id)[1:80],]
+sub_cycles$user_id_n = factor(sub_cycles$user_id_n, levels = unique(sub_cycles$user_id_n[order(sub_cycles$birth_control_CLUE)]))
+
+g_vit_init = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_init)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC) + guides(col = FALSE)
+
+g_prob = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = prob)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position="top")+ guides(col = FALSE)
+
+g_conf = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = conf)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+
+  scale_color_gradientn(colours = c("red","gray90","black"), 
+                        values = rescale(c(0,confidence_thres,1)),
+                        limits=c(0,1))+
+  #scale_color_gradient2(low = "red", high = "black",mid = "gray90", midpoint = confidence_thres, limits = c(0,2*confidence_thres))+
+  theme(legend.position="top")+ guides(col = FALSE)
+
+grid.arrange(g_vit_init, g_prob, g_conf, nrow = 1)
+```
+
+
+
+
+
 
 ### New BC labels
 
-- we take all users for which the new label is the same as the original label
-- for users that have cycles with different labels, we keep the longuonly take users for which all cycles have high enough confidence score for the new labels and for which the average confidence over that sequence of consecutive cycle is high enough as well (twice higher the confidence score for individual cycles).
+* we take all users for which the new label is the same as the original label
+* for users that have cycles with different or changing labels, we keep stretches of at least 4 cycles for which 
++ the confidence score of each cycle is above a given threshold and 
++ for which the running median confidence score over 3 cycles is above a higher threshold. 
+
 
 
 ```{r data_prep_BC_re_class cycle selection}
-
-stop("on arrête la!")
-
-
-cycles$BC = NA
 
 # keeping the cycles from users that had all their cycles matching the original BC
 same = (cycles$birth_control_CLUE == cycles$BC_hmm_init)
 same_u = aggregate(same, by = list(user_id = cycles$user_id), FUN = all)
 user_ids_same_label = same_u$user_id[same_u$x]
-j_same = which(cycles$user_id %in% user_ids_same_label)
-cycles$BC[j_same] = cycles$BC_hmm_init[j_same]
-
-if(length(j_same)>0){cycles_remain = cycles[-j_same,]}else{cycles_remain = cycles}
-
-# keeping the longest 
+cycle_ids_same = cycles$cycle_id[which(cycles$user_id %in% user_ids_same_label)]
 
 
+# keeping the stretches of at least 4 cycles with confidence score higher than confidence_thres
 
-# all cycles of a given user has a confidence score that is high enough
-conf = (cycles$conf >= confidence_thres)
-conf_u = aggregate(conf, by = list(user_id = cycles$user_id), FUN = all)
-user_ids_all_cycles_above_threshold = conf_u$user_id[conf_u$x]
+o = order(cycles$user_id_n, cycles$cycle_nb)
+cycles = cycles[o,]
 
-# average confidence score per user
-conf_av_u = aggregate(cycles$conf, by = list(user_id = cycles$user_id), FUN = mean)
-hist(conf_av_u$x, breaks = 100)
-user_ids_average_conf_score = conf_av_u$user_id[conf_av_u$x >= 2*confidence_thres]
+#running_median_3 = function(x){n = length(x);X = cbind(c(NA,x[1:(n-1)]),x,c(x[2:n], NA)); return(apply(X,1,median, na.rm = TRUE))}
+runmed_3 = function(x){runmed(x,k = 3)}
+cycles$running_median_conf = ave(cycles$conf, cycles$user_id, FUN = runmed_3)
 
+cycles$ok = (cycles$conf >= confidence_thres) & (cycles$running_median_conf >= 2 * confidence_thres)
 
+#find_longest_stretch = function(x){with(rle(x), rep((lengths == max(lengths[values])) & values, lengths))} # if there are 2 stretches of the same length, this one takes both
+#find_longest_stretch = function(x){
+#  y = with(rle(x), rep(((1:length(lengths)) == which(values)[which.max(lengths[values])]) & values, lengths))
+#  if(length(y) == 0){y = rep(FALSE, length(x))}
+#  return(y)} # this one takes the first longest stretch
 
-user_ids = union(intersect(user_ids_all_cycles_above_threshold,user_ids_average_conf_score), user_ids_same_label)
-length(user_ids)
+find_stretches = function(x,k = 4){
+  y = 1*with(rle(x), rep((lengths >= k) & values, lengths))
+  if(length(y) == 0){y = rep(0, length(x))}
+  y = y * cumsum(diff(c(0,y))>0)
+  return(y)
+}
 
-cycles$BC[cycles$user_id %in% user_ids] = cycles$BC_hmm_init[cycles$user_id %in% user_ids]
-cycles$BC[is.na(cycles$BC)] = "unclear"
+cycles$long_stretch = ave(cycles$ok, cycles$user_id, FUN = find_stretches)
+cycle_ids_stretch = cycles$cycle_id[which(cycles$long_stretch > 0)]
+cycles$stretch_id = paste0(cycles$user_id,"_",cycles$long_stretch)
+cycles$stretch_id[cycles$long_stretch == 0] = NA
 
-table(cycles$BC)
-table(cycles$BC, cycles$birth_control_CLUE)
+# merging these 2 list of cycle_ids
+cycle_ids = union(cycle_ids_same, cycle_ids_stretch)
+
+# new BC labels
+j = which(cycles$cycle_id %in% cycle_ids)
+cycles$BC = "unclear"
+cycles$BC[j] = cycles$BC_hmm_init[j]
+
+table_new_BC = table(cycles$BC)
+table_new_BC
+round(table_new_BC/sum(table_new_BC)*100,2)
+
+table_BC = table(cycles$birth_control_CLUE, cycles$BC)
+table_BC
+round(table_BC/apply(table_BC,1,sum)*100,2)
+
 
 ```
 
 
 
-```{r data_prep_BC_re_class save last cy}
+```{r data_prep_BC_re_class save last cycles}
+
+# cleaning cycles table
+j = which(colnames(cycles) %in% c("ok","long_stretch"))
+if(length(j)>0){cycles = cycles[,-j]}
+
+#saving
 save(cycles, file = paste0(IO$tmp_data,"cycles_BC_re_classification_final.Rdata"))
+file.copy(from = , to = , overwrite = TRUE)
 ```
 
 
 
 ```{r data_prep_BC_re_class vizualization of final labels, fig.height= 9, fig.width=14}
-
 
 sub_cycles = cycles[cycles$user_id %in% unique(cycles$user_id)[1:80],]
 sub_cycles$user_id_n = factor(sub_cycles$user_id_n, levels = unique(sub_cycles$user_id_n[order(sub_cycles$birth_control_CLUE)]))
@@ -472,50 +518,60 @@ g_prob = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = prob)) + geom
 
 g_conf = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = conf)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+
   scale_color_gradientn(colours = c("red","gray90","black"), 
-                         values = rescale(c(0,confidence_thres,1)),
-                         limits=c(0,1))+
-#scale_color_gradient2(low = "red", high = "black",mid = "gray90", midpoint = confidence_thres, limits = c(0,2*confidence_thres))+
+                        values = rescale(c(0,confidence_thres,1)),
+                        limits=c(0,1))+
+  #scale_color_gradient2(low = "red", high = "black",mid = "gray90", midpoint = confidence_thres, limits = c(0,2*confidence_thres))+
   theme(legend.position="top")
 
 grid.arrange(g_BC, g_vit_init, g_prob, g_conf, nrow = 1)
 
 rm(sub_cycles, g_BC, g_prob, g_vit_init, g_conf)
+
+
+
+```
+
+
+```{r}
+head(cycles[(cycles$user_id_n == 78),c("user_id_n","cycle_nb","prob","conf","BC_hmm_init", "ok","longest_stretch")], 200)
 
 ```
 
 
 
+
+
 ```{r data_prep_BC_re_class vizualization of final labels valid transition, fig.height= 9, fig.width=14}
 
-agg = aggregate(BC ~ user_id_n, cycles[cycles$BC != "unclear",], lu)
+agg = aggregate(BC ~ stretch_id + user_id, cycles[cycles$BC != "unclear",], lu)
 sum(agg$BC > 1)
 
 if(sum(agg$BC > 1)>0){
-
-sub_cycles = cycles[cycles$user_id_n %in% agg$user_id_n[which(agg$BC>1)[1:80]],]
-sub_cycles$user_id_n = factor(sub_cycles$user_id_n, levels = unique(sub_cycles$user_id_n[order(sub_cycles$birth_control_CLUE)]))
-sub_cycles$BC = factor(sub_cycles$BC, levels = c(as.character(par$BC_dict$name),"unclear"))
-
-g_BC = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = BC)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC3)
-
-g_vit_init = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_init)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC)
-
-g_prob = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = prob)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position="top")
-
-g_conf = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = conf)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+
-  scale_color_gradientn(colours = c("red","gray90","black"), 
-                         values = rescale(c(0,confidence_thres,1)),
-                         limits=c(0,1))+
-#scale_color_gradient2(low = "red", high = "black",mid = "gray90", midpoint = confidence_thres, limits = c(0,2*confidence_thres))+
-  theme(legend.position="top")
-
-grid.arrange(g_BC, g_vit_init, g_prob, g_conf, nrow = 1)
-
-rm(sub_cycles, g_BC, g_prob, g_vit_init, g_conf)
-
+  
+  sub_cycles = cycles[cycles$user_id %in% agg$user_id[which(agg$BC>1)[1:80]],]
+  sub_cycles$user_id_n = factor(sub_cycles$user_id_n, levels = unique(sub_cycles$user_id_n[order(sub_cycles$birth_control_CLUE)]))
+  sub_cycles$BC = factor(sub_cycles$BC, levels = c(as.character(par$BC_dict$name),"unclear"))
+  
+  g_BC = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = BC)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC3)
+  
+  g_vit_init = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_init)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC)
+  
+  g_prob = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = prob)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position="top")
+  
+  g_conf = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = conf)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+
+    scale_color_gradientn(colours = c("red","gray90","black"), 
+                          values = rescale(c(0,confidence_thres,1)),
+                          limits=c(0,1))+
+    #scale_color_gradient2(low = "red", high = "black",mid = "gray90", midpoint = confidence_thres, limits = c(0,2*confidence_thres))+
+    theme(legend.position="top")
+  
+  grid.arrange(g_BC, g_vit_init, g_prob, g_conf, nrow = 1)
+  
+  rm(sub_cycles, g_BC, g_prob, g_vit_init, g_conf)
+  
 }
 
-sub_cycles = cycles[cycles$user_id_n %in% agg$user_id_n[which(agg$BC==1)[1:80]],]
+sub_cycles = cycles[cycles$user_id %in% agg$user_id[which(agg$BC==1)[1:80]],]
 sub_cycles$user_id_n = factor(sub_cycles$user_id_n, levels = unique(sub_cycles$user_id_n[order(sub_cycles$birth_control_CLUE)]))
 sub_cycles$BC = factor(sub_cycles$BC, levels = c(as.character(par$BC_dict$name),"unclear"))
 
@@ -527,9 +583,9 @@ g_prob = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = prob)) + geom
 
 g_conf = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = conf)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+
   scale_color_gradientn(colours = c("red","gray90","black"), 
-                         values = rescale(c(0,confidence_thres,1)),
-                         limits=c(0,1))+
-#scale_color_gradient2(low = "red", high = "black",mid = "gray90", midpoint = confidence_thres, limits = c(0,2*confidence_thres))+
+                        values = rescale(c(0,confidence_thres,1)),
+                        limits=c(0,1))+
+  #scale_color_gradient2(low = "red", high = "black",mid = "gray90", midpoint = confidence_thres, limits = c(0,2*confidence_thres))+
   theme(legend.position="top")
 
 grid.arrange(g_BC, g_vit_init, g_prob, g_conf, nrow = 1)
@@ -541,104 +597,6 @@ rm(agg)
 ```
 
 
-
-
-
-
-
-```{r data_prep_BC_re_class generating synthetic data, eval = FALSE, include = FALSE}
-
-BC = c("none / condoms","pill","did not enter")
-input_to_generate = inputs[- which(inputs %in% c("diff_cl_median_3c","cl_sd_3c", "cycle_start"))]
-
-n_users = 30
-
-s_users = data.frame(
-  user_id = sprintf("u%03d", 1:n_users),
-  n_cycles = rpois(n_users, 10), 
-  birth_control_CLUE = sample(BC,n_users, replace = TRUE))
-
-s_cycles = data.frame(user_id = rep(s_users$user_id, s_users$n_cycles))
-s_cycles$cycle_nb = foreach(nc = s_users$n_cycles, .combine = c) %do% {1:nc}
-s_cycles$cycle_id = paste0(s_cycles$user_id,"_",s_cycles$cycle_nb)
-s_cycles$birth_control_CLUE = s_users$birth_control_CLUE[match(s_cycles$user_id, s_users$user_id)]
-
-
-# generate "true birth control" 
-s_cycles$true_BC = ""
-
-for(u in s_users$user_id){
-  transProbs = matrix(c(hmm$p_stay_in_same,1-hmm$p_stay_in_same,1-hmm$p_stay_in_same,hmm$p_stay_in_same),2,2)
-  start_prob_nc = c(0.8,0.2,0.6)[as.numeric(factor(s_users$birth_control_CLUE[1],levels = BC))]
-  
-  hmm_mod_sim = initHMM(
-  States =  hmm$bc_states[1:2], Symbols =  seq(0,1,by = 0.1), 
-  startProbs =  c(start_prob_nc,1-start_prob_nc), transProbs =  transProbs, 
-  emissionProbs =  hmm$bc_emission_prob[1:2,1:11])
-
-  rm(transProbs)  
-  
-  true_BC = simHMM(hmm_mod_sim, length = s_users$n_cycles[s_users$user_id == u])
-  s_cycles$true_BC[s_cycles$user_id == u] = true_BC$states
-}
-
-# now generating the input variables
-
-# first empty columns
-for(input in input_to_generate){
-  eval(parse(text = paste0("s_cycles$",input,"= NA")))
-}
-s_cycles$true_BC_prob = NA
-
-# then the data
-for(i in 1:nrow(s_cycles)){
-  s_cycles$true_BC_prob[i] = round(sample(cycles$prob[cycles$BC == s_cycles$true_BC[i]],1),2)
-  j = which((round(cycles$prob,2) ==  s_cycles$true_BC_prob[i]) & (cycles$BC == s_cycles$true_BC[i]))
-  for(input in input_to_generate){
-    eval(parse(text = paste0("s_cycles$",input,"[i]= sample(cycles$",input,"[j],1)")))
-  }
-}
-
-
-
-
-```
-
-
-
-
-
-```{r data_prep_BC_re_class visualization of generated input variables, eval = FALSE, include = FALSE}
-
-for(input in input_to_generate){
-  eval(parse(text = paste0("s_cycles$v = s_cycles$",input)))
-  
-  g1 =  ggplot(s_cycles, aes(x = v, col = birth_control_CLUE)) + geom_freqpoly(aes(y = ..density..),binwidth = 1) +
-    ggtitle(input) +
-    scale_color_manual(values = c(cols$BC,"gray")) + 
-    xlim(quantile(cycles$v,p = c(0.005,0.955), na.rm = TRUE)+c(-1,1))
-
-  
-  g2 =  ggplot(s_cycles, aes(x = v, col = true_BC)) + geom_freqpoly(aes(y = ..density..),binwidth = 1) +
-    ggtitle(input) +
-    scale_color_manual(values = c(cols$BC,"gray")) + 
-    xlim(quantile(cycles$v,p = c(0.005,0.955), na.rm = TRUE)+c(-1,1))
-  
-  print(grid.arrange(g1,g2))
-  
-}
-
-j = which(colnames(s_cycles)=="v")
-if(length(j)>0){s_cycles = s_cycles[,-j]}
-```
-
-
-
-```{r data_prep_BC_re_class saving generated input variables, eval = FALSE, include = FALSE}
-
-save(s_cycles, file = paste0(IO$tmp_data, "generated_cycles.Rdata"))
-
-```
 
 
 

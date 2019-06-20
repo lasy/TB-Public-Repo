@@ -297,3 +297,101 @@ rm(sub_cycles,g_glm)
 
 
 
+
+```{r data_prep_BC_re_class generating synthetic data, eval = FALSE, include = FALSE}
+
+BC = c("none / condoms","pill","did not enter")
+input_to_generate = inputs[- which(inputs %in% c("diff_cl_median_3c","cl_sd_3c", "cycle_start"))]
+
+n_users = 30
+
+s_users = data.frame(
+  user_id = sprintf("u%03d", 1:n_users),
+  n_cycles = rpois(n_users, 10), 
+  birth_control_CLUE = sample(BC,n_users, replace = TRUE))
+
+s_cycles = data.frame(user_id = rep(s_users$user_id, s_users$n_cycles))
+s_cycles$cycle_nb = foreach(nc = s_users$n_cycles, .combine = c) %do% {1:nc}
+s_cycles$cycle_id = paste0(s_cycles$user_id,"_",s_cycles$cycle_nb)
+s_cycles$birth_control_CLUE = s_users$birth_control_CLUE[match(s_cycles$user_id, s_users$user_id)]
+
+
+# generate "true birth control" 
+s_cycles$true_BC = ""
+
+for(u in s_users$user_id){
+  transProbs = matrix(c(hmm$p_stay_in_same,1-hmm$p_stay_in_same,1-hmm$p_stay_in_same,hmm$p_stay_in_same),2,2)
+  start_prob_nc = c(0.8,0.2,0.6)[as.numeric(factor(s_users$birth_control_CLUE[1],levels = BC))]
+  
+  hmm_mod_sim = initHMM(
+  States =  hmm$bc_states[1:2], Symbols =  seq(0,1,by = 0.1), 
+  startProbs =  c(start_prob_nc,1-start_prob_nc), transProbs =  transProbs, 
+  emissionProbs =  hmm$bc_emission_prob[1:2,1:11])
+
+  rm(transProbs)  
+  
+  true_BC = simHMM(hmm_mod_sim, length = s_users$n_cycles[s_users$user_id == u])
+  s_cycles$true_BC[s_cycles$user_id == u] = true_BC$states
+}
+
+# now generating the input variables
+
+# first empty columns
+for(input in input_to_generate){
+  eval(parse(text = paste0("s_cycles$",input,"= NA")))
+}
+s_cycles$true_BC_prob = NA
+
+# then the data
+for(i in 1:nrow(s_cycles)){
+  s_cycles$true_BC_prob[i] = round(sample(cycles$prob[cycles$BC == s_cycles$true_BC[i]],1),2)
+  j = which((round(cycles$prob,2) ==  s_cycles$true_BC_prob[i]) & (cycles$BC == s_cycles$true_BC[i]))
+  for(input in input_to_generate){
+    eval(parse(text = paste0("s_cycles$",input,"[i]= sample(cycles$",input,"[j],1)")))
+  }
+}
+
+
+
+
+```
+
+
+
+
+
+```{r data_prep_BC_re_class visualization of generated input variables, eval = FALSE, include = FALSE}
+
+for(input in input_to_generate){
+  eval(parse(text = paste0("s_cycles$v = s_cycles$",input)))
+  
+  g1 =  ggplot(s_cycles, aes(x = v, col = birth_control_CLUE)) + geom_freqpoly(aes(y = ..density..),binwidth = 1) +
+    ggtitle(input) +
+    scale_color_manual(values = c(cols$BC,"gray")) + 
+    xlim(quantile(cycles$v,p = c(0.005,0.955), na.rm = TRUE)+c(-1,1))
+
+  
+  g2 =  ggplot(s_cycles, aes(x = v, col = true_BC)) + geom_freqpoly(aes(y = ..density..),binwidth = 1) +
+    ggtitle(input) +
+    scale_color_manual(values = c(cols$BC,"gray")) + 
+    xlim(quantile(cycles$v,p = c(0.005,0.955), na.rm = TRUE)+c(-1,1))
+  
+  print(grid.arrange(g1,g2))
+  
+}
+
+j = which(colnames(s_cycles)=="v")
+if(length(j)>0){s_cycles = s_cycles[,-j]}
+```
+
+
+
+```{r data_prep_BC_re_class saving generated input variables, eval = FALSE, include = FALSE}
+
+save(s_cycles, file = paste0(IO$tmp_data, "generated_cycles.Rdata"))
+
+```
+
+
+
+
