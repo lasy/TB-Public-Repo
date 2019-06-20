@@ -1,0 +1,146 @@
+---
+title: "Input variables for classifier"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r data_prep_BC_input librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r data_prep_BC_input setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+## Input variables for BC re-classification
+
+load data
+
+```{r data_prep_BC_input loading cycles}
+
+load( paste0(IO$tmp_data, "cycles_after_BC_pre_filtering.Rdata"), verbose = TRUE)
+dim(cycles)
+
+cycles$birth_control_CLUE = factor(cycles$birth_control_CLUE, levels = c("none / condoms","pill","did not enter"))
+cycles$user_id_n = as.numeric(factor(cycles$user_id))
+
+```
+
+input variables
+
+```{r data_prep_BC_input input variables}
+inputs = c("cycle_length","n_days_obs","n_pill","n_prot_sex","n_unprot_sex","diff_cl_median_3c","cl_sd_3c","cycle_nb","period_length","n_egg_white_fluid", "cycle_start")
+```
+
+
+```{r data_prep_BC_input visualization of input variables}
+
+for(input in inputs[-which(inputs == "cycle_start")]){
+  if(input %in% colnames(cycles)){
+    eval(parse(text = paste0("cycles$v = cycles$",input)))
+    g =  ggplot(cycles, aes(x = v, col = birth_control_CLUE)) + geom_freqpoly(aes(y = ..density..),binwidth = 1) +
+      ggtitle(input) +
+      scale_color_manual(values = c(cols$BC,"gray")) + 
+      xlim(quantile(cycles$v,p = c(0.005,0.98), na.rm = TRUE)+c(-1,1))
+    print(g)
+  }else{print(paste0(input," is not in cycles\n"))}
+}
+
+j = which(colnames(cycles)=="v")
+if(length(j)>0){cycles = cycles[,-j]}
+
+```
+
+
+## Additional input variables to reflect non-linear differences in distributions
+
+```{r data_prep_BC_input n_cycles_tot}
+
+df_n_cycles = melt(table(cycles$birth_control_CLUE))
+colnames(df_n_cycles) = c("birth_control_CLUE","n_cycles_tot")
+
+```
+
+
+
+### Cycle length
+
+
+
+
+```{r data_prep_BC_input cycle length}
+tic()
+df_CL = melt(table(cycles$birth_control_CLUE, cycles$cycle_length))
+colnames(df_CL) = c("birth_control_CLUE","cycle_length","n_cycles")
+toc()
+
+df_CL = merge(df_CL, df_n_cycles, all = TRUE)
+df_CL$perc_cycles = df_CL$n_cycles/df_CL$n_cycles_tot
+
+df_CL = reshape(df_CL[,c("birth_control_CLUE","cycle_length","perc_cycles")],timevar = "birth_control_CLUE", idvar = "cycle_length", direction = "wide")
+df_CL$cycle_length_score = df_CL$perc_cycles.pill - df_CL$`perc_cycles.none / condoms`
+
+ggplot(df_CL, aes(x = cycle_length, y = cycle_length_score))+geom_line()+xlim(c(0,100))
+
+cycles$cycle_length_score = df_CL$cycle_length_score[match(cycles$cycle_length, df_CL$cycle_length)]
+
+inputs = c(inputs, "cycle_length_score")
+
+```
+
+### N days of observations
+
+
+
+
+```{r data_prep_BC_input N days of observations}
+tic()
+df_n_days = melt(table(cycles$birth_control_CLUE, cycles$n_days_obs))
+colnames(df_n_days) = c("birth_control_CLUE","n_days_obs","n_cycles")
+toc()
+
+df_n_days = merge(df_n_days, df_n_cycles, all = TRUE)
+df_n_days$perc_cycles = df_n_days$n_cycles/df_n_days$n_cycles_tot
+
+df_n_days = reshape(df_n_days[,c("birth_control_CLUE","n_days_obs","perc_cycles")],timevar = "birth_control_CLUE", idvar = "n_days_obs", direction = "wide")
+df_n_days$n_days_obs_score = df_n_days$perc_cycles.pill - df_n_days$`perc_cycles.none / condoms`
+
+ggplot(df_n_days, aes(x = n_days_obs, y = n_days_obs_score))+geom_line()+xlim(c(0,100))
+
+cycles$n_days_obs_score = df_n_days$n_days_obs_score[match(cycles$n_days_obs, df_n_days$n_days_obs)]
+
+inputs = c(inputs, "n_days_obs_score")
+
+```
+
+
+## Save
+
+
+```{r data_prep_BC_input save cycles}
+save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
+file.copy(from =  paste0(IO$output_data,"cycles.Rdata") , to =  paste0(IO$tmp_data,"cycles_with_input_variables.Rdata"), overwrite = TRUE)
+```
+
+
+
+```{r data_prep_BC_input save inputs}
+save(inputs, file = paste0(IO$tmp_data,"inputs.Rdata"))
+```
+
+
+

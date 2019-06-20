@@ -37,7 +37,13 @@ output:
 ```
 
 
+
+
 ```{r child = '_data_prep_BC_user_pre_filtering.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_data_prep_BC_input_variables', cache=TRUE}
 ```
 
 
@@ -49,7 +55,9 @@ output:
 ```
 
 
-```{r child = '_data_prep_BC_cycles_m.Rmd', cache=TRUE}
+
+
+```{r child = '_data_prep_cycles_m.Rmd', cache=TRUE}
 ```
 
 

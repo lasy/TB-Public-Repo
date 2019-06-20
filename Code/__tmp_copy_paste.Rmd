@@ -122,8 +122,178 @@ toc()
 
 
 
+```{r data_prep_BC_re_class test glm only on cycle length}
+
+sample_size = 100000
+
+j_pill =  which(cycles$birth_control_CLUE == "pill")
+j_pill = sample(j_pill, min(length(j_pill),round(sample_size/2)))
+j_nc =  which(cycles$birth_control_CLUE == "none / condoms")
+j_nc = sample(j_nc, min(length(j_nc),round(sample_size/2)))
+
+j = c(j_pill, j_nc)
+cycles_training_set = cycles[j , ]
+cycles_training_set$birth_control_CLUE = factor(as.character(cycles_training_set$birth_control_CLUE), levels = c("pill", "none / condoms"))
 
 
+glm_cl = glm(birth_control_CLUE ~ cycle_length, data = cycles_training_set, family = "binomial")
+summary(glm_cl)
+
+new_data = data.frame(cycle_length = -1000:1000)
+
+prob = predict(glm_cl, newdata = new_data, type = "response")
+
+plot(prob)
+abline(h = 0.5)
+
+
+
+glm_cl_score = glm(birth_control_CLUE ~ cycle_length_score + cycle_length, data = cycles_training_set, family = "binomial")
+summary(glm_cl_score)
+
+new_data = cycles[1:10000,]
+
+prob = predict(glm_cl_score, newdata = new_data, type = "response")
+
+plot(new_data$cycle_length_score, prob, pch = 16, cex = 0.5)
+abline(h = 0.5)
+
+plot(new_data$cycle_length, prob, pch = 16, cex = 0.5)
+abline(h = 0.5)
+
+```
+
+
+
+### Classifying cycles using a SVM
+
+
+```{r data_prep_BC_re_class svm training subset size}
+subset_perc = 1
+sample_size = round(subset_perc*nrow(cycles)/100)
+min_sample_size = 1000
+sample_size = max(sample_size, min(nrow(cycles),min_sample_size))
+sample_size
+```
+
+We will only use a subset (`r subset_perc`% or at least `r min_sample_size` cycles) of the data to train the model.
+
+This represents `r sample_size` cycles, selected randomly.
+
+And we only train on cycles of users that indicated `pill`, `none` or `condoms` and exclude users that `did not enter` their birth control in the settings
+
+```{r data_prep_BC_re_class svm training, warning=FALSE}
+j =  which(cycles$birth_control_CLUE %in% c("pill", "none / condoms"))
+j = sample(j, min(length(j),sample_size))
+cycles_training_set = cycles[j , ]
+cycles_training_set$birth_control_CLUE = factor(as.character(cycles_training_set$birth_control_CLUE), levels = c("pill", "none / condoms"))
+
+# fit
+tic()
+eval(parse(text = paste0("svm_fit = alphasvm(birth_control_CLUE ~ ",paste(inputs, collapse = " + "),", 
+                         data = cycles_training_set , 
+                         probability = TRUE)")))
+tac(chunck_name = "data_prep_BC_re_class svm training")
+summary(svm_fit)
+save(svm_fit, file = paste0(IO$tmp_data, "svm_fit.Rdata"))
+```
+
+The SVM training scales as $O(n^2)$.
+
+
+
+
+
+```{r data_prep_BC_re_class svm predictions, warning=FALSE}
+
+# prediction
+cycles$SVM_prob = NA
+j = 1:nrow(cycles)
+#j = which(cycles$user_id %in% unique(cycles$user_id)[1:1000])
+
+tic()
+SVM_prob = predict(svm_fit, newdata = cycles[j,inputs], decision.value = TRUE, probability = TRUE)
+tac(chunck_name = "data_prep_BC_re_class svm predictions")
+SVM_prob_p = attr(SVM_prob, "probabilities")
+head(SVM_prob_p, 20)
+
+cycles$SVM_prob[j] = SVM_prob_p[,which(colnames(SVM_prob_p) == "pill")]
+
+```
+The SVM prediction scales as $O(n)$.
+
+
+```{r data_prep_BC_re_class save svm}
+save(cycles, file = paste0(IO$tmp_data, "cycles_SVM.Rdata"))
+```
+
+
+```{r data_prep_BC_re_class checks, fig.height=10, fig.width=7 }
+
+load(paste0(IO$tmp_data,"cycles_glm.Rdata"), verbose = TRUE)
+colnames(cycles)
+
+
+ggplot(cycles[sample(1:nrow(cycles),10000),], aes(x = SVM_prob, y = glm_prob, col = birth_control_CLUE))+
+  geom_point(alpha = 0.3)
+
+ggplot(cycles, aes(x = SVM_prob,fill = birth_control_CLUE))+
+  geom_histogram(position ="identity", binwidth = 0.01)+facet_grid(birth_control_CLUE~.)
+
+ggplot(cycles, aes(x = glm_prob,fill = birth_control_CLUE))+
+  geom_histogram(position ="identity", binwidth = 0.01)+facet_grid(birth_control_CLUE~.)
+
+
+by = 0.001
+h_pill = hist(cycles$prob[(cycles$birth_control_CLUE == "pill")], breaks = seq(0-by/2,1+by/2,by = by), plot = TRUE)
+h_nc = hist(cycles$prob[(cycles$birth_control_CLUE != "pill")], breaks = seq(0-by/2,1+by/2,by = by), plot = TRUE)
+
+h_pill = data.frame(mids = h_pill$mids, density = h_pill$density*by)
+h_nc = data.frame(mids = h_nc$mids, density = h_nc$density*by)
+
+h_pill$density_corrected = h_pill$density * 1 
+h_nc$density_corrected = h_nc$density * 1
+
+
+g_pill = ggplot(h_pill, aes(x = mids, y = density) )+ 
+  geom_line(col = "blue")+
+  geom_line(aes(y = density_corrected), col = "red") + 
+  xlab("prob") + ylab("density")+
+  ggtitle("pill prob density")
+
+g_nc = ggplot(h_nc, aes(x = mids, y = density) )+ 
+  geom_line(col = "blue")+
+  geom_line(aes(y = density_corrected), col = "red") + 
+  xlab("prob") + ylab("density")+
+  ggtitle("none/condoms prob density")
+
+grid.arrange(g_pill, g_nc)
+
+
+sub_cycles = cycles[cycles$user_id %in% unique(cycles$user_id)[1:80],]
+sub_cycles$user_id_n = factor(sub_cycles$user_id_n, levels = unique(sub_cycles$user_id_n[order(sub_cycles$birth_control_CLUE)]))
+
+g_svm = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = SVM_prob)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+theme(legend.position="right")
+
+grid.arrange(g_svm, nrow = 1)
+
+rm(sub_cycles,g_svm)
+
+
+sub_cycles = cycles[cycles$user_id %in% unique(cycles$user_id)[1:80],]
+sub_cycles$user_id_n = factor(sub_cycles$user_id_n, levels = unique(sub_cycles$user_id_n[order(sub_cycles$birth_control_CLUE)]))
+
+g_glm = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = glm_prob)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+theme(legend.position="right")
+
+grid.arrange(g_glm, nrow = 1)
+
+rm(sub_cycles,g_glm)
+
+
+
+
+
+```
 
 
 
