@@ -43,7 +43,7 @@ output:
 ```
 
 
-```{r child = '_data_prep_BC_input_variables', cache=TRUE}
+```{r child = '_data_prep_BC_input_variables.Rmd', cache=TRUE}
 ```
 
 
