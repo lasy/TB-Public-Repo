@@ -115,9 +115,6 @@ if(length(j)>0){cycles = cycles[,-j]}
 
 We only train on cycles of users that indicated `pill`, `none` or `condoms` and exclude users that `did not enter` their birth control in the settings.
 
-We use a balanced subset of  `r sample_size` cycles, selected randomly, to train the model.
-
-
 
 ```{r data_prep_BC_re_class logistic regression subset size}
 subset_perc = 100
@@ -128,6 +125,11 @@ min_sample_size = min(1000, 2*sample_number_each_BC)
 sample_size = max(sample_size, min_sample_size)
 sample_size
 ```
+
+
+We use a balanced subset of  `r sample_size` cycles, selected randomly, to train the model.
+
+
 
 
 ```{r data_prep_BC_re_class logistic regression}
