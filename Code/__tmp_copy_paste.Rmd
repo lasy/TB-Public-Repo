@@ -394,4 +394,8 @@ save(s_cycles, file = paste0(IO$tmp_data, "generated_cycles.Rdata"))
 
 
 
+```{r}
+head(cycles[(cycles$user_id_n == 78),c("user_id_n","cycle_nb","prob","conf","BC_hmm_init", "ok","longest_stretch")], 200)
+
+```
 

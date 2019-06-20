@@ -532,13 +532,6 @@ rm(sub_cycles, g_BC, g_prob, g_vit_init, g_conf)
 ```
 
 
-```{r}
-head(cycles[(cycles$user_id_n == 78),c("user_id_n","cycle_nb","prob","conf","BC_hmm_init", "ok","longest_stretch")], 200)
-
-```
-
-
-
 
 
 ```{r data_prep_BC_re_class vizualization of final labels valid transition, fig.height= 9, fig.width=14}
