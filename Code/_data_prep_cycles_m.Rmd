@@ -15,12 +15,12 @@ output:
 
 
 
-```{r _data_prep_cycles_m librairies and stuff, include = FALSE, eval = TRUE}
+```{r data_prep_cycles_m librairies and stuff, include = FALSE, eval = TRUE}
 source("Scripts/00_setup.R")
 ```
 
 
-```{r _data_prep_cycles_m setup, include=FALSE}
+```{r data_prep_cycles_m setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 options(scipen=999)
 ```
@@ -33,7 +33,7 @@ With users and BC attributes.
 ### loading data
 
 
-```{r _data_prep_cycles_m Loading reclassified cycles}
+```{r data_prep_cycles_m Loading reclassified cycles}
 load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
 load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 ```
@@ -41,7 +41,7 @@ load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 
 ### Days
 
-```{r _data_prep_cycles_m creating the cycle_m tables from days}
+```{r data_prep_cycles_m creating the cycle_m tables from days}
 
 days_folder = paste0(IO$output_data,"days/")
 filenames = list.files(days_folder)
@@ -84,7 +84,7 @@ stopImplicitCluster()
 ```
 
 
-```{r _data_prep_cycles_m add columns}
+```{r data_prep_cycles_m add columns}
 
 
 m = match(cycles_m$cycle_id_m, cycles$cycle_id)
@@ -106,7 +106,7 @@ if(length(j)>0){ cycles_m = cycles_m[, -j]}
 ```
 
 
-```{r _data_prep_cycles_m save}
+```{r data_prep_cycles_m save}
 
 save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
 file.copy(from = paste0(IO$output_data, "cycles_m.Rdata"), to = paste0(IO$tmp_data, "cycles_m_first_version.Rdata"), overwrite = TRUE)
