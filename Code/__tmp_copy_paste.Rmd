@@ -399,3 +399,119 @@ head(cycles[(cycles$user_id_n == 78),c("user_id_n","cycle_nb","prob","conf","BC_
 
 ```
 
+
+
+
+
+```{r}
+load("../../TB-Restricted-Access-Repo/stuff_from_sherlock/cycles_BC_re_classification_final.Rdata", verbose = TRUE)
+cycles_full = cycles
+cycles = cycles_full[which(cycles_full$user_id_n %in% unique(cycles_full$user_id_n)[1:6000]),]
+
+cycles_sherlock = cycles
+
+plot(cycles$prob, cycles_sherlock$prob, pch = 16, cex = 0.1)
+max(abs(cycles$prob- cycles_sherlock$prob))
+
+cont_table = table(cycles$BC_hmm_init, cycles_sherlock$BC_hmm_init)
+round(cont_table/apply(cont_table,1,sum)*100, 2)
+
+
+cycles_sherlock[cycles_sherlock$user_id_n == 78, c("user_id","cycle_nb","prob","BC_hmm_init")]
+cycles[cycles$user_id_n == 78, c("user_id","cycle_nb","prob","BC_hmm_init")]
+
+
+
+```
+
+### Adding memory with an HMM
+
+![](../Figures Tables Media/Media/cycle_classification_hmm_states_4 states HMM.png)
+
+Model initialisation:
+
+
+```{r data_prep_BC_re_class hmm: model initialization}
+hmm = list()
+
+# defining model
+hmm$bc_states = c("none / condoms","pill","X-nc", "X-pill","X-did-not-enter") # we split the state X into 3 sub-states to account for the on-boarding BC info of a given user
+hmm$symbols = c(paste0("p_",0:10),"X-nc","X-pill","X-did-not-enter")
+
+#initializing model
+
+bc_emission_prob.N = c(dbeta(seq(0,1,by = 0.1), shape1 = 1 , shape2 = 3)+0.2,0,0,0) # more likely to observe LOW score for N/C
+bc_emission_prob.P = c(dbeta(seq(0,1,by = 0.1), shape1 = 3 , shape2 = 1)+0.2,0,0,0) # more likely to observe HIGH score for pill
+bc_emission_prob.Xnc = c(rep(0,11),1,0,0) # we only observe Xs when we switch users
+bc_emission_prob.Xpill = c(rep(0,11),0,1,0) # we only observe Xs when we switch users
+bc_emission_prob.Xdne = c(rep(0,11),0,0,1) # we only observe Xs when we switch users
+
+plot(seq(0,1,by = 0.1) , bc_emission_prob.N[1:11], type = "l", col = cols$NC, lwd = 2)
+points(seq(0,1,by = 0.1) , bc_emission_prob.P[1:11], type = "l", col = cols$pill, lwd = 2)
+
+
+# building and normalizing emission prob matrix
+hmm$bc_emission_prob = matrix(c(bc_emission_prob.N,bc_emission_prob.P, bc_emission_prob.Xnc, bc_emission_prob.Xpill,bc_emission_prob.Xdne),nrow = length(hmm$bc_states), ncol = length(hmm$symbols), byrow = TRUE)
+hmm$bc_emission_prob = hmm$bc_emission_prob/apply(hmm$bc_emission_prob, 1, sum)
+
+rm(bc_emission_prob.N,bc_emission_prob.P,bc_emission_prob.Xnc, bc_emission_prob.Xpill)
+
+
+hmm$start_prob_declared = 0.6  #probability to start in the declared BC
+hmm$p_stay_in_same = 0.90 # probability to stay in the same BC
+hmm$p_exit = 0.01 # probability to switch to one of the X- states
+hmm$bc_transition_prob = matrix(
+  c( hmm$p_stay_in_same , 1 - hmm$p_stay_in_same- 3*hmm$p_exit , rep(hmm$p_exit,3),
+     1 - hmm$p_stay_in_same - 3*hmm$p_exit , hmm$p_stay_in_same, rep(hmm$p_exit,3),
+     hmm$start_prob_declared, 1-hmm$start_prob_declared,0,0,0,
+     1-hmm$start_prob_declared, hmm$start_prob_declared,0,0,0,
+     0.5, 0.5, 0,0,0), 
+  nrow = length(hmm$bc_states), ncol = length(hmm$bc_states), byrow = TRUE)
+
+hmm$start_prob = c(hmm$start_prob_declared,1-hmm$start_prob_declared, 0.5)[as.numeric(cycles$birth_control_CLUE[1])]
+hmm$start_prob = c(hmm$start_prob, 1 - hmm$start_prob, 0,0,0)
+
+hmm_mod = initHMM(
+  States =  hmm$bc_states, Symbols =  hmm$symbols, 
+  startProbs =  hmm$start_prob, transProbs =  hmm$bc_transition_prob, 
+  emissionProbs =  hmm$bc_emission_prob)
+
+```
+
+
+
+Observations:
+
+```{r data_prep_BC_re_class hmm with fit - observations are probabilities}
+
+obs_p =  paste0("p_",round(10*cycles$prob))
+
+# inserting Xs
+x = which(diff(cycles$user_id_n) !=0) 
+obs_x = c("X-nc","X-pill","X-did-not-enter")[as.numeric(cycles$birth_control_CLUE)]
+id = c(seq_along(obs_p)*10, 10*x+5)
+o = order(id)
+obs = c(obs_p, obs_x)[o]
+
+rm(x, id, o, obs_p, obs_x)
+
+```
+
+
+
+Estimating most likely BC for each cycle using the Viterbi algorithm:
+
+
+
+
+```{r data_prep_BC_re_class viterbi on init model}
+# running viterbi
+tic()
+vit_init = viterbi(hmm = hmm_mod, obs = obs) 
+tac(chunck_name = "data_prep_BC_re_class viterbi on init model")
+
+vit_init_no_x = vit_init[-grep("X-",vit_init)]
+cycles$BC_hmm_init = vit_init_no_x
+
+rm(vit_init, vit_init_no_x, hmm_mod, obs)
+```

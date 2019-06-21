@@ -91,10 +91,13 @@ inputs
 for(input in inputs[-which(inputs == "cycle_start")]){
   if(input %in% colnames(cycles)){
     eval(parse(text = paste0("cycles$v = cycles$",input)))
-    g =  ggplot(cycles, aes(x = v, col = birth_control_CLUE)) + geom_freqpoly(aes(y = ..density..),binwidth = 1) +
+    range_v = diff(quantile(cycles$v,p = c(0.1,0.9)))
+    if(range_v>=5){binwidth = 1}else{binwidth = range_v/10}
+    g =  ggplot(cycles, aes(x = v, col = birth_control_CLUE)) + 
+      geom_freqpoly(aes(y = ..density..),binwidth = binwidth) +
       ggtitle(input) +
       scale_color_manual(values = c(cols$BC,"gray")) + 
-      xlim(quantile(cycles$v,p = c(0.005,0.98), na.rm = TRUE)+c(-1,1))
+      xlim(quantile(cycles$v,p = c(0.005,0.98), na.rm = TRUE)+c(-2*binwidth,2*binwidth))
     print(g)
   }else{print(paste0(input," is not in cycles\n"))}
 }
@@ -218,7 +221,7 @@ rm(sub_cycles,g)
 
 ### Adding memory with an HMM
 
-![](../Figures Tables Media/Media/cycle_classification_hmm_states_4 states HMM.png)
+![](../Figures Tables Media/Media/cycle_classification_hmm_states_2 states HMM.png)
 
 Model initialisation:
 
@@ -227,41 +230,32 @@ Model initialisation:
 hmm = list()
 
 # defining model
-hmm$bc_states = c("none / condoms","pill","X-nc", "X-pill","X-did-not-enter") # we split the state X into 3 sub-states to account for the on-boarding BC info of a given user
-hmm$symbols = c(paste0("p_",0:10),"X-nc","X-pill","X-did-not-enter")
+hmm$bc_states = c("none / condoms","pill") # hidden states
+hmm$symbols = c(paste0("p_",0:10)) # observations
 
 #initializing model
 
-bc_emission_prob.N = c(dbeta(seq(0,1,by = 0.1), shape1 = 1 , shape2 = 3)+0.2,0,0,0) # more likely to observe LOW score for N/C
-bc_emission_prob.P = c(dbeta(seq(0,1,by = 0.1), shape1 = 3 , shape2 = 1)+0.2,0,0,0) # more likely to observe HIGH score for pill
-bc_emission_prob.Xnc = c(rep(0,11),1,0,0) # we only observe Xs when we switch users
-bc_emission_prob.Xpill = c(rep(0,11),0,1,0) # we only observe Xs when we switch users
-bc_emission_prob.Xdne = c(rep(0,11),0,0,1) # we only observe Xs when we switch users
+bc_emission_prob.N = c(dbeta(seq(0,1,by = 0.1), shape1 = 1 , shape2 = 3)+0.2) # more likely to observe LOW score for N/C
+bc_emission_prob.P = c(dbeta(seq(0,1,by = 0.1), shape1 = 3 , shape2 = 1)+0.2) # more likely to observe HIGH score for pill
 
-plot(seq(0,1,by = 0.1) , bc_emission_prob.N[1:11], type = "l", col = cols$NC, lwd = 2)
-points(seq(0,1,by = 0.1) , bc_emission_prob.P[1:11], type = "l", col = cols$pill, lwd = 2)
+plot(seq(0,1,by = 0.1) , bc_emission_prob.N, type = "l", col = cols$NC, lwd = 2)
+points(seq(0,1,by = 0.1) , bc_emission_prob.P, type = "l", col = cols$pill, lwd = 2)
 
 
 # building and normalizing emission prob matrix
-hmm$bc_emission_prob = matrix(c(bc_emission_prob.N,bc_emission_prob.P, bc_emission_prob.Xnc, bc_emission_prob.Xpill,bc_emission_prob.Xdne),nrow = length(hmm$bc_states), ncol = length(hmm$symbols), byrow = TRUE)
+hmm$bc_emission_prob = matrix(c(bc_emission_prob.N,bc_emission_prob.P),nrow = length(hmm$bc_states), ncol = length(hmm$symbols), byrow = TRUE)
 hmm$bc_emission_prob = hmm$bc_emission_prob/apply(hmm$bc_emission_prob, 1, sum)
 
-rm(bc_emission_prob.N,bc_emission_prob.P,bc_emission_prob.Xnc, bc_emission_prob.Xpill)
+rm(bc_emission_prob.N,bc_emission_prob.P)
 
 
-hmm$start_prob_declared = 0.6  #probability to start in the declared BC
 hmm$p_stay_in_same = 0.90 # probability to stay in the same BC
-hmm$p_exit = 0.01 # probability to switch to one of the X- states
 hmm$bc_transition_prob = matrix(
-  c( hmm$p_stay_in_same , 1 - hmm$p_stay_in_same- 3*hmm$p_exit , rep(hmm$p_exit,3),
-     1 - hmm$p_stay_in_same - 3*hmm$p_exit , hmm$p_stay_in_same, rep(hmm$p_exit,3),
-     hmm$start_prob_declared, 1-hmm$start_prob_declared,0,0,0,
-     1-hmm$start_prob_declared, hmm$start_prob_declared,0,0,0,
-     0.5, 0.5, 0,0,0), 
+  c( hmm$p_stay_in_same , 1 - hmm$p_stay_in_same,
+     1 - hmm$p_stay_in_same , hmm$p_stay_in_same), 
   nrow = length(hmm$bc_states), ncol = length(hmm$bc_states), byrow = TRUE)
 
-hmm$start_prob = c(hmm$start_prob_declared,1-hmm$start_prob_declared, 0.5)[as.numeric(cycles$birth_control_CLUE[1])]
-hmm$start_prob = c(hmm$start_prob, 1 - hmm$start_prob, 0,0,0)
+hmm$start_prob = c(1/2,1/2) 
 
 hmm_mod = initHMM(
   States =  hmm$bc_states, Symbols =  hmm$symbols, 
@@ -275,32 +269,26 @@ hmm_mod = initHMM(
 Observations:
 
 ```{r data_prep_BC_re_class hmm with fit - observations are probabilities}
-
-obs_p =  paste0("p_",round(10*cycles$prob))
-
-# inserting Xs
-x = which(diff(cycles$user_id_n) !=0) 
-obs_x = c("X-nc","X-pill","X-did-not-enter")[as.numeric(cycles$birth_control_CLUE)]
-id = c(seq_along(obs_p)*10, 10*x+5)
-o = order(id)
-obs = c(obs_p, obs_x)[o]
-
-rm(x, id, o, obs_p, obs_x)
-
+obs =  paste0("p_",round(10*cycles$prob))
 ```
 
 
 
 Estimating most likely BC for each cycle using the Viterbi algorithm:
 
+
+
+
 ```{r data_prep_BC_re_class viterbi on init model}
+
+my_viterbi = function(obs = obs){viterbi(hmm = hmm_mod, obs = obs)}
+
 # running viterbi
 tic()
-vit_init = viterbi(hmm = hmm_mod, obs = obs) 
+vit_init = ave(obs, cycles$user_id, FUN = my_viterbi)
 tac(chunck_name = "data_prep_BC_re_class viterbi on init model")
 
-vit_init_no_x = vit_init[-grep("X-",vit_init)]
-cycles$BC_hmm_init = vit_init_no_x
+cycles$BC_hmm_init = vit_init
 
 rm(vit_init, vit_init_no_x, hmm_mod, obs)
 ```
@@ -327,12 +315,12 @@ sub_cycles = cycles[cycles$user_id %in% unique(cycles$user_id)[1:80],]
 sub_cycles$user_id_n = factor(sub_cycles$user_id_n, levels = unique(sub_cycles$user_id_n[order(sub_cycles$birth_control_CLUE)]))
 
 
-g_vit_init = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_init)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC)
-g_prob = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = prob)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position="top")
+g_vit_init = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = BC_hmm_init)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y") + theme(legend.position="top")+ scale_color_manual(values = cols$BC)+guides(col = FALSE)
+g_prob = ggplot(sub_cycles, aes(x = cycle_nb, y = user_id_n, col = prob)) + geom_point() + facet_grid(birth_control_CLUE ~ ., scale = "free_y")+ scale_color_gradient2(low = cols$NC, high = cols$pill, mid = "gray90", midpoint = 0.5)+ theme(legend.position="top")+guides(col = FALSE)
 
 grid.arrange(g_vit_init, g_prob, nrow = 1)
 
-rm(sub_cy, g_prob, g_vit_init)
+rm(sub_cycles, g_prob, g_vit_init)
 
 ```
 
