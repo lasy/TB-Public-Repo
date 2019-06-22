@@ -231,7 +231,7 @@ tic()
 cl = makeCluster(min(par$n_cores, length(filenames)), outfile="")
 registerDoParallel(cl)
 foreach(file = filenames) %dopar%{define_menstruation_centered_cycles(file = file)}
-stopImplicitCluster(cl)
+stopCluster(cl)
 tac(chunck_name = "data_prep_cycle_id define menstruation-centered cycle_id")
 
 ```
