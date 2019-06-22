@@ -184,7 +184,7 @@ foreach(filename = filenames) %dopar%
   days = days[days$cycle_id %in% cycle_ids,]
   
   # augmenting days with users and cycles characteristics
-  days$BC = cycles$BC[match(days$cycle_id, cycles$cycle_id)]
+  days$BC = cycles_BC$BC[match(days$cycle_id, cycles_BC$cycle_id)]
   m = match(days$user_id, users$user_id)
   days$age = users$age[m]
   days$country = users$country[m]
