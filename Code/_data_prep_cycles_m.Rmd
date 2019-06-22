@@ -41,16 +41,10 @@ load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 
 ### Days
 
-```{r data_prep_cycles_m creating the cycle_m tables from days}
 
-days_folder = paste0(IO$output_data,"days/")
-filenames = list.files(days_folder)
+```{r data_prep_cycles_m creating the cycle_m tables from days - function}
 
-cl = makeCluster(par$n_cores)
-registerDoParallel(cl)
-
-cycles_m = foreach(filename = filenames, .combine = rbind, .packages = c('plyr','dplyr')) %dopar%
-{
+create_cycle_m = function(filename = filename){
   cat(filename,"\n")
   load(paste0(days_folder, filename), verbose = TRUE)
   
@@ -77,9 +71,25 @@ cycles_m = foreach(filename = filenames, .combine = rbind, .packages = c('plyr',
                         n_days_obs_foll_Df = lu(cycleday_m_D_foll_Df[!is.na(cycleday_m_D_foll_Df)])
   )
   return(this_cycles_m)
-
+  
 }
+```
+
+
+
+```{r data_prep_cycles_m creating the cycle_m tables from days}
+
+days_folder = paste0(IO$output_data,"days/")
+filenames = list.files(days_folder)
+
+tic()
+cl = makeCluster(min(par$n_cores, length(filenames)), outfile="")
+registerDoParallel(cl)
+
+cycles_m = foreach(filename = filenames, .combine = rbind, .packages = c('plyr','dplyr')) %dopar% {create_cycle_m(filename = filename)}
+
 stopImplicitCluster()
+tac(chunck_name = "data_prep_cycles_m creating the cycle_m tables from days")
 
 ```
 
