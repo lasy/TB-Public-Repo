@@ -12,5 +12,6 @@ Tender_breasts_ANALYSIS.html
 #ignore compiled modified cluster package
 cluster_*.tar.gz
 
-
+# ignore DS_store files
+*.DS_Store
 
