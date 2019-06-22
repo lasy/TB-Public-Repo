@@ -155,7 +155,7 @@ par$D
 define_menstruation_centered_cycles = function(file = file, par = par){
   cat(file,"\n")
   load(paste0(input_days_folder,file), verbose = TRUE)
-  cat(dim(days),"\n")
+  cat(file," : ",dim(days),"\n")
   
   # cycle id and cycle number
   
@@ -206,10 +206,9 @@ define_menstruation_centered_cycles = function(file = file, par = par){
   
   rm(agg, m1, m2)
   
-  cat(dim(days),"\n")
+  cat(file," : ",dim(days),"\n")
   save(days, file = paste0(output_days_folder,file))
-  rm(days)
-  
+  cat(file," : done\n")
 }
 
 
@@ -218,9 +217,6 @@ define_menstruation_centered_cycles = function(file = file, par = par){
 
 
 ```{r data_prep_cycle_id define menstruation-centered cycle_id, eval = TRUE}
-tic()
-
-
 
 #input
 input_days_folder = paste0(IO$tmp_data,"days_with_cycle_ids/")
@@ -231,13 +227,13 @@ output_days_folder = paste0(IO$tmp_data,"days_with_m_centered_cycle_ids/")
 if(dir.exists(output_days_folder)){unlink(output_days_folder, recursive = TRUE)}
 dir.create(output_days_folder)
 
-
+tic()
 cl = makeCluster(min(par$n_cores, length(filenames)), outfile="")
 registerDoParallel(cl)
 foreach(file = filenames) %dopar%{define_menstruation_centered_cycles(file = file)}
 stopImplicitCluster()
-
 tac(chunck_name = "data_prep_cycle_id define menstruation-centered cycle_id")
+
 ```
 
 
