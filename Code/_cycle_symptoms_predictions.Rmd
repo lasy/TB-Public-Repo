@@ -34,6 +34,7 @@ dim(cycles_m)
 
 load(paste0(IO$output_data,"cycles.Rdata"), verbose = TRUE)
 colnames(cycles)
+dim(cycles)
 ```
 
 
@@ -53,6 +54,8 @@ for(column in colnames(d_wide[,-1])){
 }
 
 d_wide_full = rbind(d_wide, d_wide_empty)
+
+dim(d_wide_empty)
 ```
 
 
