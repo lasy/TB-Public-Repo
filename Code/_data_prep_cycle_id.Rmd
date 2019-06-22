@@ -64,7 +64,7 @@ add_cycles_to_day_table = function(filename = filename){
   cycles_sub = cycles[j,]
   
   # expand cycles for each day
-  cycles_sub_exp = as.data.frame(lapply(cycles_sub, rep, cycles_sub$cycle_length))
+  cycles_sub_exp = as.data.frame(lapply(cycles_sub, rep, cycles_sub$cycle_length), stringsAsFactors = FALSE)
   cycles_sub_exp$cycleday = ave(rep(1,nrow(cycles_sub_exp)), cycles_sub_exp$cycle_id, FUN =cumsum)
   cycles_sub_exp$date = cycles_sub_exp$cycle_start + (cycles_sub_exp$cycleday - 1)
   cycles_sub_exp$day_id = paste0(cycles_sub_exp$user_id, "_", cycles_sub_exp$date)
@@ -152,17 +152,17 @@ par$D
 
 ```{r data_prep_cycle_id define menstruation-centered cycle_id - function}
 
-define_menstruation_centered_cycles = function(file = "", param = par){
+define_menstruation_centered_cycles = function(file = ""){
   cat(file,"\n")
   load(paste0(input_days_folder,file), verbose = TRUE)
   cat(file," - dim init : ",dim(days),"\n")
   
   # cycle id and cycle number
   
-  days$cycle_id_m = days$cycle_id
+  days$cycle_id_m = as.character(days$cycle_id)
   days$cycle_nb_m = days$cycle_nb
   
-  end.j = which(days$cycleday_from_end >= -param$D)
+  end.j = which(days$cycleday_from_end >= -par$D)
   days$cycle_id_m[end.j] = paste0(days$user_id[end.j],"_",days$cycle_nb[end.j]+1)
   days$cycle_nb_m[end.j] = days$cycle_nb[end.j]+1
   
@@ -173,7 +173,7 @@ define_menstruation_centered_cycles = function(file = "", param = par){
   days$cycleday_m = days$cycleday-1
   days$cycleday_m_D = NA
   
-  j.start = which((days$cycle_id_m == days$cycle_id) & (days$cycleday_m <= param$Df))
+  j.start = which((days$cycle_id_m == days$cycle_id) & (days$cycleday_m <= par$Df))
   days$cycleday_m_D[j.start] = days$cycleday[j.start]-1
   
   j.end = which(days$cycle_id_m != days$cycle_id)
@@ -231,7 +231,7 @@ tic()
 cl = makeCluster(min(par$n_cores, length(filenames)), outfile="")
 registerDoParallel(cl)
 foreach(file = filenames) %dopar%{define_menstruation_centered_cycles(file = file)}
-stopImplicitCluster()
+stopImplicitCluster(cl)
 tac(chunck_name = "data_prep_cycle_id define menstruation-centered cycle_id")
 
 ```
@@ -243,7 +243,7 @@ copy_days_tmp2out(output_days_folder)
 
 
 
-```{r define checking menstruation-centered cycle_id, eval = TRUE}
+```{r data_prep_cycle_id checking menstruation-centered cycle_id, eval = TRUE}
 
 filenames = list.files(output_days_folder)
 load(paste0(output_days_folder, filenames[length(filenames)]), verbose = TRUE)
