@@ -52,29 +52,14 @@ file.copy(paste0(IO$output_data,"cycles.Rdata"),paste0(IO$tmp_data,"cycles_after
 ### Linking the days with the cycles
 
 
-```{r data_prep_cycle_id linking the days with the cycles}
 
-tic()
+```{r data_prep_cycle_id linking the days with the cycles - functions}
 
-#input
-input_days_folder = paste0(IO$tmp_data,"days_with_n_logs/")
-filenames = list.files(input_days_folder)
-
-#output
-output_days_folder = paste0(IO$tmp_data,"days_with_cycle_ids/")
-if(dir.exists(output_days_folder)){unlink(output_days_folder, recursive = TRUE)}
-dir.create(output_days_folder)
-
-
-cl = makeCluster(min(length(filenames),par$n_cores), outfile="")
-registerDoParallel(cl)
-
-foreach(filename = filenames) %dopar% 
-{
+add_cycles_to_day_table = function(filename = filename){
   cat(filename,"\n")
   load(paste0(input_days_folder, filename), verbose = TRUE)
   
-   # take the part of cycles that matches with the days users
+  # take the part of cycles that matches with the days users
   j = which(cycles$user_id %in% unique(days$user_id))
   cycles_sub = cycles[j,]
   
@@ -95,15 +80,37 @@ foreach(filename = filenames) %dopar%
   days$cycleday_from_end = days$cycleday - days$cycle_length - 1
   
   cat(filename, " : days table has cycle_id \n")
-
+  
   save(days, file = paste0(output_days_folder, filename))
   cat(filename, " : days table saved \n")
 }
 
+```
+
+
+
+```{r data_prep_cycle_id linking the days with the cycles}
+
+#input
+input_days_folder = paste0(IO$tmp_data,"days_with_n_logs/")
+filenames = list.files(input_days_folder)
+
+#output
+output_days_folder = paste0(IO$tmp_data,"days_with_cycle_ids/")
+if(dir.exists(output_days_folder)){unlink(output_days_folder, recursive = TRUE)}
+dir.create(output_days_folder)
+
+
+tic()
+cl = makeCluster(min(length(filenames),par$n_cores), outfile="")
+registerDoParallel(cl)
+foreach(filename = filenames) %dopar% {add_cycles_to_day_table(filename = filename)}
 stopCluster(cl)
 tac()
 
 ```
+
+
 ```{r data_prep_cycle_id copying days in tmp folder}
 copy_days_tmp2out(output_days_folder)
 ```
@@ -149,7 +156,7 @@ define_menstruation_centered_cycles = function(file = file, par = par){
   cat(file,"\n")
   load(paste0(input_days_folder,file), verbose = TRUE)
   cat(dim(days),"\n")
- 
+  
   # cycle id and cycle number
   
   days$cycle_id_m = days$cycle_id
@@ -202,7 +209,7 @@ define_menstruation_centered_cycles = function(file = file, par = par){
   cat(dim(days),"\n")
   save(days, file = paste0(output_days_folder,file))
   rm(days)
-
+  
 }
 
 
@@ -246,6 +253,6 @@ filenames = list.files(output_days_folder)
 load(paste0(output_days_folder, filenames[length(filenames)]), verbose = TRUE)
 summary(days)
 head(days)
-  
+
 head(days[days$cycle_nb == 2, ])
 ```
