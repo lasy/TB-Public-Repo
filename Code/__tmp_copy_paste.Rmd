@@ -7,6 +7,36 @@ output: html_document
 
 
 
+
+
+```{r child = '_users_description.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_cycle_clustering.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_pill_transition_analysis.Rmd', cache=TRUE}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+######################
+
+
 ```{r user_filt create tmp tracking dir}
 
 raw_batches_folder = paste0(IO$tmp_data,"tracking_raw_batches/")

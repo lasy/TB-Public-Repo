@@ -68,8 +68,14 @@ create_cycle_m = function(filename = filename){
                         n_obs = sum(number * (type == "n_logs"), na.rm = TRUE),
                         n_days_obs_lut_D = lu(cycleday_m_D_lut_D[!is.na(cycleday_m_D_lut_D)]),
                         n_days_obs_lut_7 = lu(cycleday_m_D_lut_7[!is.na(cycleday_m_D_lut_7)]),
-                        n_days_obs_foll_Df = lu(cycleday_m_D_foll_Df[!is.na(cycleday_m_D_foll_Df)])
+                        n_days_obs_foll_Df = lu(cycleday_m_D_foll_Df[!is.na(cycleday_m_D_foll_Df)]),
+                        n_TB = sum(type == TB),
+                        first_TB = min(cycleday_m_D[type == TB], na.rm = TRUE),
+                        last_TB = max(cycleday_m_D[type == TB], na.rm = TRUE)
   )
+  this_cycles_m$first_TB[is.infinite(this_cycles_m$first_TB)] = NA
+  this_cycles_m$last_TB[is.infinite(this_cycles_m$last_TB)] = NA
+  this_cycles_m$TB_stretch = this_cycles_m$last_TB - this_cycles_m$first_TB + 1
   return(this_cycles_m)
   
 }

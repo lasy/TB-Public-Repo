@@ -16,6 +16,9 @@ output:
 
 # Users description in terms of symptoms occurence, consistenty and evolution
 
+```{r child = '_users_descr_evolution_of_symptoms_with_time.Rmd', cache=TRUE}
+```
+
 
 ```{r child = '_users_descr_average_dist_per_user.Rmd', cache=TRUE}
 ```
@@ -24,7 +27,4 @@ output:
 ```{r child = '_users_descr_selecting_user_examples.Rmd', cache=TRUE}
 ```
  
-
-```{r child = '_users_descr_evolution_of_symptoms_with_time.Rmd', cache=TRUE}
-```
 

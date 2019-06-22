@@ -41,8 +41,24 @@ load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
 ```
 
 
-```{r data_prep_users_agg aggregates from days}
+```{r data_prep_users_agg aggregates from tracking}
 
+# n cycles
+# total cycles from original dataset
+users_agg = aggregate(cycle_id ~ user_id, cycles, lu)
+users$n_cycles_o = users_agg$cycle_id[match(users$user_id,users_agg$user_id)]
+users$n_cycles_o[is.na(users$n_cycles_o )] = 0
+# cycles with ok BC
+users_agg = aggregate(cycle_id ~ user_id, cycles[which(cycles$BC %in% par$BC_dict$name),], lu)
+users$n_cycles = users_agg$cycle_id[match(users$user_id,users_agg$user_id)]
+users$n_cycles[is.na(users$n_cycles )] = 0
+
+# n TB
+users_agg = aggregate(n_TB ~ user_id, cycles[which(cycles$BC %in% par$BC_dict$name),], sum)
+users$n_TB = users_agg$n_TB[match(users$user_id,users_agg$user_id)]
+users$n_TB[is.na(users$n_TB )] = 0
+
+# n cycles with TB
 users_agg = aggregate( cycle_id ~ user_id,cycles[which(cycles$n_TB >0),], lu)
 users$n_cycles_with_TB = users_agg$cycle_id[match(users$user_id,users_agg$user_id)]
 users$n_cycles_with_TB[is.na(users$n_cycles_with_TB )] = 0

@@ -63,15 +63,18 @@ dim(users)
 o = order(cycles_BC$user_id_n, cycles_BC$cycle_nb)
 if(any(unique(diff(o))>1)){cycles_BC = cycles_BC[o,]}
 
+# adding BC
 user_BC_agg = aggregate(BC ~ user_id, cycles_BC[which(cycles_BC$BC %in% par$BC_dict$name),], function(x){paste0(sort(unique(x)), collapse = " - ")})
 user_BC_agg$BC[which(!(user_BC_agg$BC %in% par$BC_dict$name))] = "both"
 users$BC = user_BC_agg$BC[match(users$user_id, user_BC_agg$user_id)]
 users$BC[is.na(users$BC)] = "unclear"
 
+# adding number of stretches
 agg = aggregate(stretch_id ~ user_id, cycles_BC[!is.na(cycles_BC$stretch_id),], lu)
 users$n_stretches = agg$stretch_id[match(users$user_id, agg$user_id)]
 users$n_stretches[is.na(users$n_stretches)] = 0
 
+# adding first and last BC + transition type
 agg = aggregate(BC ~ user_id, cycles_BC[which(cycles_BC$BC %in% par$BC_dict$name),], first)
 users$BC_first = agg$BC[match(users$user_id, agg$user_id)]
 agg = aggregate(BC ~ user_id, cycles_BC[which(cycles_BC$BC %in% par$BC_dict$name),], last)
@@ -82,6 +85,10 @@ users$BC_trans = case_when((users$BC == "unclear") ~ "unknown",
                            (users$BC_first != users$BC_last) & (users$BC_first == "pill") ~ "off pill",
                            (users$BC_first != users$BC_last) & (users$BC_last == "pill") ~ "on pill",
                            TRUE ~ "NA")
+
+# adding # of cycles with BC not "unclear"
+
+users$n_cycles_o
 
 
 ```

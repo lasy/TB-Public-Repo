@@ -30,34 +30,67 @@ options(scipen=999)
 ```{r users_descr_evolution loading cycles_m and users}
 load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 load(paste0(IO$output_data,"cycles_m.Rdata"), verbose=  TRUE)
+```
+
+
+## Selecting regular users that tracked at least 20 cycles and that did not switch BC
+
+
+
+```{r users_descr_evolution user selection}
+
+j = which(
+  (users$n_cycles >= 20) &
+    (users$f_regular_tracking >= 0.75) &
+    (users$BC %in% par$BC_dict$name)
+)
+
+user_ids_users = users$user_id[j]
+
+agg = aggregate(cycle_nb_m ~ user_id, cycles_m, min)
+cycles_m$cycle_nb_m_rel = cycles_m$cycle_nb_m - agg$cycle_nb_m[match(cycles_m$user_id,agg$user_id)]
+
+agg = aggregate(cycle_id_m ~ user_id, cycles_m[cycles_m$cycle_nb_m_rel <= 21,], lu)
+user_ids_cycles_m = agg$user_id[agg$cycle_id_m>=18]
+
+user_ids = intersect(user_ids_users, user_ids_cycles_m)
 
 ```
 
 
-## Selecting consistent and inconsistent users
 
 
-```{r users_descr_evolution prep}
+## Classifying users into "initial TB" groups
 
-cycles_m$most_preval_clust = users$most_preval_clust[match(cycles_m$user_id, users$user_id)]
-cycles_m$most_preval_clust = factor(cycles_m$most_preval_clust, 
-                                      levels = min(cycles_m$cluster_num):max(cycles_m$cluster_num))
 
-load(paste0(IO$tmp_data,"d_wide.Rdata"), verbose = TRUE)
 
-agg = apply(d_wide[,2:ncol(d_wide)], 1, function(x){sum(x == 1)})
-cycles_m$n_TB = agg[match(cycles_m$cycle_id_m, d_wide$cycle_id_m)]
-cycles_m$n_TB[is.na(cycles_m$n_TB )] = 0
+```{r users_descr_evolution classifying users initial TB groups}
 
-save(cycles_m, file = paste0(IO$output_data,"cycles_m.Rdata"))
-file.copy(from = paste0(IO$output_data,"cycles_m.Rdata") , to = paste0(IO$tmp_data,"cycles_m_with_n_TB_and_most_preval_clust.Rdata") , overwrite = TRUE)
-
+agg = aggregate(n_TB ~ user_id, cycles_m[(cycles_m$cycle_nb_m<=6),], mean)
+agg$init_TB_group = cut(agg$n_TB, breaks = c(0, 1, 3, Inf), right = FALSE)
+cycles_m$init_TB_group = agg$init_TB_group[match(cycles_m$user_id, agg$user_id)]
 ```
+
+
+
+
+
+
+```{r users_descr_evolution save cycles_m}
+save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
+file.copy(from = paste0(IO$output_data, "cycles_m.Rdata"), to = paste0(IO$output_data, "cycles_m_with_init_TB_group.Rdata"), overwrite = TRUE)
+```
+
+
+
+
+## Evolution of symptoms in time
+
 
 ```{r users_descr_evolution aggregate}
 
-fraction_TB = ddply(cycles_m[(cycles_m$cycle_nb_m <= 20) & (cycles_m$BC %in% par$BC_dict$name),], 
-                    c("most_preval_clust", "cycle_nb_m", "BC"), 
+fraction_TB = ddply(cycles_m[(cycles_m$cycle_nb_m_rel <= 20) & (cycles_m$user_id %in% user_ids),], 
+                    c("init_TB_group", "cycle_nb_m_rel", "BC"), 
                     summarise,
                     n_cycles = uniqueN(cycle_id_m),
                     avg_n_TB = mean(n_TB, na.rm = TRUE),
@@ -67,30 +100,31 @@ fraction_TB = ddply(cycles_m[(cycles_m$cycle_nb_m <= 20) & (cycles_m$BC %in% par
                     q_25_n_TB = quantile(n_TB, probs = 0.25, na.rm = TRUE),
                     q_75_n_TB = quantile(n_TB, probs = 0.75, na.rm = TRUE),
                     q_95_n_TB = quantile(n_TB, probs = 0.95, na.rm = TRUE)
-                    )
+)
 
-min_n_cycles = aggregate(n_cycles ~ BC + most_preval_clust , fraction_TB, min)
+min_n_cycles = aggregate(n_cycles ~ BC + init_TB_group , fraction_TB, min)
 colnames(min_n_cycles)[which(colnames(min_n_cycles) == "n_cycles" )] = "min_n_cycles"
 
-fraction_TB = fraction_TB[(!is.na(fraction_TB$most_preval_clust)) & (!is.na(fraction_TB$BC)),]
+fraction_TB = fraction_TB[(!is.na(fraction_TB$init_TB_group)) & (!is.na(fraction_TB$BC)),]
 fraction_TB = merge(fraction_TB, min_n_cycles, all = TRUE)
 fraction_TB = fraction_TB[,- which(colnames(fraction_TB) == "n_cycles")]
 
 save(fraction_TB, file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time.Rdata"))
 save(min_n_cycles, file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time_min_n_cycles.Rdata"))
 
-ggplot(fraction_TB, aes(x = cycle_nb_m, y = median_n_TB, col = most_preval_clust, fill = most_preval_clust)) + 
+ggplot(fraction_TB, aes(x = cycle_nb_m_rel, y = median_n_TB, col = init_TB_group, fill = init_TB_group)) + 
   geom_line() + 
   geom_line(aes(y = avg_n_TB), linetype = 3) + 
   geom_ribbon(aes(ymin = q_05_n_TB , ymax = q_95_n_TB), alpha = 0.2, col = NA)+
   geom_ribbon(aes(ymin = q_25_n_TB , ymax = q_75_n_TB), alpha = 0.2, col = NA)+
   geom_text(data = min_n_cycles, aes(label = paste0("min # = ",min_n_cycles)), x = 5, y = 0.95*max(fraction_TB$q_95_n_TB), size = 3, vjust = 0, hjust = 0)+
-  facet_grid(BC  ~ most_preval_clust)+
+  facet_grid(BC  ~ init_TB_group)+
   #scale_color_manual(values = cols$clusters_6) + scale_fill_manual(values = cols$clusters_6)+ 
   guides(col = FALSE, fill = FALSE) +
   xlab("Cycle number") + ylab("# of reported TB")
 
 
 ```
+
 
 
