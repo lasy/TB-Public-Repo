@@ -117,9 +117,24 @@ cycles_m$BC = par$cycles_m$BC_dict$new_value[match(cycles_m$BC_o, par$cycles_m$B
 j = which(colnames(cycles_m) == "BC_o")
 if(length(j)>0){ cycles_m = cycles_m[, -j]}
 
+```
 
+
+
+```{r data_prep_cycles_m size checks}
+
+dim(cycles)
+
+sum(cycles$BC %in% par$BC_dict$name, na.rm = TRUE)
+
+sum(cycles$BC %in% par$BC_dict$name, na.rm = TRUE) - nrow(users)
+
+dim(cycles_m)
 
 ```
+
+
+
 
 
 ```{r data_prep_cycles_m save}
