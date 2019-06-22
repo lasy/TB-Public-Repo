@@ -32,94 +32,118 @@ options(scipen=999)
 ### Loading re-classified cycles
 
 
+```{r data_prep_BC_user_post_filtering Loading reclassified cycles and users}
 
-```{r data_prep_BC_user_post_filtering Loading reclassified cycles}
-
-load(file = paste0(IO$tmp_data,"cycles_BC_re_classification_final.Rdata"), verbose = TRUE)
+load(file = paste0(IO$tmp_data,"cycles_BC_re_classification.Rdata"), verbose = TRUE)
 cycles_BC = cycles
-rm(cycles) # to avoid confusion
+rm(cycles)
 
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+
+
+```
+
+```{r data_prep_BC_user_post_filtering counting users for whom all their cycles are "unclear"}
 cycle_ids = cycles_BC$cycle_id[which(cycles_BC$BC %in% par$BC_dict$name)]
 length(cycle_ids)/nrow(cycles_BC)
 
 user_ids = unique(cycles_BC$user_id[which(cycles_BC$BC %in% par$BC_dict$name)])
 length(user_ids)
 
+dim(users)
 ```
+
+
 
 ### users
 
-```{r data_prep_BC_user_post_filtering loading and filtering users}
-file.copy(paste0(IO$output_data, "users.Rdata"), paste0(IO$tmp_data, "users_before_BC_post_filtering.Rdata"))
-load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
-
-dim(users)
-
-users = users[users$user_id %in% user_ids,]
-dim(users)
-
-```
 
 ```{r data_prep_BC_user_post_filtering adding BC to users}
 
-user_BC_agg = ddply(cycles_BC, c("user_id"), summarise,
-                    BC_rle = paste0(rle(BC)$values, collapse = " - "))
+o = order(cycles_BC$user_id_n, cycles_BC$cycle_nb)
+if(any(unique(diff(o))>1)){cycles_BC = cycles_BC[o,]}
 
-tmp_rle = rle(sort(user_BC_agg$BC_rle))
+user_BC_agg = aggregate(BC ~ user_id, cycles_BC[which(cycles_BC$BC %in% par$BC_dict$name),], function(x){paste0(sort(unique(x)), collapse = " - ")})
+user_BC_agg$BC[which(!(user_BC_agg$BC %in% par$BC_dict$name))] = "both"
+users$BC = user_BC_agg$BC[match(users$user_id, user_BC_agg$user_id)]
+users$BC[is.na(users$BC)] = "unclear"
+
+agg = aggregate(stretch_id ~ user_id, cycles_BC[!is.na(cycles_BC$stretch_id),], lu)
+users$n_stretches = agg$stretch_id[match(users$user_id, agg$user_id)]
+users$n_stretches[is.na(users$n_stretches)] = 0
+
+agg = aggregate(BC ~ user_id, cycles_BC[which(cycles_BC$BC %in% par$BC_dict$name),], first)
+users$BC_first = agg$BC[match(users$user_id, agg$user_id)]
+agg = aggregate(BC ~ user_id, cycles_BC[which(cycles_BC$BC %in% par$BC_dict$name),], last)
+users$BC_last = agg$BC[match(users$user_id, agg$user_id)]
+users$BC_trans = case_when((users$BC == "unclear") ~ "unknown",
+                           (users$BC_first == users$BC_last) & (users$BC != "both") ~ "0",
+                           (users$BC_first == users$BC_last) & (users$BC == "both") ~ "mult",
+                           (users$BC_first != users$BC_last) & (users$BC_first == "pill") ~ "off pill",
+                           (users$BC_first != users$BC_last) & (users$BC_last == "pill") ~ "on pill",
+                           TRUE ~ "NA")
+
+
+```
+
+```{r data_prep_BC_user_post_filtering saving users}
+save(users, file = paste0(IO$output_data, "users.Rdata"))
+file.copy(from = paste0(IO$output_data, "users.Rdata"), to = paste0(IO$tmp_data,"users_with_BC_reclassified.Rdata"), overwrite = TRUE)
+```
+
+
+```{r data_prep_BC_user_post_filtering users statistics}
+table_BC = table(users$BC)
+table_BC
+round(table_BC/sum(table_BC)*100,2)
+
+table_BC = table(users$birth_control, users$BC)
+table_BC
+round(table_BC/apply(table_BC,1,sum)*100,2)
+
+table_stretches = table(users$n_stretches)
+table_stretches
+round(table_stretches/sum(table_stretches)*100,2)
+
+table_BC_trans = table(users$BC_trans)
+table_BC_trans
+round(table_BC_trans/sum(table_BC_trans)*100,2)
+
+```
+
+
+
+
+
+```{r data_prep_BC_user_post_filtering stretches BC transitions}
+
+stretches = aggregate(BC ~ stretch_id, cycles_BC[which(cycles_BC$BC %in% par$BC_dict$name),], function(x){paste0(rle(x)$values, collapse = " - ")})
+
+stretches$BC_o = stretches$BC
+stretches$BC[grep("none / condoms - pill",stretches$BC)] = "on pill"
+stretches$BC[grep("pill - none / condoms",stretches$BC)] = "off pill"
+stretches$BC[grep("pill - none / condoms - pill",stretches$BC)] = "off-on pill"
+stretches$BC[grep("none / condoms - pill - none / condoms",stretches$BC)] = "on-off pill"
+stretches$BC[nchar(stretches$BC) > 38 ] = "mult. trans."
+
+table_BC = table(stretches$BC)
+table_BC
+round(table_BC/sum(table_BC)*100,2)
+
+
+tmp_rle = rle(sort(stretches$BC))
 df = data.frame(categories = tmp_rle$values, n = tmp_rle$lengths)
 rm(tmp_rle)
 df$categories = factor(df$categories, levels = df$categories[order(df$n)])
 ggplot(df, aes(x = categories, y = n)) + geom_bar(stat = "identity") + coord_flip() + geom_text(aes(label = n))
 rm(df)
 
-user_BC_agg$BC = user_BC_agg$BC_rle 
-user_BC_agg$BC[grep("none / condoms - pill",user_BC_agg$BC_rle)] = "on pill"
-user_BC_agg$BC[grep("pill - none / condoms",user_BC_agg$BC_rle)] = "off pill"
-user_BC_agg$BC[grep("pill - none / condoms - pill",user_BC_agg$BC_rle)] = "off-on pill"
-user_BC_agg$BC[grep("none / condoms - pill - none / condoms",user_BC_agg$BC_rle)] = "on-off pill"
-user_BC_agg$BC[nchar(user_BC_agg$BC_rle) > 38 ] = "mult. trans."
-
-m = match(users$user_id, user_BC_agg$user_id)
-users$BC = user_BC_agg$BC[m]
-
-table(users$BC,users$birth_control)
-rm(m,user_BC_agg)
-```
-
-```{r data_prep_BC_user_post_filtering save users}
-
-save(users, file = paste0(IO$tmp_data, "users_after_BC_post_filtering.Rdata"))
-save(users, file = paste0(IO$output_data, "users.Rdata"))
-
 ```
 
 
-
-### cycles
-
-```{r data_prep_BC_user_post_filtering loading and filtering cycles}
-file.copy(paste0(IO$output_data, "cycles.Rdata"), paste0(IO$tmp_data, "cycles_before_BC_post_filtering.Rdata"))
-load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
-
-
-dim(cycles)
-
-cycles= cycles[cycles$cycle_id %in% cycle_ids,]
-
-dim(cycles)
-
-cycles$BC = cycles_BC$BC[match(cycles$cycle_id, cycles_BC$cycle_id)]
-
-table(cycles$BC, cycles$birth_control_CLUE)
-
-
-```
-
-```{r data_prep_BC_user_post_filtering save cycles}
-
-save(cycles, file = paste0(IO$tmp_data, "cycles_after_BC_post_filtering.Rdata"))
-save(cycles, file = paste0(IO$output_data, "cycles.Rdata"))
-
+```{r data_prep_BC_user_post_filtering saving stretches}
+save(stretches, file = paste0(IO$output_data, "stretches.Rdata"))
+file.copy(from = paste0(IO$output_data, "stretches.Rdata"), to = paste0(IO$tmp_data,"stretches.Rdata"), overwrite = TRUE)
 ```
 
 
@@ -155,7 +179,7 @@ foreach(filename = filenames) %dopar%
 {
   cat(filename,"\n")
   load(paste0(days_folder, filename), verbose = TRUE)
-
+  
   #filtering on BC  
   days = days[days$cycle_id %in% cycle_ids,]
   
@@ -170,16 +194,16 @@ foreach(filename = filenames) %dopar%
   # saving full tracking days
   save(days, file = paste0(days_folder_full_tracking, filename))
   file.copy( from = paste0(days_folder_full_tracking, filename), to = paste0(tmp_days_folder_full_tracking, filename))
-
+  
   # only keep pill, TB, period and n_logs
   j = which(days$category %in% c("pill_hbc","n_logs","period","pain"))
   length(j)/nrow(days)
   days = days[j,]
-
+  
   #save days table
   save(days, file = paste0(days_folder, filename))
   file.copy( from = paste0(days_folder, filename), to = paste0(tmp_days_folder, filename))
-
+  
 }
 
 

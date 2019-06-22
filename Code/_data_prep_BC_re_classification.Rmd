@@ -442,6 +442,8 @@ find_stretches = function(x,k = 4){
 
 cycles$long_stretch = ave(cycles$ok, cycles$user_id, FUN = find_stretches)
 cycle_ids_stretch = cycles$cycle_id[which(cycles$long_stretch > 0)]
+# strech id
+cycles$long_stretch[cycles$cycle_id %in% cycle_ids_same] = 1
 cycles$stretch_id = paste0(cycles$user_id,"_",cycles$long_stretch)
 cycles$stretch_id[cycles$long_stretch == 0] = NA
 
@@ -460,21 +462,18 @@ round(table_new_BC/sum(table_new_BC)*100,2)
 table_BC = table(cycles$birth_control_CLUE, cycles$BC)
 table_BC
 round(table_BC/apply(table_BC,1,sum)*100,2)
-
-
 ```
 
 
 
 ```{r data_prep_BC_re_class save last cycles}
-
 # cleaning cycles table
 j = which(colnames(cycles) %in% c("ok","long_stretch"))
 if(length(j)>0){cycles = cycles[,-j]}
 
 #saving
 save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
-file.copy(from = paste0(IO$output_data,"cycles.Rdata"), to = paste0(IO$tmp_data,"cycles_BC_re_classification_final.Rdata"), overwrite = TRUE)
+file.copy(from = paste0(IO$output_data,"cycles.Rdata"), to = paste0(IO$tmp_data,"cycles_BC_re_classification.Rdata"), overwrite = TRUE)
 ```
 
 
@@ -580,6 +579,26 @@ rm(agg)
 
 
 
+
+```{r data_prep_BC_re_class visualization of input variables WITH NEW BC labels}
+# ,"score_n_days_obs","score_BC","score_CL"
+for(input in inputs[-which(inputs == "cycle_start")]){
+  if(input %in% colnames(cycles)){
+    eval(parse(text = paste0("cycles$v = cycles$",input)))
+    range_v = diff(quantile(cycles$v,p = c(0.1,0.9)))
+    if(range_v>=5){binwidth = 1}else{binwidth = range_v/10}
+    g =  ggplot(cycles, aes(x = v, col = BC)) + 
+      geom_freqpoly(aes(y = ..density..),binwidth = binwidth) +
+      ggtitle(input) +
+      scale_color_manual(values = c(cols$BC,"gray")) + 
+      xlim(quantile(cycles$v,p = c(0.005,0.98), na.rm = TRUE)+c(-2*binwidth,2*binwidth))
+    print(g)
+  }else{print(paste0(input," is not in cycles\n"))}
+}
+
+j = which(colnames(cycles)=="v")
+if(length(j)>0){cycles = cycles[,-j]}
+```
 
 
 
