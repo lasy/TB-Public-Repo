@@ -152,7 +152,7 @@ par$D
 
 ```{r data_prep_cycle_id define menstruation-centered cycle_id - function}
 
-define_menstruation_centered_cycles = function(file = file, par = par){
+define_menstruation_centered_cycles = function(file = "", param = par){
   cat(file,"\n")
   load(paste0(input_days_folder,file), verbose = TRUE)
   cat(file," - dim init : ",dim(days),"\n")
@@ -162,7 +162,7 @@ define_menstruation_centered_cycles = function(file = file, par = par){
   days$cycle_id_m = days$cycle_id
   days$cycle_nb_m = days$cycle_nb
   
-  end.j = which(days$cycleday_from_end >= -par$D)
+  end.j = which(days$cycleday_from_end >= -param$D)
   days$cycle_id_m[end.j] = paste0(days$user_id[end.j],"_",days$cycle_nb[end.j]+1)
   days$cycle_nb_m[end.j] = days$cycle_nb[end.j]+1
   
@@ -173,7 +173,7 @@ define_menstruation_centered_cycles = function(file = file, par = par){
   days$cycleday_m = days$cycleday-1
   days$cycleday_m_D = NA
   
-  j.start = which((days$cycle_id_m == days$cycle_id) & (days$cycleday_m <= par$Df))
+  j.start = which((days$cycle_id_m == days$cycle_id) & (days$cycleday_m <= param$Df))
   days$cycleday_m_D[j.start] = days$cycleday[j.start]-1
   
   j.end = which(days$cycle_id_m != days$cycle_id)
