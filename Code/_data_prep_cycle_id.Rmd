@@ -155,7 +155,7 @@ par$D
 define_menstruation_centered_cycles = function(file = file, par = par){
   cat(file,"\n")
   load(paste0(input_days_folder,file), verbose = TRUE)
-  cat(file," : ",dim(days),"\n")
+  cat(file," - dim init : ",dim(days),"\n")
   
   # cycle id and cycle number
   
@@ -206,7 +206,7 @@ define_menstruation_centered_cycles = function(file = file, par = par){
   
   rm(agg, m1, m2)
   
-  cat(file," : ",dim(days),"\n")
+  cat(file," - dim after : ",dim(days),"\n")
   save(days, file = paste0(output_days_folder,file))
   cat(file," : done\n")
 }
