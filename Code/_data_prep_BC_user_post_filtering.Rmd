@@ -188,6 +188,7 @@ filter_day_after_BC_re_class = function(filename = ""){
   #save days table
   save(days, file = paste0(days_folder, filename))
   file.copy( from = paste0(days_folder, filename), to = paste0(tmp_days_folder, filename))
+  cat(filename," : done \n")
 }
   
 ```
@@ -216,7 +217,7 @@ dir.create(tmp_days_folder_full_tracking)
 filenames = list.files(days_folder)
 
 tic()
-cl = makeCluster(par$n_cores)
+cl = makeCluster(par$n_cores, outfile = "")
 registerDoParallel(cl)
 foreach(this_filename = filenames) %dopar% {filter_day_after_BC_re_class(filename = this_filename)}
 stopCluster(cl)
