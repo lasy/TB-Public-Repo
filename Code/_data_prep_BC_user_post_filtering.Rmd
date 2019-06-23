@@ -157,33 +157,11 @@ file.copy(from = paste0(IO$output_data, "stretches.Rdata"), to = paste0(IO$tmp_d
 
 ### Days
 
-```{r data_prep_BC_user_post_filtering filtering days}
 
-days_folder = paste0(IO$output_data,"days/")
+```{r data_prep_BC_user_post_filtering filtering days - function}
 
-tmp_days_folder = paste0(IO$tmp_data,"days_before_BC_post_filtering/")
-file.copy(days_folder, IO$tmp_data, recursive=TRUE)
-file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
-
-tmp_days_folder = paste0(IO$tmp_data,"days_after_BC_post_filtering/")
-dir.create(tmp_days_folder)
-
-
-days_folder_full_tracking = paste0(IO$output_data,"days_full_tracking/")
-dir.create(days_folder_full_tracking)
-
-tmp_days_folder_full_tracking = paste0(IO$tmp_data,"days_full_tracking_after_BC_filtering/")
-dir.create(tmp_days_folder_full_tracking)
-
-
-
-filenames = list.files(days_folder)
-
-cl = makeCluster(par$n_cores)
-registerDoParallel(cl)
-
-foreach(filename = filenames) %dopar%
-{
+filter_day_after_BC_re_class = function(filename = ""){
+  
   cat(filename,"\n")
   load(paste0(days_folder, filename), verbose = TRUE)
   
@@ -210,9 +188,39 @@ foreach(filename = filenames) %dopar%
   #save days table
   save(days, file = paste0(days_folder, filename))
   file.copy( from = paste0(days_folder, filename), to = paste0(tmp_days_folder, filename))
-  
 }
+  
+```
 
+
+
+```{r data_prep_BC_user_post_filtering filtering days}
+
+days_folder = paste0(IO$output_data,"days/")
+
+tmp_days_folder = paste0(IO$tmp_data,"days_before_BC_post_filtering/")
+file.copy(days_folder, IO$tmp_data, recursive=TRUE)
+file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
+
+tmp_days_folder = paste0(IO$tmp_data,"days_after_BC_post_filtering/")
+dir.create(tmp_days_folder)
+
+
+days_folder_full_tracking = paste0(IO$output_data,"days_full_tracking/")
+dir.create(days_folder_full_tracking)
+
+tmp_days_folder_full_tracking = paste0(IO$tmp_data,"days_full_tracking_after_BC_filtering/")
+dir.create(tmp_days_folder_full_tracking)
+
+
+filenames = list.files(days_folder)
+
+tic()
+cl = makeCluster(par$n_cores)
+registerDoParallel(cl)
+foreach(this_filename = filenames) %dopar% {filter_day_after_BC_re_class(filename = this_filename)}
+stopCluster(cl)
+tac(chunck_name = "data_prep_BC_user_post_filtering filtering days")
 
 ```
 
