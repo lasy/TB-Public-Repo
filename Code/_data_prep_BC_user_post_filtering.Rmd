@@ -187,7 +187,7 @@ filter_day_after_BC_re_class = function(filename = ""){
   
   #save days table
   save(days, file = paste0(days_folder, filename))
-  file.copy( from = paste0(days_folder, filename), to = paste0(tmp_days_folder, filename))
+  file.copy( from = paste0(days_folder, filename), to = paste0(tmp_days_folder, filename), overwrite = TRUE)
   cat(filename," : done \n")
 }
   
