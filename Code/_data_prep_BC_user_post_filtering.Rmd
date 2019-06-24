@@ -203,7 +203,7 @@ tmp_days_folder = paste0(IO$tmp_data,"days_before_BC_post_filtering/")
 file.copy(days_folder, IO$tmp_data, recursive=TRUE)
 file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
 
-tmp_days_folder = paste0(IO$tmp_data,"days_after_BC_post_filtering/")
+tmp_days_folder = paste0(IO$tmp_data,"days_after_BC_filtering/")
 dir.create(tmp_days_folder)
 
 
