@@ -178,7 +178,9 @@ filter_day_after_BC_re_class = function(filename = ""){
   
   # saving full tracking days
   save(days, file = paste0(days_folder_full_tracking, filename))
-  file.copy( from = paste0(days_folder_full_tracking, filename), to = paste0(tmp_days_folder_full_tracking, filename))
+  file.copy( from = paste0(days_folder_full_tracking, filename), to = paste0(tmp_days_folder_full_tracking, filename), overwrite = TRUE)
+  
+  cat(filename," : full tracking saved \n")
   
   # only keep pill, TB, period and n_logs
   j = which(days$category %in% c("pill_hbc","n_logs","period","pain"))
@@ -187,6 +189,7 @@ filter_day_after_BC_re_class = function(filename = ""){
   
   #save days table
   save(days, file = paste0(days_folder, filename))
+  cat(filename," : saved \n")
   file.copy( from = paste0(days_folder, filename), to = paste0(tmp_days_folder, filename), overwrite = TRUE)
   cat(filename," : done \n")
 }
