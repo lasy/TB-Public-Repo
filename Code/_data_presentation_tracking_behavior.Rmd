@@ -92,15 +92,9 @@ n_cycles_any_log_day1/n_cycles
 rm(n_cycles_with_period_day1,n_cycles_any_log_day1, n_cycles)
 ```
 
+```{r data_presentation_tracking_behavior tracking patterns by age and BC categories - function}
 
-
-```{r data_presentation_tracking_behavior tracking patterns by age and BC categories}
-
-clue_file_list = list.files(paste0(IO$output_data,"days/"))
-
-registerDoParallel(par$n_cores)
-tic()
-a = foreach(file = clue_file_list, .combine = rbind) %dopar%{
+tracking_pattern = function(file = ""){
   cat(file,"\n")
   load(paste0(IO$output_data,"days/",file), verbose = TRUE)
   days$age_cat = cut(days$age, breaks = breaks$age)
@@ -115,9 +109,26 @@ a = foreach(file = clue_file_list, .combine = rbind) %dopar%{
   agg_tot_n_cycles = aggregate(cycle_id_m ~  age_cat + BC, days[!is.na(days$cycleday_m_D),], lu)
   colnames(agg_tot_n_cycles)[which(colnames(agg_tot_n_cycles) == "cycle_id_m")] = "tot_n_cycles"
   agg = merge(agg, agg_tot_n_cycles, all = TRUE)
+  return(agg)
 }
-toc()
+
+```
+
+
+
+
+```{r data_presentation_tracking_behavior tracking patterns by age and BC categories}
+
+clue_file_list = list.files(paste0(IO$output_data,"days/"))
+
+now()
+tic()
+cl = makeCluster(min(par$n_cores, length(clue_file_list)), outfile="")
+registerDoParallel(cl)
+a = foreach(clue_file = clue_file_list, .combine = rbind) %dopar% { tracking_pattern(file = clue_file) }
+tac(chunck_name = "data_presentation_tracking_behavior tracking patterns by age and BC categories")
 stopImplicitCluster()
+
 
 agg = aggregate(. ~ cycleday_m_D + BC + age_cat, a, sum)
 
