@@ -64,7 +64,7 @@ $F_i$ of the shape of an hyperbolic cosine could be a good option that respect t
 [https://en.wikipedia.org/wiki/Catenary](https://en.wikipedia.org/wiki/Catenary)
 
 
-
+### Imputing logs: implementation.
 
 ```{r cycle_prep_imputing_logs loading d_wide}
 
@@ -102,14 +102,10 @@ m = match(d$cycle_id_m, cycles$cycle_id)
 d$user_id = cycles$user_id[m]
 d$cycle_nb_m = cycles$cycle_nb[m]
 d$cycle_id_m = as.character(d$cycle_id_m)
-
-
-save(d, file = paste0(IO$tmp_data,"d_imputed.Rdata"))
-
-
 ```
 
 
 
-
-
+```{r cycle_prep_imputing_logs saving d}
+save(d, file = paste0(IO$tmp_data,"d_imputed.Rdata"))
+```
