@@ -51,6 +51,8 @@ user_ids = unique(cycles_BC$user_id[which(cycles_BC$BC %in% par$BC_dict$name)])
 length(user_ids)
 
 dim(users)
+
+save(cycle_ids, file = paste0(IO$tmp_data, "cycle_ids_BC_reclassified.Rdata"))
 ```
 
 
@@ -163,10 +165,13 @@ file.copy(from = paste0(IO$output_data, "stretches.Rdata"), to = paste0(IO$tmp_d
 filter_day_after_BC_re_class = function(filename = ""){
   
   cat(filename,"\n")
-  load(paste0(days_folder, filename), verbose = TRUE)
+  load(paste0(input_days_folder, filename), verbose = TRUE)
+  cat(filename," : days table loaded \n")
   
   #filtering on BC  
-  days = days[days$cycle_id %in% cycle_ids,]
+  days = days[which(days$cycle_id %in% cycle_ids),]
+  cat(filename," : days table filtered on BC \n")
+
   
   # augmenting days with users and cycles characteristics
   days$BC = cycles_BC$BC[match(days$cycle_id, cycles_BC$cycle_id)]
@@ -176,10 +181,10 @@ filter_day_after_BC_re_class = function(filename = ""){
   days$height = users$height[m]
   days$weight = users$weight[m]
   
-  # saving full tracking days
-  save(days, file = paste0(days_folder_full_tracking, filename))
-  file.copy( from = paste0(days_folder_full_tracking, filename), to = paste0(tmp_days_folder_full_tracking, filename), overwrite = TRUE)
+  cat(filename," : days table augmented \n")
   
+  # saving full tracking days
+  save(days, file = paste0(output_days_folder_full, filename))
   cat(filename," : full tracking saved \n")
   
   # only keep pill, TB, period and n_logs
@@ -188,9 +193,8 @@ filter_day_after_BC_re_class = function(filename = ""){
   days = days[j,]
   
   #save days table
-  save(days, file = paste0(days_folder, filename))
+  save(days, file = paste0(output_days_folder, filename))
   cat(filename," : saved \n")
-  file.copy( from = paste0(days_folder, filename), to = paste0(tmp_days_folder, filename), overwrite = TRUE)
   cat(filename," : done \n")
 }
   
@@ -200,33 +204,48 @@ filter_day_after_BC_re_class = function(filename = ""){
 
 ```{r data_prep_BC_user_post_filtering filtering days}
 
-days_folder = paste0(IO$output_data,"days/")
+if(!("cycle_ids" %in% ls())){load(file = paste0(IO$tmp_data, "cycle_ids_BC_reclassified.Rdata"), verbose = TRUE)}
+if(!("cycles_BC" %in% ls())){load(file = paste0(IO$tmp_data, "cycles_BC_re_classification.Rdata"), verbose = TRUE); cycles_BC = cycles; rm(cycles)}
+if(!("users" %in% ls())){load(file = paste0(IO$output_data, "users.Rdata"), verbose = TRUE)}
 
-tmp_days_folder = paste0(IO$tmp_data,"days_before_BC_post_filtering/")
-file.copy(days_folder, IO$tmp_data, recursive=TRUE)
-file.rename(paste0(IO$tmp_data,"days"),tmp_days_folder)
+#input
+input_days_folder = paste0(IO$tmp_data,"days_with_m_centered_cycle_ids/")
+filenames = list.files(input_days_folder)
 
-tmp_days_folder = paste0(IO$tmp_data,"days_after_BC_filtering/")
-dir.create(tmp_days_folder)
+#output filtered days
+output_days_folder = paste0(IO$tmp_data,"days_after_BC_filtering/")
+if(dir.exists(output_days_folder)){unlink(output_days_folder, recursive = TRUE)}
+dir.create(output_days_folder)
+
+#output full tracking ( = all logs for the properly re-classified cycles)
+output_days_folder_full = paste0(IO$tmp_data,"days_after_BC_filtering_full_tracking/")
+if(dir.exists(output_days_folder_full)){unlink(output_days_folder_full, recursive = TRUE)}
+dir.create(output_days_folder_full)
 
 
-days_folder_full_tracking = paste0(IO$output_data,"days_full_tracking/")
-dir.create(days_folder_full_tracking)
-
-tmp_days_folder_full_tracking = paste0(IO$tmp_data,"days_full_tracking_after_BC_filtering/")
-dir.create(tmp_days_folder_full_tracking)
-
-
-filenames = list.files(days_folder)
-
+filenames = filenames[sample(1:length(filenames),20)]
+now()
 tic()
-cl = makeCluster(par$n_cores, outfile = "")
+cl = makeCluster(min(par$n_cores, length(filenames)), outfile="")
 registerDoParallel(cl)
-foreach(this_filename = filenames) %dopar% {filter_day_after_BC_re_class(filename = this_filename)}
+foreach(this_filename = filenames,
+        .export = c("cycle_ids","cycles_BC","users","input_days_folder","output_days_folder","output_days_folder_full")
+        ) %dopar% {filter_day_after_BC_re_class(filename = this_filename)}
 stopCluster(cl)
 tac(chunck_name = "data_prep_BC_user_post_filtering filtering days")
 
+# tic()
+# foreach(this_filename = filenames) %do% {filter_day_after_BC_re_class(filename = this_filename)}
+# tac(chunck_name = "data_prep_BC_user_post_filtering filtering days")
+
 ```
 
+
+```{r data_prep_BC_user_post_filtering copy to output folder}
+copy_days_tmp2out(output_days_folder_full)
+file.rename(from = paste0(IO$output_data,"days"),to = paste0(IO$output_data,"days_full_tracking"))
+
+copy_days_tmp2out(output_days_folder)
+```
 
 
