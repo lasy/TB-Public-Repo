@@ -223,7 +223,7 @@ if(dir.exists(output_days_folder_full)){unlink(output_days_folder_full, recursiv
 dir.create(output_days_folder_full)
 
 
-filenames = filenames[sample(1:length(filenames),20)]
+#filenames = filenames[sample(1:length(filenames),20)]
 now()
 tic()
 cl = makeCluster(min(par$n_cores, length(filenames)), outfile="")
