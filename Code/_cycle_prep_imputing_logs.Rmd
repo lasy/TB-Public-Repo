@@ -85,7 +85,7 @@ rm(d_wide_imputed, d_wide_imputed_df)
 ```
 
 
-```{r cycle_prep_imputing_logs creating d}
+```{r cycle_prep_imputing_logs creating d, cache.lazy = FALSE}
 
 load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
 
@@ -106,6 +106,6 @@ d$cycle_id_m = as.character(d$cycle_id_m)
 
 
 
-```{r cycle_prep_imputing_logs saving d}
+```{r cycle_prep_imputing_logs saving d, cache.lazy = FALSE}
 save(d, file = paste0(IO$tmp_data,"d_imputed.Rdata"))
 ```

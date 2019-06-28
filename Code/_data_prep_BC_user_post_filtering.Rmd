@@ -226,19 +226,19 @@ dir.create(output_days_folder_full)
 #filenames = filenames[sample(1:length(filenames),20)]
 
 
-# now()
-# tic()
-# cl = makeCluster(min(par$n_cores, length(filenames)), outfile="")
-# registerDoParallel(cl)
-# foreach(this_filename = filenames,
-#         .export = c("cycle_ids","cycles_BC","users","input_days_folder","output_days_folder","output_days_folder_full")
-#         ) %dopar% {filter_day_after_BC_re_class(filename = this_filename)}
-# stopCluster(cl)
-# tac(chunck_name = "data_prep_BC_user_post_filtering filtering days")
-
+now()
 tic()
-foreach(this_filename = filenames) %do% {filter_day_after_BC_re_class(filename = this_filename)}
+cl = makeForkCluster(nnode = min(par$n_cores, length(filenames)), outfile="")
+registerDoParallel(cl)
+foreach(this_filename = filenames,
+        .export = c("cycle_ids","cycles_BC","users","input_days_folder","output_days_folder","output_days_folder_full")
+        ) %dopar% {filter_day_after_BC_re_class(filename = this_filename)}
+stopCluster(cl)
 tac(chunck_name = "data_prep_BC_user_post_filtering filtering days")
+
+# tic()
+# foreach(this_filename = filenames) %do% {filter_day_after_BC_re_class(filename = this_filename)}
+# tac(chunck_name = "data_prep_BC_user_post_filtering filtering days")
 
 ```
 
