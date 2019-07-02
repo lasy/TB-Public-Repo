@@ -36,6 +36,22 @@ load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 
 We only compute the average distance for users that had as least 1 TB ever logged
 
+```{r users_descr_avg_dist reshape d - function, cache = TRUE}
+reshape_d = function(n = 1){
+  output_file = paste0(output_folder, "d_",n,".Rdata")
+  if(!file.exists(output_file)){
+    load(paste0(input_folder,days_files[n]), verbose = TRUE)
+    #impute and transform all cycles to wide format, including cycles without TB logs
+    user_ids = unique(days$user_id[days$type == "tender_breasts"])
+    days = days[days$user_id %in% user_ids,]
+    d = reshape_and_impute(days)
+    save(d, file = output_file)
+    rm(d, days)
+  }
+}
+```
+
+
 
 ```{r users_descr_avg_dist reshape d, cache = TRUE}
 
@@ -46,36 +62,18 @@ days_files = list.files(input_folder)
 days_files = days_files
 N = length(days_files)
 
-
-cl = makeCluster(min(par$n_cores, N), outfile="")
-registerDoParallel(cl)
-
 tic()
-foreach(n = 1:N)%dopar%{
-  output_file = paste0(output_folder, "d_",n,".Rdata")
-  if(!file.exists(output_file)){
-    load(paste0(input_folder,days_files[n]), verbose = TRUE)
-    #impute and transform all cycles to wide format, including cycles without TB logs
-    user_ids = unique(days$user_id[days$type == "tender_breasts"])
-    days = days[days$user_id %in% user_ids,]
-    d = reshape_and_impute(days)
-    save(d, file = output_file)
-  }
-}
-tac("users_descr_avg_dist reshape d")
+cl = makeForkCluster(min(par$n_cores, N), outfile="")
+registerDoParallel(cl)
+foreach(n = 1:N)%dopar%{reshape_d(n = n)}
 stopImplicitCluster()
-
+tac("users_descr_avg_dist reshape d")
 ```
 
 
 ```{r users_descr_avg_dist average distance}
 
-
-cl = makeCluster(min(par$n_cores, N), outfile="")
-registerDoParallel(cl)
-
-tic()
-foreach(n = 1:N,.packages = c("foreach","Rcpp"),.noexport = "TB_distance_Rccp")%dopar%{
+compute_average_distance_for_file_n = function(n = 1){
   source("Scripts/00_functions_distance.R")
   output_file = paste0(output_folder,"users_with_avg_distance_",n,".Rdata")
   if(!file.exists(output_file)){
@@ -90,8 +88,16 @@ foreach(n = 1:N,.packages = c("foreach","Rcpp"),.noexport = "TB_distance_Rccp")%
     cat(n," : users_with_avg_distance computed\n")
     head(users_with_avg_distance)
     save(users_with_avg_distance, file = output_file)
+    rm(d, users_with_avg_distance)
   }
 }
+
+
+
+cl = makeCluster(min(par$n_cores, N), outfile="")
+registerDoParallel(cl)
+tic()
+foreach(n = 1:N,.packages = c("foreach","Rcpp"),.noexport = "TB_distance_Rccp")%dopar%{compute_average_distance_for_file_n(n = n)}
 tac("users_descr_avg_dist average distance 1")
 stopImplicitCluster()
 
@@ -175,7 +181,7 @@ file.copy(from = paste0(IO$output_data, "users.Rdata"), to = paste0(IO$tmp_data,
 
 user_selection = which(
   (users$tracking_consistency >= 0.75)&
-  (users$BC %in% par$BC_dict$name) &
+    (users$BC %in% par$BC_dict$name) &
     (users$perc_cycles_with_TB >= 0.5)
 )
 
@@ -208,27 +214,27 @@ ggplot(users[user_selection,], aes(x = sd_d, fill = BC)) +
 ggplot(users, aes(x = median_d, fill = factor(most_preval_clust))) +
   geom_histogram(position = "identity", col = NA) + 
   facet_grid(most_preval_clust ~ ., scale = "free_y")#+
-  #scale_fill_manual(values = cols$clusters_6)
+#scale_fill_manual(values = cols$clusters_6)
 
 
 
 ggplot(users, aes(x = median_d, fill = factor(most_preval_clust))) +
   geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
   facet_grid(most_preval_clust ~ ., scale = "free_y")#+
-  #scale_fill_manual(values = cols$clusters_6)
+#scale_fill_manual(values = cols$clusters_6)
 
 
 ggplot(users, aes(x = avg_d, fill = factor(most_preval_clust))) +
   geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
   facet_grid(most_preval_clust ~ ., scale = "free_y")#+
-  #scale_fill_manual(values = cols$clusters_6)
+#scale_fill_manual(values = cols$clusters_6)
 
 
 
 ggplot(users, aes(x = sd_d, fill = factor(most_preval_clust))) +
   geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
   facet_grid(most_preval_clust ~ ., scale = "free_y")#+
-  #scale_fill_manual(values = cols$clusters_6)
+#scale_fill_manual(values = cols$clusters_6)
 
 ```
 

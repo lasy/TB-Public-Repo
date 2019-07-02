@@ -91,7 +91,7 @@ load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
 ```
 
 
-```{r cycle_prep_imputing_logs creating d}
+```{r cycle_prep_imputing_logs creating d, cache.lazy = FALSE}
 
 d = reshape(d_wide, 
             idvar = "cycle_id_m", 
