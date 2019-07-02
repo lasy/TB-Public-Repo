@@ -56,14 +56,14 @@ reshape_d = function(n = 1){
 ```{r users_descr_avg_dist reshape d, cache = TRUE}
 
 output_folder = paste0(IO$tmp_data,"avg_dist_per_user/")
-dir.create(output_folder)
+if(!dir.exists(output_folder)){dir.create(output_folder)}
 input_folder = paste0(IO$output_data,"days/")
 days_files = list.files(input_folder)
 days_files = days_files
 N = length(days_files)
 
 tic()
-cl = makeForkCluster(min(par$n_cores, N), outfile="")
+cl = makeCluster(min(par$n_cores, N), outfile="")
 registerDoParallel(cl)
 foreach(n = 1:N)%dopar%{reshape_d(n = n)}
 stopImplicitCluster()

@@ -187,7 +187,7 @@ g = ggplot(agg, aes(x = cycleday_m_D, y = fraction_cycles_with_TB, col = BC, sha
   scale_colour_manual(values= cols$BC , name="BC")+
   scale_fill_manual(values= cols$BC , name="BC")+
   guides(col = FALSE, fill = FALSE, shape = FALSE)+
-  xlab("cycleday from 1st day of menstruation") + ylab("% cycles with any log")+
+  xlab("cycleday from 1st day of menstruation") + ylab("% cycles with reported BT")+
   theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))+
   facet_grid( . ~ tracking_group)
 g
