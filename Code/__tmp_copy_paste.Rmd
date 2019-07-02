@@ -25,7 +25,58 @@ output: html_document
 
 
 
+######################
 
+
+
+
+
+
+```{r clust_tracking_behavior optimal number of clusters - deprecated, fig.width= 10, fig.height= 4, eval = FALSE}
+
+n_cluster_range = 2:10
+df = data.frame()
+
+
+for(n_clust in n_cluster_range){
+  cat(n_clust,"\n")
+  tracking_clustering = clara(x = X, 
+                              k = n_clust, 
+                              metric = "euclidean",
+                              samples = 50,
+                              sampsize = 200)
+  cat("\t\t",tracking_clustering$silinfo$avg.width,"\n")
+  df = rbind(df,data.frame(n_clust = n_clust, avg_silhouette_score = tracking_clustering$silinfo$avg.width))
+  
+  silh = as.data.frame(tracking_clustering$silinfo$widths)
+  silh$x = 1:nrow(silh)
+  silh$rows = as.numeric(rownames(tracking_clustering$silinfo$widths))
+  
+  X_long$cluster_num = tracking_clustering$clustering[match(X_long$rows, X_wide$rows)]
+  
+  # show the samples chosen by clara FOR SILHOUETTE
+  
+  m = which(!is.na(match( X_long$rows, silh$rows)))
+  X_long_subset = X_long[m,]
+  X_long_subset$rows = factor(X_long_subset$rows, levels = rev(silh$rows))
+  g_samples = ggplot(X_long_subset,aes(x = variable, y = rows, col = value))+ geom_point() + 
+    guides(color = FALSE) + scale_color_gradient(low = "white",high = "blue4")+ggtitle(paste("n_clust = ",n_clust))
+  
+  g_silh = ggplot(silh, aes(fill = factor(cluster),x = factor(x, levels =rev(x)), y = sil_width)) + coord_flip()+
+    geom_bar(stat = "identity")+
+    #ylim(c(-1,1))+
+    geom_hline(yintercept = tracking_clustering$silinfo$avg.width, linetype = 2)+ 
+    ggtitle(paste0("avg. silh score = ",round(tracking_clustering$silinfo$avg.width,digits = 3)))+
+    guides(fill = FALSE, color = FALSE)+
+    xlab("")+ylab("silh width")+ theme(axis.text.y = element_blank())
+  
+  grid.arrange(g_samples, g_silh, nrow = 1, widths = c(2,1))
+  
+}
+
+ggplot(df, aes(x = factor(n_clust), y = avg_silhouette_score)) + geom_bar(stat = "identity")
+
+```
 
 
 

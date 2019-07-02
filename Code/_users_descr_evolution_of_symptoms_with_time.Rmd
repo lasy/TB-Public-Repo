@@ -37,6 +37,14 @@ load(paste0(IO$output_data,"cycles_m.Rdata"), verbose=  TRUE)
 
 
 
+```{r users_descr_evolution relative cycle number}
+# computing their relative cycle number from their first valid cycle (i.e. cycles for which the BC was not "unclear")
+agg = aggregate(cycle_nb_m ~ user_id, cycles_m, min)
+cycles_m$cycle_nb_m_rel = cycles_m$cycle_nb_m - agg$cycle_nb_m[match(cycles_m$user_id,agg$user_id)]
+```
+
+
+
 ```{r users_descr_evolution user selection}
 
 # selecting users
@@ -49,9 +57,6 @@ j = which(
 user_ids_users = users$user_id[j]
 
 # we also want to make sure that these 20 cycles are within the first 22 cycles they ever tracked in the app and that there were no too big gaps in these 22 first cycles.
-# computing their relative cycle number from their first valid cycle (i.e. cycles for which the BC was not "unclear")
-agg = aggregate(cycle_nb_m ~ user_id, cycles_m, min)
-cycles_m$cycle_nb_m_rel = cycles_m$cycle_nb_m - agg$cycle_nb_m[match(cycles_m$user_id,agg$user_id)]
 
 agg = aggregate(cycle_id_m ~ user_id, cycles_m[cycles_m$cycle_nb_m_rel <= 21,], lu)
 user_ids_cycles_m = agg$user_id[agg$cycle_id_m>=18]
@@ -93,7 +98,9 @@ file.copy(from = paste0(IO$output_data, "users.Rdata"), to = paste0(IO$output_da
 
 ```{r users_descr_evolution aggregate}
 
-fraction_TB = ddply(cycles_m[(cycles_m$cycle_nb_m_rel <= 20) & (cycles_m$user_id %in% user_ids),], 
+j = which((cycles_m$cycle_nb_m_rel <= 20) & (cycles_m$user_id %in% user_ids))
+
+fraction_TB = ddply(cycles_m[j,], 
                     c("init_TB_group", "cycle_nb_m_rel", "BC"), 
                     summarise,
                     n_cycles = uniqueN(cycle_id_m),

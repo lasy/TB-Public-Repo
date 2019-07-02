@@ -188,6 +188,7 @@ symptoms_pattern_age_cat = function(file = "", cycles_m = cycles_m){
   colnames(agg_tot_n_cycles)[which(colnames(agg_tot_n_cycles) == "cycle_id_m")] = "tot_n_cycles"
   agg = merge(agg_n_cycles_with_log, agg_tot_n_cycles, all = TRUE)
   cat(file," : done \n")
+  rm(days)
   return(agg)
 }
 
@@ -202,7 +203,7 @@ days_file_list = list.files(paste0(IO$output_data,"days/"))
 
 now()
 tic()
-cl = makeCluster(min(par$n_cores, length(days_file_list)), outfile="")
+cl = makeForkCluster(min(par$n_cores, length(days_file_list)), outfile="")
 registerDoParallel(cl)
 a = foreach(days_file = days_file_list, .combine = rbind) %dopar% { symptoms_pattern_age_cat(file = days_file, cycles_m = cycles_m) }
 tac(chunck_name = "profiles symptoms patterns by age_cat and BC categories for regular tracking")

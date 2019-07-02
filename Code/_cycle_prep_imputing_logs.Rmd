@@ -85,10 +85,13 @@ rm(d_wide_imputed, d_wide_imputed_df)
 ```
 
 
-```{r cycle_prep_imputing_logs creating d, cache.lazy = FALSE}
 
+```{r cycle_prep_imputing_logs loading cycles, cache.lazy = FALSE}
 load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+```
 
+
+```{r cycle_prep_imputing_logs creating d}
 
 d = reshape(d_wide, 
             idvar = "cycle_id_m", 
