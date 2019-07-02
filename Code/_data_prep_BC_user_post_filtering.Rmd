@@ -88,10 +88,6 @@ users$BC_trans = case_when((users$BC == "unclear") ~ "unknown",
                            (users$BC_first != users$BC_last) & (users$BC_last == "pill") ~ "on pill",
                            TRUE ~ "NA")
 
-# adding # of cycles with BC not "unclear"
-
-users$n_cycles_o
-
 
 ```
 

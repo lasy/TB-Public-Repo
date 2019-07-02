@@ -63,6 +63,13 @@ cols_feature = data.frame(type = c("heavy","medium","light","spotting",
                           stringsAsFactors = FALSE)
 
 
+cols$init_TB_group = c("skyblue3","skyblue4","black")
+N = 3
+cols$BC_x_init_TB_group = c(scales::seq_gradient_pal(cols$NC, "black")(seq(0,1,length.out=N+1))[1:N],
+                            scales::seq_gradient_pal(cols$pill, "black")(seq(0,1,length.out=N+1))[1:N],
+                            scales::seq_gradient_pal("gray", "black")(seq(0,1,length.out=N+1))[1:N])
+rm(N)
+
 
 cols$pill_trans = c("gray40","royalblue1")
 

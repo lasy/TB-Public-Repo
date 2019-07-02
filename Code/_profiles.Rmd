@@ -1,0 +1,254 @@
+---
+title: "Demographics, overall symptoms and tracking profiles"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+```{r profiles setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+source("Scripts/00_setup.R")
+```
+
+
+# Profiles
+
+We saw that cycles can be classified into 3 groups depending on the tracking behavior.
+Here we will describe the average tracking and symptoms profiles for these 3 groups and by BC.
+
+```{r profiles load cycles_m}
+
+load(paste0(IO$output_data, "cycles_m.Rdata"), verbose = TRUE)
+
+```
+
+
+
+## Tracking behavior
+
+
+```{r profiles tracking patterns by tracking group and BC categories - function}
+
+tracking_pattern = function(file = "", cycles_m = cycles_m){
+  cat(file,"\n")
+  load(paste0(IO$output_data,"days/",file), verbose = TRUE)
+  days$tracking_group = cycles_m$tracking_group[match(days$cycle_id_m, cycles_m$cycle_id_m)]
+  
+  # number of cycles with logs at each cycle day
+  agg_n_cycles_with_log = aggregate(cycle_id_m ~ cycleday_m_D +  BC + tracking_group, days, lu)
+  colnames(agg_n_cycles_with_log)[which(colnames(agg_n_cycles_with_log) == "cycle_id_m")] = "n_cycles"
+  
+  # sum of n_logs at each cycle days=
+  days$n_logs = days$number
+  agg_n_logs = aggregate(n_logs ~ cycleday_m_D + BC + tracking_group, days[days$type == "n_logs",], sum)
+  agg = merge(agg_n_cycles_with_log, agg_n_logs, all = TRUE)
+  
+  # total number of cycles (to get the proportions)
+  agg_tot_n_cycles = aggregate(cycle_id_m ~  BC + tracking_group, days[!is.na(days$cycleday_m_D),], lu)
+  colnames(agg_tot_n_cycles)[which(colnames(agg_tot_n_cycles) == "cycle_id_m")] = "tot_n_cycles"
+  agg = merge(agg, agg_tot_n_cycles, all = TRUE)
+  cat(file," : done \n")
+  return(agg)
+}
+
+```
+
+
+
+
+```{r profiles tracking patterns by tracking group and BC categories}
+
+days_file_list = list.files(paste0(IO$output_data,"days/"))
+
+now()
+tic()
+cl = makeCluster(min(par$n_cores, length(days_file_list)), outfile="")
+registerDoParallel(cl)
+a = foreach(days_file = days_file_list, .combine = rbind) %dopar% { tracking_pattern(file = days_file, cycles_m = cycles_m) }
+tac(chunck_name = "profiles tracking patterns by tracking group and BC categories")
+stopImplicitCluster()
+
+
+agg = aggregate(. ~ cycleday_m_D + BC + tracking_group, a, sum)
+
+agg$fraction_cycles_with_logs = agg$n_cycles/agg$tot_n_cycles
+agg$perc_cycles_with_logs = round(100*agg$fraction_cycles_with_logs, digits = 2)
+
+aggregate(fraction_cycles_with_logs ~ tracking_group + BC, agg, max)
+
+agg$avg_n_logs = agg$n_logs/agg$tot_n_cycles
+
+agg$fraction_cycles_with_logs_SE = sqrt(agg$fraction_cycles_with_logs*(1-agg$fraction_cycles_with_logs)/agg$tot_n_cycles)
+agg$perc_cycles_with_logs_SE = 100 * agg$fraction_cycles_with_logs_SE
+
+
+rm(a, days_file_list)
+
+save(agg, file = paste0(IO$out_Rdata,"tracking_behavior_overal_pattern_by_tracking_group_and_birth_control.Rdata"))
+
+```
+
+
+
+
+
+## Breast Tenderness symptoms
+
+
+```{r profiles symptoms patterns by tracking group and BC categories - function}
+
+symptoms_pattern = function(file = "", cycles_m = cycles_m){
+  cat(file,"\n")
+  load(paste0(IO$output_data,"days/",file), verbose = TRUE)
+  days$tracking_group = cycles_m$tracking_group[match(days$cycle_id_m, cycles_m$cycle_id_m)]
+  
+  j = which((!is.na(days$cycleday_m_D)) & (days$type == TB))
+  
+  # number of cycles with TB at each cycle day
+  agg_n_cycles_with_log = aggregate(cycle_id_m ~ cycleday_m_D +  BC + tracking_group, days[j,], lu)
+  colnames(agg_n_cycles_with_log)[which(colnames(agg_n_cycles_with_log) == "cycle_id_m")] = "n_cycles_with_TB"
+  
+  # total number of cycles (to get the proportions)
+  agg_tot_n_cycles = aggregate(cycle_id_m ~  BC + tracking_group, days[!is.na(days$cycleday_m_D),], lu)
+  colnames(agg_tot_n_cycles)[which(colnames(agg_tot_n_cycles) == "cycle_id_m")] = "tot_n_cycles"
+  agg = merge(agg_n_cycles_with_log, agg_tot_n_cycles, all = TRUE)
+  cat(file," : done \n")
+  return(agg)
+}
+
+```
+
+
+
+
+```{r profiles symptoms patterns by tracking group and BC categories}
+
+days_file_list = list.files(paste0(IO$output_data,"days/"))
+
+now()
+tic()
+cl = makeCluster(min(par$n_cores, length(days_file_list)), outfile="")
+registerDoParallel(cl)
+a = foreach(days_file = days_file_list, .combine = rbind) %dopar% { symptoms_pattern(file = days_file, cycles_m = cycles_m) }
+tac(chunck_name = "profiles symptoms patterns by tracking group and BC categories")
+stopImplicitCluster()
+
+
+agg = aggregate(. ~ cycleday_m_D + BC + tracking_group, a, sum)
+
+agg$fraction_cycles_with_TB = agg$n_cycles_with_TB/agg$tot_n_cycles
+agg$perc_cycles_with_TB = round(100*agg$fraction_cycles_with_TB, digits = 2)
+
+aggregate(fraction_cycles_with_TB ~ tracking_group + BC, agg, max)
+
+agg$fraction_cycles_with_TB_SE = sqrt(agg$fraction_cycles_with_TB*(1-agg$fraction_cycles_with_TB)/agg$tot_n_cycles)
+agg$perc_cycles_with_TB_SE = 100 * agg$fraction_cycles_with_TB_SE
+
+
+save(agg, file = paste0(IO$out_Rdata,"TB_overal_pattern_by_tracking_group_and_birth_control.Rdata"))
+
+rm(a, days_file_list)
+
+
+```
+
+
+
+
+## Breast Tenderness symptoms per BC and age_cat for cycles in "regular tracking"
+
+```{r profiles symptoms patterns by age_cat and BC categories for regular tracking - function}
+
+symptoms_pattern_age_cat = function(file = "", cycles_m = cycles_m){
+  cat(file,"\n")
+  load(paste0(IO$output_data,"days/",file), verbose = TRUE)
+  days$tracking_group = cycles_m$tracking_group[match(days$cycle_id_m, cycles_m$cycle_id_m)]
+  days$age_cat = cut(days$age, breaks = breaks$age)
+  
+  i = (!is.na(days$cycleday_m_D)) & (days$tracking_group %in% c("regular tracking", "pre-menstrual tracking"))
+  j = which(i & (days$type == TB))
+  i = which(i)
+
+  
+  # number of cycles with TB at each cycle day
+  agg_n_cycles_with_log = aggregate(cycle_id_m ~ cycleday_m_D +  BC + age_cat + tracking_group , days[j,], lu)
+  colnames(agg_n_cycles_with_log)[which(colnames(agg_n_cycles_with_log) == "cycle_id_m")] = "n_cycles_with_TB"
+  
+  # total number of cycles (to get the proportions)
+  agg_tot_n_cycles = aggregate(cycle_id_m ~  BC + age_cat + tracking_group, days[i,], lu)
+  colnames(agg_tot_n_cycles)[which(colnames(agg_tot_n_cycles) == "cycle_id_m")] = "tot_n_cycles"
+  agg = merge(agg_n_cycles_with_log, agg_tot_n_cycles, all = TRUE)
+  cat(file," : done \n")
+  return(agg)
+}
+
+```
+
+
+
+
+```{r profiles symptoms patterns by age_cat and BC categories for regular tracking}
+
+days_file_list = list.files(paste0(IO$output_data,"days/"))
+
+now()
+tic()
+cl = makeCluster(min(par$n_cores, length(days_file_list)), outfile="")
+registerDoParallel(cl)
+a = foreach(days_file = days_file_list, .combine = rbind) %dopar% { symptoms_pattern_age_cat(file = days_file, cycles_m = cycles_m) }
+tac(chunck_name = "profiles symptoms patterns by age_cat and BC categories for regular tracking")
+stopImplicitCluster()
+
+
+agg = aggregate(. ~ cycleday_m_D + BC + age_cat + tracking_group, a, sum)
+
+agg$fraction_cycles_with_TB = agg$n_cycles_with_TB/agg$tot_n_cycles
+agg$perc_cycles_with_TB = round(100*agg$fraction_cycles_with_TB, digits = 2)
+
+aggregate(fraction_cycles_with_TB ~ age_cat + BC + tracking_group, agg, max)
+
+agg$fraction_cycles_with_TB_SE = sqrt(agg$fraction_cycles_with_TB*(1-agg$fraction_cycles_with_TB)/agg$tot_n_cycles)
+agg$perc_cycles_with_TB_SE = 100 * agg$fraction_cycles_with_TB_SE
+
+save(agg, file = paste0(IO$out_Rdata,"TB_overal_pattern_by_age_cat_and_birth_control_for_regular_tracking.Rdata"))
+
+
+```
+
+
+
+
+```{r profiles symptoms patterns by age_cat and BC categories for regular tracking - vizualisations}
+
+agg$age_x_BC = interaction(agg$age_cat , agg$BC)
+agg$SE = agg$fraction_cycles_with_TB_SE
+
+j = which(agg$age_cat %in% par$age_cat_exclude)
+if(length(j)>0){agg = agg[-j,]}
+j = which((agg$age_cat == "(35,40]") & (agg$BC == "pill"))
+if(length(j)>0){agg = agg[-j,]}
+
+g = ggplot(agg, aes(x = cycleday_m_D, y = fraction_cycles_with_TB, col = age_x_BC, shape = BC)) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_ribbon(aes(ymin = fraction_cycles_with_TB-1.96*SE, ymax = fraction_cycles_with_TB+1.96*SE, fill = age_x_BC), alpha = 0.5, col = NA)+
+  geom_line() + geom_point()+ 
+  scale_y_continuous(labels = scales::percent)+ scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values= cols$age_x_BC , name="Age group x BC")+
+  scale_fill_manual(values= cols$age_x_BC , name="Age group x BC")+
+  guides(col = FALSE, fill = FALSE, shape = FALSE)+
+  xlab("cycleday from 1st day of menstruation") + ylab("% cycles with reported TB")+
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))+
+  facet_grid(. ~ tracking_group)
+g
+
+```
+

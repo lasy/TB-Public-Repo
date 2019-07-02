@@ -42,11 +42,20 @@ source("Scripts/00_init_0.R")
 ```{r child = '_tracking_behavior_clustering.Rmd', cache=TRUE}
 ```
 
+
+```{r child = '_profiles.Rmd', cache=TRUE}
+```
+
 ```{r child = '_cycle_prep.Rmd', cache=TRUE}
 ```
 
 ```{r child = '_cycle_symptoms_predictions.Rmd', cache=TRUE}
 ```
+
+```{r child = '_users_description.Rmd', cache=TRUE}
+```
+
+
 
 
 

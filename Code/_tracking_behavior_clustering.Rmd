@@ -146,8 +146,8 @@ cycles_m$tracking_cluster_n = tracking_clustering$clustering
 cycles_m$tracking_cluster = c("regular_tracking","menstrual_tracking")[tracking_clustering$clustering]
 
 cycles_m$tracking_group = ifelse((cycles_m$n_days_obs_lut_D < 2) & (cycles_m$n_days_obs_lut_7 < 2), "menstrual tracking",
-                                 ifelse((cycles_m$f_D_7 >= 0.5) & (cycles_m$f_7_0 >= 0.5),"regular tracking",
-                                        ifelse((cycles_m$f_D_7 < 0.5) & (cycles_m$f_7_0 >= 0.5),"pre-menstrual tracking",
+                                 ifelse((cycles_m$f_D_7 >= 0.5) & (cycles_m$f_7_0 >= 0.5) & (cycles_m$f_0_7 >= 0.5),"regular tracking",
+                                        ifelse((cycles_m$f_D_7 < 0.5) & (cycles_m$f_7_0 >= 0.5) & (cycles_m$f_0_7 >= 0.3),"pre-menstrual tracking",
                                                "sporadic tracking"))) 
 
 save(cycles_m, file = paste0(IO$output_data,"cycles_m.Rdata"))

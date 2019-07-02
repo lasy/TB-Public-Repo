@@ -39,6 +39,7 @@ load(paste0(IO$output_data,"cycles_m.Rdata"), verbose=  TRUE)
 
 ```{r users_descr_evolution user selection}
 
+# selecting users
 j = which(
   (users$n_cycles >= 20) &
     (users$f_regular_tracking >= 0.75) &
@@ -47,6 +48,8 @@ j = which(
 
 user_ids_users = users$user_id[j]
 
+# we also want to make sure that these 20 cycles are within the first 22 cycles they ever tracked in the app and that there were no too big gaps in these 22 first cycles.
+# computing their relative cycle number from their first valid cycle (i.e. cycles for which the BC was not "unclear")
 agg = aggregate(cycle_nb_m ~ user_id, cycles_m, min)
 cycles_m$cycle_nb_m_rel = cycles_m$cycle_nb_m - agg$cycle_nb_m[match(cycles_m$user_id,agg$user_id)]
 
@@ -59,16 +62,14 @@ user_ids = intersect(user_ids_users, user_ids_cycles_m)
 
 
 
-
 ## Classifying users into "initial TB" groups
 
 
-
 ```{r users_descr_evolution classifying users initial TB groups}
-
-agg = aggregate(n_TB ~ user_id, cycles_m[(cycles_m$cycle_nb_m<=6),], mean)
+agg = aggregate(n_TB ~ user_id, cycles_m[(cycles_m$cycle_nb_m_rel<=6),], mean)
 agg$init_TB_group = cut(agg$n_TB, breaks = c(0, 1, 3, Inf), right = FALSE)
 cycles_m$init_TB_group = agg$init_TB_group[match(cycles_m$user_id, agg$user_id)]
+users$init_TB_group = agg$init_TB_group[match(users$user_id, agg$user_id)]
 ```
 
 
@@ -76,9 +77,12 @@ cycles_m$init_TB_group = agg$init_TB_group[match(cycles_m$user_id, agg$user_id)]
 
 
 
-```{r users_descr_evolution save cycles_m}
+```{r users_descr_evolution save cycles_m and users}
 save(cycles_m, file = paste0(IO$output_data, "cycles_m.Rdata"))
 file.copy(from = paste0(IO$output_data, "cycles_m.Rdata"), to = paste0(IO$output_data, "cycles_m_with_init_TB_group.Rdata"), overwrite = TRUE)
+
+save(users, file = paste0(IO$output_data, "users.Rdata"))
+file.copy(from = paste0(IO$output_data, "users.Rdata"), to = paste0(IO$output_data, "users_with_init_TB_group.Rdata"), overwrite = TRUE)
 ```
 
 
@@ -112,19 +116,36 @@ fraction_TB = fraction_TB[,- which(colnames(fraction_TB) == "n_cycles")]
 save(fraction_TB, file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time.Rdata"))
 save(min_n_cycles, file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time_min_n_cycles.Rdata"))
 
-ggplot(fraction_TB, aes(x = cycle_nb_m_rel, y = median_n_TB, col = init_TB_group, fill = init_TB_group)) + 
-  geom_line() + 
-  geom_line(aes(y = avg_n_TB), linetype = 3) + 
-  geom_ribbon(aes(ymin = q_05_n_TB , ymax = q_95_n_TB), alpha = 0.2, col = NA)+
-  geom_ribbon(aes(ymin = q_25_n_TB , ymax = q_75_n_TB), alpha = 0.2, col = NA)+
-  geom_text(data = min_n_cycles, aes(label = paste0("min # = ",min_n_cycles)), x = 5, y = 0.95*max(fraction_TB$q_95_n_TB), size = 3, vjust = 0, hjust = 0)+
-  facet_grid(BC  ~ init_TB_group)+
-  #scale_color_manual(values = cols$clusters_6) + scale_fill_manual(values = cols$clusters_6)+ 
-  guides(col = FALSE, fill = FALSE) +
-  xlab("Cycle number") + ylab("# of reported TB")
+
+
 
 
 ```
 
+
+
+```{r users_descr_evolution aggregate - visualisation}
+
+fraction_TB$init_TB_group_text = factor(paste0("avg. #BT in cycles 1-5 = ",fraction_TB$init_TB_group))
+min_n_cycles$init_TB_group_text = factor(paste0("avg. #BT in cycles 1-5 = ",min_n_cycles$init_TB_group))
+
+fraction_TB$BC_x_init_TB_group =  interaction(fraction_TB$init_TB_group, fraction_TB$BC)
+min_n_cycles$BC_x_init_TB_group =  interaction(min_n_cycles$init_TB_group, min_n_cycles$BC)
+
+
+g = ggplot(fraction_TB, aes(x = cycle_nb_m_rel, y = median_n_TB, col = BC_x_init_TB_group, fill = BC_x_init_TB_group)) + 
+  geom_line() + 
+  geom_line(aes(y = avg_n_TB), linetype = 3) + 
+  geom_ribbon(aes(ymin = q_05_n_TB , ymax = q_95_n_TB), alpha = 0.2, col = NA)+
+  geom_ribbon(aes(ymin = q_25_n_TB , ymax = q_75_n_TB), alpha = 0.2, col = NA)+
+  geom_text(data = min_n_cycles, aes(label = paste0("min # = ",min_n_cycles)), x = 0.5, y = 0.95*max(fraction_TB$q_95_n_TB), size = 3, vjust = 0, hjust = 0)+
+  facet_grid(BC  ~ init_TB_group_text )+
+  scale_y_continuous(breaks = seq(0,21, by = 3), minor_breaks = 0:21)+
+  scale_color_manual(values = cols$BC_x_init_TB_group) + scale_fill_manual(values = cols$BC_x_init_TB_group)+ 
+  guides(col = FALSE, fill = FALSE) +
+  xlab("Cycle number") + ylab("# of reported BT")
+g
+
+```
 
 

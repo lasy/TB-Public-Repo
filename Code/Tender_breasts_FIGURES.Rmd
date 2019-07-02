@@ -33,9 +33,6 @@ load(file = paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 ```
 
 
-
-
-
 # Figure 1 INTRO
 
 ## Demographics (Supplementary)
@@ -93,7 +90,7 @@ ggsave(filename = paste0(IO$panels, "S1_X_number_of_cycles_per_cat.pdf"), plot =
 ## Examples
 
 
-```{r overall_profile examples fig 1A}
+```{r TB examples fig 1A}
 
 #load(paste0(IO$input_data,"days/days_1.Rdata"), verbose = TRUE)
 
@@ -121,85 +118,127 @@ rm(days, user_id, user_ids, g, d, j)
 ```
 
 
-## Overall tender breasts profiles
+## Tracking groups
+
+```{r tracking groups average tracking profile, fig.width=6, fig.height=2.5}
+
+load(file = paste0(IO$out_Rdata,"tracking_behavior_overal_pattern_by_tracking_group_and_birth_control.Rdata"), verbose = TRUE)
+
+
+agg$SE = agg$fraction_cycles_with_logs_SE
+
+g = ggplot(agg, aes(x = cycleday_m_D, y = fraction_cycles_with_logs, col = BC, shape = BC)) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_ribbon(aes(ymin = fraction_cycles_with_logs-1.96*SE, ymax = fraction_cycles_with_logs+1.96*SE, fill = BC), alpha = 0.5, col = NA)+
+  geom_line() + geom_point()+ 
+  scale_y_continuous(labels = scales::percent)+ scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values= cols$BC , name="BC")+
+  scale_fill_manual(values= cols$BC , name="BC")+
+  guides(col = FALSE, fill = FALSE, shape = FALSE)+
+  xlab("cycleday from 1st day of menstruation") + ylab("% cycles with any log")+
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))+
+  facet_grid( . ~ tracking_group)
+g
+
+
+g_n = ggplot(agg, aes(x = cycleday_m_D, y = avg_n_logs, col = BC, shape = BC)) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_line() + geom_point()+ 
+  scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values= cols$BC , name="BC")+
+  scale_fill_manual(values= cols$BC , name="BC")+
+  guides(col = FALSE, fill = FALSE, shape = FALSE)+
+  xlab("cycleday from 1st day of menstruation") + ylab("average # of logs")+
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))+
+  facet_grid( . ~ tracking_group)
+g_n
+
+
+ggsave(file = paste0(IO$panels, "tracking_profile_perc_cycles_with_logs_per_tracking_group_and_BC.pdf"),
+       plot = g, 
+       width = viz$full_width/2,
+       height = 0.3*viz$full_width/2,
+       scale = viz$scale)
+
+ggsave(file = paste0(IO$panels, "tracking_profile_avg_log_per_tracking_group_and_BC.pdf"),
+       plot = g_n, 
+       width = viz$full_width/2,
+       height = 0.3*viz$full_width/2,
+       scale = viz$scale)
+
+
+```
+
+
+##  Overall tender breasts profiles per tracking groups
+
+```{r tracking groups average symptoms profile, fig.width=6, fig.height=2.5}
+
+load(file = paste0(IO$out_Rdata,"TB_overal_pattern_by_tracking_group_and_birth_control.Rdata"), verbose = TRUE)
+
+
+agg$SE = agg$fraction_cycles_with_TB_SE
+
+g = ggplot(agg, aes(x = cycleday_m_D, y = fraction_cycles_with_TB, col = BC, shape = BC)) + 
+  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
+  geom_ribbon(aes(ymin = fraction_cycles_with_TB-1.96*SE, ymax = fraction_cycles_with_TB+1.96*SE, fill = BC), alpha = 0.5, col = NA)+
+  geom_line() + geom_point()+ 
+  scale_y_continuous(labels = scales::percent)+ scale_x_continuous(breaks = par$x.axis)+
+  scale_colour_manual(values= cols$BC , name="BC")+
+  scale_fill_manual(values= cols$BC , name="BC")+
+  guides(col = FALSE, fill = FALSE, shape = FALSE)+
+  xlab("cycleday from 1st day of menstruation") + ylab("% cycles with any log")+
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))+
+  facet_grid( . ~ tracking_group)
+g
+
+
+ggsave(file = paste0(IO$panels, "symptoms_profile_per_tracking_group_and_BC.pdf"),
+       plot = g, 
+       width = viz$full_width/2,
+       height = 0.3*viz$full_width/2,
+       scale = viz$scale)
+
+
+```
+
+
+## Overall tender breasts profiles per age categories and BC for cycles with regular tracking
 
 ```{r overall_profile profile by BC and age cat}
 
-load(file = paste0(IO$out_Rdata,"overal_pattern_of_breasts_tenderness_by_age_and_BC.Rdata"), verbose = TRUE)
+load(file = paste0(IO$out_Rdata,"TB_overal_pattern_by_age_cat_and_birth_control_for_regular_tracking.Rdata"), verbose = TRUE)
 
-a$age_x_BC = interaction(a$age_cat , a$BC)
+agg$age_x_BC = interaction(agg$age_cat , agg$BC)
+agg$SE = agg$fraction_cycles_with_TB_SE
 
 
-g = ggplot(a[a$BC != "unclear",], aes(x = cycleday_m_D, y = perc_tender_breasts, col = age_x_BC, shape = BC)) + 
+j = which(agg$age_cat %in% par$age_cat_exclude)
+if(length(j)>0){agg = agg[-j,]}
+j = which((agg$age_cat == "(35,40]") & (agg$BC == "pill"))
+if(length(j)>0){agg = agg[-j,]}
+
+agg = agg[which(agg$tracking_group == "regular tracking"),]
+
+g = ggplot(agg, aes(x = cycleday_m_D, y = fraction_cycles_with_TB, col = age_x_BC, shape = BC)) + 
   geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
-  geom_ribbon(aes(ymin = perc_tender_breasts-1.96*SE, ymax = perc_tender_breasts+1.96*SE, fill = age_x_BC), alpha = 0.5, col = NA)+
+  geom_ribbon(aes(ymin = fraction_cycles_with_TB-1.96*SE, ymax = fraction_cycles_with_TB+1.96*SE, fill = age_x_BC), alpha = 0.5, col = NA)+
   geom_line() + geom_point()+ 
   scale_y_continuous(labels = scales::percent)+ scale_x_continuous(breaks = par$x.axis)+
   scale_colour_manual(values= cols$age_x_BC , name="Age group x BC")+
   scale_fill_manual(values= cols$age_x_BC , name="Age group x BC")+
   guides(col = FALSE, fill = FALSE, shape = FALSE)+
   xlab("cycleday from 1st day of menstruation") + ylab("% cycles with reported TB")+
-  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))
+  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))#+
+  #facet_grid(. ~ tracking_group)
 g
 
-ggsave(filename = paste0(IO$panels, "1C_profile_by_BC_and_age_cat.pdf"), plot = g, width = viz$full_width/3, height = viz$full_width/4.5, scale = viz$scale)
+ggsave(filename = paste0(IO$panels, "symptoms_profile_by_BC_and_age_cat_for_regular_tracking.pdf"), 
+       plot = g, 
+       width = viz$full_width/2, 
+       height = 0.5*viz$full_width/2,
+       scale = viz$scale)
 
-
-
-
-g = ggplot(a, aes(x = cycleday_m_D, y = perc_tender_breasts, col = age_x_BC, shape = BC)) + 
-  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
-  geom_ribbon(aes(ymin = perc_tender_breasts-1.96*SE, ymax = perc_tender_breasts+1.96*SE, fill = age_x_BC), alpha = 0.5, col = NA)+
-  geom_line() + geom_point()+ 
-  scale_y_continuous(labels = scales::percent)+ scale_x_continuous(breaks = par$x.axis)+
-  scale_colour_manual(values= cols$age_x_BC , name="Age group x BC")+
-  scale_fill_manual(values= cols$age_x_BC , name="Age group x BC")+
-  xlab("cycleday from 1st day of menstruation") + ylab("% of reported breasts tenderness")+
-  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))
-g
-
-
-
-rm(a, g)
-
-```
-
-
-
-## Overall tracking behaviour
-
-```{r tracking_behavior plotting tracking patterns by age and BC categories - Fig 1C}
-load( file = paste0(IO$out_Rdata,"tracking_behavior_overal_pattern_by_age_and_BC.Rdata"), verbose = TRUE)
-
-agg$age_x_BC = interaction( agg$age_cat , agg$BC)
-
-g = ggplot(agg[agg$BC != "unclear",], aes(x = cycleday_m_D, y = perc_cycles_with_logs, col = age_x_BC, shape = BC))+
-  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
-  geom_ribbon(aes(ymin = perc_cycles_with_logs-1.96*100*SE, ymax = perc_cycles_with_logs+1.96*100*SE, fill = age_x_BC), alpha = 0.5, col = NA)+
-  geom_point()+ geom_line() + 
-  scale_x_continuous(breaks = par$x.axis)+
-  scale_colour_manual(values= cols$age_x_BC , name="Age group x Birth Control")+
-  scale_fill_manual(values= cols$age_x_BC , name="Age group")+
-  xlab("cycleday from 1st day of menstruation") + ylab("% of cycles | # logs > 0")+
-  guides(col = FALSE, fill = FALSE, shape = FALSE)+
-  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA)) + expand_limits(y = 0)
-g
-
-ggsave(filename = paste0(IO$panels, "1C_tracking_behavior_by_BC_and_age_cat.pdf"), plot = g, width = viz$full_width/3, height = viz$full_width/4.5, scale = viz$scale)
-
-
-g = ggplot(agg[agg$BC != "unclear",], aes(x = cycleday_m_D, y = avg_n_logs, col = age_x_BC, shape = BC)) + 
-  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
-  geom_line() + geom_point()+ 
-  scale_x_continuous(breaks = par$x.axis)+
-  scale_colour_manual(values= cols$age_x_BC , name="Age group")+
-  xlab("cycleday from 1st day of menstruation") + ylab("avg # of logged features per cycle")+
-  theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA)) + expand_limits(y = 0)
-g
-
-ggsave(filename = paste0(IO$panels, "S1X_n_logs_profile_by_BC_and_age_cat.pdf"), plot = g, width = viz$full_width/2, height = viz$full_width/2.35)
-
-rm(g, agg)
 
 ```
 
@@ -244,6 +283,44 @@ ggsave(filename = paste0(IO$panels, "1_number_of_TB_per_cycle.pdf"), plot = g, w
 ```
 
 
+
+
+# Evolution in time
+
+```{r evolution in time}
+
+load(file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time.Rdata"), verbose = TRUE)
+load(file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time_min_n_cycles.Rdata"), verbose = TRUE)
+
+fraction_TB$init_TB_group_text = factor(paste0("avg. #BT in cycles 1-5 = ",fraction_TB$init_TB_group))
+min_n_cycles$init_TB_group_text = factor(paste0("avg. #BT in cycles 1-5 = ",min_n_cycles$init_TB_group))
+
+fraction_TB$BC_x_init_TB_group =  interaction(fraction_TB$init_TB_group, fraction_TB$BC)
+min_n_cycles$BC_x_init_TB_group =  interaction(min_n_cycles$init_TB_group, min_n_cycles$BC)
+
+
+g = ggplot(fraction_TB, aes(x = cycle_nb_m_rel, y = median_n_TB, col = BC_x_init_TB_group, fill = BC_x_init_TB_group)) + 
+  geom_line() + 
+  geom_line(aes(y = avg_n_TB), linetype = 3) + 
+  geom_ribbon(aes(ymin = q_05_n_TB , ymax = q_95_n_TB), alpha = 0.2, col = NA)+
+  geom_ribbon(aes(ymin = q_25_n_TB , ymax = q_75_n_TB), alpha = 0.2, col = NA)+
+  geom_text(data = min_n_cycles, aes(label = paste0("min # = ",min_n_cycles)), x = 0.5, y = 0.95*max(fraction_TB$q_95_n_TB), size = 3, vjust = 0, hjust = 0)+
+  facet_grid(BC  ~ init_TB_group_text )+
+  scale_y_continuous(breaks = seq(0,21, by = 3), minor_breaks = 0:21)+
+  scale_color_manual(values = cols$BC_x_init_TB_group) + scale_fill_manual(values = cols$BC_x_init_TB_group)+ 
+  guides(col = FALSE, fill = FALSE) +
+  xlab("Cycle number") + ylab("# of reported BT")
+g
+
+
+ggsave(filename = paste0(IO$panels, "evolution_in_time.pdf"), 
+       plot = g, 
+       width = viz$full_width/2, 
+       height = 0.5*viz$full_width/2,
+       scale = viz$scale)
+
+
+```
 
 
 
