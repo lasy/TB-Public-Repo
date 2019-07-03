@@ -43,7 +43,7 @@ reshape_d = function(n = 1){
     load(paste0(input_folder,days_files[n]), verbose = TRUE)
     #impute and transform all cycles to wide format, including cycles without TB logs
     user_ids = unique(days$user_id[days$type == "tender_breasts"])
-    days = days[days$user_id %in% user_ids,]
+    days = days[which(days$user_id %in% user_ids),]
     d = reshape_and_impute(days)
     save(d, file = output_file)
     rm(d, days)
@@ -165,7 +165,7 @@ load(file = paste0(IO$tmp_data,"avg_dist_per_user.Rdata"), verbose=  TRUE)
 load(paste0(IO$output_data, "users.Rdata"), verbose=  TRUE)
 
 
-m = match(users$user_id, avg_dist_per_user$user_id)
+m = match(users$user_id, as.character(avg_dist_per_user$user_id))
 users$avg_d = avg_dist_per_user$avg_d[m]
 users$median_d = avg_dist_per_user$median_d[m]
 users$sd_d = avg_dist_per_user$sd_d[m]

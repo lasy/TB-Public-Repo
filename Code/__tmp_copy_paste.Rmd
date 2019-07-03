@@ -29,6 +29,92 @@ output: html_document
 
 
 
+## Selecting consistent and inconsistent users
+
+
+```{r users_descr_examples selecting consistent and inconsistent users from each TB cluster}
+
+N = max(users$most_preval_clust, na.rm = TRUE)
+N_users = 5 
+
+consistent_users = data.frame()
+inconsistent_users = data.frame()
+
+
+for(n in 1:N){
+  j = which(
+    (users$most_preval_clust == n) & 
+      (users$batch == 1) & 
+      (users$n_cycles_m %in% 7:10) & 
+      (users$perc_cycles_with_TB > 0.7))
+  sub_users = users[j,]
+  
+  o = order(sub_users$median_d, decreasing = FALSE)
+  sub_users[o[1],]
+  
+  N_users_n = min(N_users, ceiling(nrow(sub_users)/2))
+  if(N_users_n >= 1){
+    consistent_users = rbind(consistent_users, sub_users[o[1:N_users_n],])
+    inconsistent_users = rbind(inconsistent_users, sub_users[o[(length(o)-N_users_n+1) : length(o)],])
+  }
+}
+
+consistent_users$consistent = TRUE
+inconsistent_users$consistent = FALSE
+
+selected_users = rbind(consistent_users, inconsistent_users)
+
+```
+
+
+
+
+```{r users_descr_examples showing the examples of consistent and inconsistent users from each TB cluster, fig.height=12, fig.width=12}
+
+
+load(paste0(IO$tmp_data,"avg_dist_per_user/d_1.Rdata"), verbose = TRUE)
+
+m = match(d$user_id, selected_users$user_id)
+d$consistent = selected_users$consistent[m]
+d$most_preval_cluster = selected_users$most_preval_clust[m]
+d$cluster_num = cycles_m$cluster_num[match(d$cycle_id_m, cycles_m$cycle_id_m)]
+
+sel_d = d[d$user_id %in% selected_users$user_id,]
+
+sel_d = melt(sel_d, id.vars = c("user_id","cycle_id_m","consistent","most_preval_cluster","cluster_num"))
+
+sel_d$cycleday_m_D = as.numeric(gsub("\\.","-",gsub("n\\.","",sel_d$variable)))
+sel_d$cycle_nb_m = unlist(strsplit(as.character(sel_d$cycle_id_m), "_"))[(1:nrow(sel_d))*2]
+sel_d$tender_breasts = sel_d$value
+
+sel_d = sel_d[,c("user_id","cycle_nb_m","cycleday_m_D","tender_breasts","consistent","most_preval_cluster","cluster_num")]
+
+sel_d_consistent = sel_d[sel_d$consistent, ]
+sel_d_inconsistent = sel_d[!sel_d$consistent, ]
+
+if(nrow(sel_d_inconsistent)>0){
+  
+  g_consistent = ggplot_imputed_TB(sel_d = sel_d_consistent, 
+                                   facet_grid = c("most_preval_cluster","user_id"), cycle_id = FALSE, col = "cluster_num")#+
+  #scale_color_manual(values = cols$clusters_6)
+  
+  
+  g_inconsistent = ggplot_imputed_TB(sel_d = sel_d_inconsistent, 
+                                     facet_grid = c("most_preval_cluster","user_id"), cycle_id = FALSE, col = "cluster_num")#+
+  #scale_color_manual(values = cols$clusters_6)
+  
+  grid.arrange(g_consistent, g_inconsistent, nrow = 1)
+  
+}else{
+  
+  g_consistent = ggplot_imputed_TB(sel_d = sel_d_consistent, 
+                                   facet_grid = c("most_preval_cluster","user_id"), cycle_id = FALSE, col = "cluster_num")#+
+  #scale_color_manual(values = cols$clusters_6)
+  g_consistent
+}
+
+```
+
 
 
 

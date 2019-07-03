@@ -32,41 +32,84 @@ load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 load(paste0(IO$output_data,"cycles_m.Rdata"), verbose=  TRUE)
 ```
 
+## Are users consistent?
+
+We consider users that have logged Breast Tenderness in at least 50% of their and that have tracked regularly.
+
+```{r users_descr_examples selecting users}
+
+j = which((users$f_regular_tracking >= 0.8) & (users$perc_cycles_with_TB >= 0.8) & (users$n_stretches == 1))
+length(j)
+
+table(round(users$avg_d[j],1))
+table(round(users$median_d[j],1))
+
+
+table_by_BC = table(users$BC[j], round(users$avg_d[j],1))
+t(table_by_BC)
+table_by_BC_norm = table_by_BC/apply(table_by_BC, 1, sum)
+t(round(100*table_by_BC_norm,1))
+
+
+table_by_BC = table(users$BC[j], round(users$avg_d[j],2))
+t(table_by_BC)
+table_by_BC_norm = table_by_BC/apply(table_by_BC, 1, sum)
+t(round(100*table_by_BC_norm,1))
+
+df = melt(table_by_BC)
+df_norm = melt(table_by_BC_norm)
+colnames(df) =  c("BC","avg_d","n_users")
+colnames(df_norm) =  c("BC","avg_d","fraction_of_users")
+df = merge(df, df_norm)
+
+
+save(df, file = paste0(IO$out_Rdata,"consistency_summary.Rdata"))
+
+
+```
+
+
+
+
 
 ## Selecting consistent and inconsistent users
 
 
-```{r users_descr_examples selecting consistent and inconsistent users from each TB cluster}
+```{r users_descr_examples selecting consistent and inconsistent users}
 
-N = max(users$most_preval_clust, na.rm = TRUE)
-N_users = 5 
+N_users = 5
 
+average_users = data.frame()
 consistent_users = data.frame()
 inconsistent_users = data.frame()
 
-
-for(n in 1:N){
+for(bc in par$BC_dict$name){
   j = which(
-    (users$most_preval_clust == n) & 
-      (users$batch == 1) & 
-      (users$n_cycles_m %in% 7:10) & 
-      (users$perc_cycles_with_TB > 0.7))
+    (users$BC == bc) & 
+      (users$n_cycles %in% 7:10) & 
+      (users$perc_cycles_with_TB >= 0.8) &
+      (users$f_regular_tracking >= 0.8) )
+  length(j)
   sub_users = users[j,]
   
-  o = order(sub_users$median_d, decreasing = FALSE)
+  o = order(sub_users$avg_d, decreasing = FALSE)
   sub_users[o[1],]
+  
   
   N_users_n = min(N_users, ceiling(nrow(sub_users)/2))
   if(N_users_n >= 1){
+    average_users = rbind(average_users, sub_users[o[round((length(o) - N_users_n)/2):round((length(o) + N_users_n)/2)],])
     consistent_users = rbind(consistent_users, sub_users[o[1:N_users_n],])
     inconsistent_users = rbind(inconsistent_users, sub_users[o[(length(o)-N_users_n+1) : length(o)],])
   }
+  
 }
+average_users$consistent = "average"
+consistent_users$consistent = "consistent"
+inconsistent_users$consistent = "inconsistent"
 
-consistent_users$consistent = TRUE
-inconsistent_users$consistent = FALSE
 
-selected_users = rbind(consistent_users, inconsistent_users)
+selected_users = rbind(consistent_users, average_users, inconsistent_users)
 
 ```
 
@@ -75,55 +118,36 @@ selected_users = rbind(consistent_users, inconsistent_users)
 
 ```{r users_descr_examples showing the examples of consistent and inconsistent users from each TB cluster, fig.height=12, fig.width=12}
 
-
-load(paste0(IO$tmp_data,"avg_dist_per_user/d_1.Rdata"), verbose = TRUE)
+dd = data.frame()
+for(b in unique(selected_users$batch)){
+  cat(b, "\n")
+  #load(paste0(IO$tmp_data,"avg_dist_per_user/d_",b,".Rdata"), verbose = TRUE)
+  load(paste0(IO$output_data,"days/days_",b,".Rdata"), verbose = TRUE)
+  days = days[which(days$user_id %in% selected_users$user_id),]
+  d = reshape_and_impute(days = days)
+  dd = rbind(dd, d)
+  cat(dim(dd), "\n")
+}
+d = dd
 
 m = match(d$user_id, selected_users$user_id)
+d$BC = selected_users$BC[m]
 d$consistent = selected_users$consistent[m]
-d$most_preval_cluster = selected_users$most_preval_clust[m]
-d$cluster_num = cycles_m$cluster_num[match(d$cycle_id_m, cycles_m$cycle_id_m)]
+d$init_TB_group = selected_users$init_TB_group[m]
+d$avg_d = selected_users$avg_d[m]
 
-sel_d = d[d$user_id %in% selected_users$user_id,]
-
-sel_d = melt(sel_d, id.vars = c("user_id","cycle_id_m","consistent","most_preval_cluster","cluster_num"))
+sel_d = melt(d, id.vars = c("user_id","cycle_id_m","BC","consistent","avg_d","init_TB_group"))
 
 sel_d$cycleday_m_D = as.numeric(gsub("\\.","-",gsub("n\\.","",sel_d$variable)))
 sel_d$cycle_nb_m = unlist(strsplit(as.character(sel_d$cycle_id_m), "_"))[(1:nrow(sel_d))*2]
 sel_d$tender_breasts = sel_d$value
 
-sel_d = sel_d[,c("user_id","cycle_nb_m","cycleday_m_D","tender_breasts","consistent","most_preval_cluster","cluster_num")]
+sel_d = sel_d[,c("user_id","cycle_nb_m","cycleday_m_D","tender_breasts","BC","consistent","avg_d","init_TB_group")]
 
-sel_d_consistent = sel_d[sel_d$consistent, ]
-sel_d_inconsistent = sel_d[!sel_d$consistent, ]
-
-if(nrow(sel_d_inconsistent)>0){
-  
-  g_consistent = ggplot_imputed_TB(sel_d = sel_d_consistent, 
-                                   facet_grid = c("most_preval_cluster","user_id"), cycle_id = FALSE, col = "cluster_num")#+
-  #scale_color_manual(values = cols$clusters_6)
-  
-  
-  g_inconsistent = ggplot_imputed_TB(sel_d = sel_d_inconsistent, 
-                                     facet_grid = c("most_preval_cluster","user_id"), cycle_id = FALSE, col = "cluster_num")#+
-  #scale_color_manual(values = cols$clusters_6)
-  
-  grid.arrange(g_consistent, g_inconsistent, nrow = 1)
-  
-}else{
-  
-  g_consistent = ggplot_imputed_TB(sel_d = sel_d_consistent, 
-                                   facet_grid = c("most_preval_cluster","user_id"), cycle_id = FALSE, col = "cluster_num")#+
-  #scale_color_manual(values = cols$clusters_6)
-  g_consistent
-}
+save(sel_d, file = paste0(IO$out_Rdata,"consistent_and_inconsistent_users.Rdata"))
 
 ```
 
-
-
-```{r users_descr_examples save sel_d}
-save(sel_d, file = paste0(IO$out_Rdata,"selected_users_for_TB_consistency.Rdata"))
-```
 
 
 

@@ -106,7 +106,7 @@ for(user_id in user_ids){
   print(g)
   
   ggsave(filename = paste0(IO$panels, "1A_example_",d$user_id[1],".pdf"), plot = g, width = viz$full_width/2.8, height = viz$full_width/4)
-
+  
 }
 
 
@@ -230,7 +230,7 @@ g = ggplot(agg, aes(x = cycleday_m_D, y = fraction_cycles_with_TB, col = age_x_B
   guides(col = FALSE, fill = FALSE, shape = FALSE)+
   xlab("cycleday from 1st day of menstruation") + ylab("% cycles with reported TB")+
   theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))#+
-  #facet_grid(. ~ tracking_group)
+#facet_grid(. ~ tracking_group)
 g
 
 ggsave(filename = paste0(IO$panels, "symptoms_profile_by_BC_and_age_cat_for_regular_tracking.pdf"), 
@@ -324,6 +324,115 @@ ggsave(filename = paste0(IO$panels, "evolution_in_time.pdf"),
 
 
 
+# Consistency of Symptoms
+
+```{r consistency of symptoms - all examples, fig.width= 12, fig.height=10 }
+
+load(file = paste0(IO$out_Rdata,"consistent_and_inconsistent_users.Rdata"), verbose = TRUE)
+
+
+sel_d_consistent = sel_d[sel_d$consistent == "consistent", ]
+sel_d_average = sel_d[sel_d$consistent == "average", ]
+sel_d_inconsistent = sel_d[sel_d$consistent == "inconsistent", ]
+
+
+if((nrow(sel_d_inconsistent)>0)&(nrow(sel_d_consistent)>0)){
+  
+  g_consistent = ggplot_imputed_TB(sel_d = sel_d_consistent, 
+                                   facet_grid = c("BC","init_TB_group","user_id"), cycle_id = FALSE, col = "user_id")
+  
+  
+  g_average = ggplot_imputed_TB(sel_d = sel_d_average, 
+                                facet_grid = c("BC","init_TB_group","user_id"), cycle_id = FALSE, col = "user_id")
+  
+  
+  
+  g_inconsistent = ggplot_imputed_TB(sel_d = sel_d_inconsistent, 
+                                     facet_grid = c("BC","init_TB_group","user_id"), cycle_id = FALSE, col = "user_id")
+  
+  grid.arrange(g_consistent, g_average, g_inconsistent, nrow = 1)
+}
+
+```
+
+
+
+```{r consistency of symptoms - specific examples, fig.width= 12, fig.height=5 }
+
+load(file = paste0(IO$out_Rdata,"consistent_and_inconsistent_users.Rdata"), verbose = TRUE)
+
+user_ids = 
+  c("a425726839dbff5f10272c564486b5a8ec4a3862", "79f4a938b9e8373c1d0b8ea5cb75177fc371045a", 
+    "4e176a95b8e1a597b3450da70decf84eb0c0af79", "6ef947aeb9cfe0468bd1efd26b8a10dca0a1e645", 
+    "17115bfd58d8ec029cdc33f6baca4b9f3facf4f5","a992ef487ea4400458f13fd658b84cdec0a89e78",
+    "30f5a242cbc40cd7430a1077907d806ed24e3ba1","d63bb13e24e6ee03bac73670e13646df708c37c6",
+    "c154cdb272a63d259667755834768dd7b77c1306","2e30d0a5b7c2c48993920c63485bc187c521e838",
+    "f38a635f9ca89b5258e37049d2933b9ef8086d58","d915a3e8ea4abefc864ef25686a9739eb9f87072")
+
+sel_d = sel_d[which(sel_d$user_id %in% user_ids),]
+
+sel_d_consistent = sel_d[sel_d$consistent == "consistent", ]
+sel_d_average = sel_d[sel_d$consistent == "average", ]
+sel_d_inconsistent = sel_d[sel_d$consistent == "inconsistent", ]
+
+if((nrow(sel_d_inconsistent)>0)&(nrow(sel_d_consistent)>0)&(nrow(sel_d_average)>0)){
+  
+  g_consistent = ggplot_imputed_TB(sel_d = sel_d_consistent, 
+                                   facet_grid = c("BC","user_id"), cycle_id = FALSE, col = "BC")+
+    scale_color_manual(values = cols$BC)
+  
+  g_average = ggplot_imputed_TB(sel_d = sel_d_average, 
+                                facet_grid = c("BC","user_id"), cycle_id = FALSE, col = "BC")+
+    scale_color_manual(values = cols$BC)
+  
+  
+  g_inconsistent = ggplot_imputed_TB(sel_d = sel_d_inconsistent, 
+                                     facet_grid = c("BC","user_id"), cycle_id = FALSE, col = "BC")+
+    scale_color_manual(values = cols$BC)
+  
+  grid.arrange(g_consistent, g_average, g_inconsistent, nrow = 1)
+  g_consistency = arrangeGrob(g_consistent, g_average, g_inconsistent, nrow = 1, widths = c(1,1,1))
+  g_consistency
+  
+  ggsave(filename = paste0(IO$panels, "consistency_examples.pdf"), 
+         plot = g_consistency, 
+         width = viz$full_width, 
+         height = 0.4*viz$full_width,
+         scale = viz$scale)
+}
+
+
+
+
+```
+
+
+
+```{r consistency}
+load(file = paste0(IO$out_Rdata,"consistency_summary.Rdata"), verbose = TRUE)
+
+df$BC = factor(df$BC, levels = c(as.character(par$BC_dict$name),"both"))
+
+g = ggplot(df, aes(x = avg_d, y = n_users, fill = BC)) + 
+  geom_area(position = "identity", alpha = 0.75) + 
+  facet_grid(BC ~ ., scale = "free_y")+
+  scale_fill_manual(values = cols$BC3)
+g
+
+
+ggsave(filename = paste0(IO$panels, "consistency_summary.pdf"), 
+       plot = g, 
+       width = viz$full_width/2, 
+       height = 0.4*viz$full_width/2,
+       scale = viz$scale)
+
+```
+
+
+
+
+
+# Figure 2 CYCLE CLUSTERS
 
 
 
