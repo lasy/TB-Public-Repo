@@ -22,7 +22,7 @@ X = round(matrix(rbeta(26*10^6/4, shape1 = 1, shape2 = 10),10^6/4, 26),1)
 k = 2
 
   # do the clustering
-  clustering = clara(x = X[1:130000,], 
+  clustering = clara(x = X[1:50000,], 
                      k = k, 
                      metric = "custom_jaccard",
                      w = par$w, cjratio = par$r,
