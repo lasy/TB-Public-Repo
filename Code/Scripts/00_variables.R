@@ -117,6 +117,6 @@ par$bmi_cat_exclude = c("(0,15]")
 par$age_cat_exclude = c("(10,15]","(40,45]")
 
 par$clara = list()
-par$clara$samples = 10
-par$clara$sampsize = 100
+par$clara$samples = 50
+par$clara$sampsize = 200
 

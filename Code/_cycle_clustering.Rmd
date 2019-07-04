@@ -13,23 +13,158 @@ output:
     fig_caption: true
 ---
 
+```{r cycle_clustering librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
 
 # Cycle clustering
 
+We want to cluster cycles BC group (2) and by tracking category (regular tracking and pre-menstrual tracking = 2).
+For each sub-sample (4), we will evaluate the optimal number of clusters and characterize these clusters.
+We will use the distance defined earlier in  `_metric.Rmd`.
 
-```{r child = '_cycle_clust_metric.Rmd', cache=TRUE}
+
+```{r cycle_clustering load data}
+load(paste0(IO$output_data, "cycles_m.Rdata"), verbose = TRUE)
+load(paste0(IO$tmp_data, "d_wide_imputed.Rdata"), verbose = TRUE)
+load(paste0(IO$tmp_data,"d_imputed.Rdata"), verbose = TRUE)
 ```
 
 
-```{r child = '_cycle_clust_optimal_cluster_number.Rmd', cache=TRUE}
+
+```{r cycle_clustering clustering procedure functions}
+
+
+optimal_number_of_clusters = function(X = matrix()){
+  
+  y = data.frame()
+  
+  tic()
+  for(i in 1:5){
+    cat(i,"\n")
+    set.seed(i)
+    j = sample(1:nrow(X),5000)
+    g_clara = fviz_nbclust(X[j,], k.max = 10, 
+                           FUNcluster = clara, 
+                           metric = "custom_jaccard",
+                           w = par$w, cjratio = par$r,
+                           samples = par$clara$samples, 
+                           sampsize = par$clara$sampsize, 
+                           method = "silhouette")
+    #print(g_clara)
+    y = rbind(y, g_clara$data$y)
+  }
+  toc()
+  colnames(y) = g_clara$data$clusters
+  
+  y_average =  apply(y, 2, mean)
+  n_clust = as.numeric(colnames(y)[which.max(y_average)])
+  
+  y$i = 1:nrow(y)
+  y = melt(y, id.vars = "i")
+  colnames(y) = c("i","k","avg_silh_score")
+  
+  ggplot(y, aes(x = k, y = avg_silh_score, group = i))+
+    geom_line()+
+    stat_summary(fun.y=mean, aes(group=1), geom="line", colour="blue")
+  
+  opt = list(k = n_clust, y = y)
+  return(opt)
+}
+
+process_clustering = function(clara_output = clustering){
+  
+  # re-order clusters by avg silh score.
+  o = order(clusters_clara$silinfo$clus.avg.widths, decreasing = TRUE)
+  cl_table = data.frame(cl_i = o, cl_num = 1:length(o),cl = paste0("cl",1:length(o)))
+  cl_table = cl_table[order(cl_table$cl_i),]
+  
+  
+  
+}
+
+
+
+run_clustering_procedure = function(d_wide = data.frame()){
+  
+  X = as.matrix(d_wide[,-1])
+  
+  # find the optimal number of clusters
+  opt = optimal_number_of_clusters(X = X)
+  k = opt$k
+  
+  
+  
+  # do the clustering
+  clustering = clara(x = X, 
+                     k = k, 
+                     metric = "custom_jaccard",
+                     w = par$w, cjratio = par$r,
+                     samples = par$clara$samples,
+                     sampsize = par$clara$sampsize)
+  
+  
+  processed_clustering = process_clustering(clara_output = clustering)
+  
+  
+  clusters = process_clustering$clustering
+  medoids = process_clustering$medoids
+  
+  
+  
+  process_clustering = clustering$silh
+  
+  clustering_res = list(k = k, opt = opt, clusters = clusters, medoids = medoids, silh = silh)
+  return(clustering_res)
+  
+} 
+
 ```
 
 
-```{r child = '_cycle_clust_clustering.Rmd', cache=TRUE}
+
+```{r cycle_clustering clustering}
+d_wide_full = d_wide ### DELETE
+BC = "pill" ### DELETE
+tracking_group = "regular tracking" ### DELETE
+
+for(BC in as.character(par$BC_dict$name)){
+  for(tracking_group in c("regular tracking","pre-menstrual tracking")){
+    j = which((cycles_m$BC == BC) & (cycles_m$tracking_group == tracking_group))
+    cycle_ids = cycles_m$cycle_id[j]
+    this_d_wide = d_wide[which(d_wide$cycle_id %in% cycle_ids),]
+    
+    d_wide = this_d_wide ### DELETE
+    
+    clustering_res = run_clustering_procedure(d_wide = this_d_wide)
+    save(clustering_res)
+    
+    # viz + add clustering to cycles_m
+    
+    
+  }
+}
+
+
 ```
 
 
-```{r child = '_cycle_clust_users_descr_cluster_info.Rmd', cache=TRUE}
+```{r}
+
+source("Scripts/00_setup.R")
+
+X = round(matrix(rbeta(26*10^6/4, shape1 = 1, shape2 = 10),10^6/4, 26),1)
+k = 2
+
+  # do the clustering
+  clustering = clara(x = X[1:130000,], 
+                     k = k, 
+                     metric = "custom_jaccard",
+                     w = par$w, cjratio = par$r,
+                     samples = par$clara$samples,
+                     sampsize = par$clara$sampsize)
 ```
 
 

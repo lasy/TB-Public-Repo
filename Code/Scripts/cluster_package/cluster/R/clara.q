@@ -3,7 +3,7 @@
 #### Note that the algorithm is O(n), but O(ns^2) where ns == sampsize
 
 clara <- function(x, k,
-		  metric = c("euclidean", "manhattan", "jaccard", "custom_jaccard"), w = NA, cjratio = 0.7,
+		  metric = c("euclidean", "manhattan", "jaccard"),
                   stand = FALSE,
 		  samples = 5, sampsize = min(n, 40 + 2 * k), trace = 0,
                   medoids.x = TRUE, keep.data = medoids.x, rngR = FALSE,
@@ -34,17 +34,6 @@ clara <- function(x, k,
     else if(keep.data)
         stop("when 'medoids.x' is FALSE, 'keep.data' must be too")
     metric <- match.arg(metric)
-    
-    ## options for custom_jaccard
-    # weight
-    if(any(is.na(w))){w = rep(1, ncol(x))}
-    if(any((w>1)|(w<0))){stop("w must be between 0 and 1\n")}
-    if(length(w) != ncol(x)){stop("w must be NA or the same length as the number of columns of x\n")}
-    # ratio
-    if(is.na(cjratio) | (cjratio>1) | (cjratio<0)){cjratio = 0.7}
-    #cat("w: ",w,"\n")
-    #cat("cjratio: ",cjratio,"\n")
-    
     if(stand)
         x <- scale(x, scale = apply(x, 2, meanabsdev))
     if(keep.data)
@@ -66,8 +55,6 @@ to suppress this warning.")
 	    stop("invalid 'correct.d'")
     } else rm(inax) # save space
 
-  
-    #cat("cjratio: ",cjratio,"\n")
     res <- .C(cl_clara,
 	      n,
 	      jp,
@@ -79,7 +66,7 @@ to suppress this warning.")
 	      as.integer(mdata),	# = mdata
 	      valmd = if(mdata) rep(valmisdat, jp) else -1.,	## 9
 	      jtmd  = if(mdata) jtmd else integer(1),
-	      c("euclidean" = 1L, "manhattan" = 2L, "jaccard" = 3L, "custom_jaccard" = 4L)[[metric]],
+	      c("euclidean" = 1L, "manhattan" = 2L, "jaccard" = 3L)[[metric]],
 					# =  diss_kind (DISS_KIND : ../src/cluster.h)
 	      as.logical(rngR[1]), 	# = rng_R		## 12
 	      as.logical(pamLike[1]),	# = pam_like
@@ -103,9 +90,7 @@ to suppress this warning.")
 	      jstop = integer(1),
 	      as.integer(trace),	# = trace_lev
 	      double (3 * sampsize),	# = tmp			## 33
-	      integer(6 * sampsize),	# = itmp
-        w, # weight for the CUSTOM_JACCARD distance
-				cjratio = cjratio) # ratio for the 2 indexes for the CUSTOM_JACCARD distance
+	      integer(6 * sampsize))	# = itmp
     ## give a warning when errors occured
     ## res[] components really used below:
     ## jstop, clu, silinf, dis, sample, med, imed, obj, size, maxis, avdis, ratdis,

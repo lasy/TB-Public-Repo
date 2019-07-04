@@ -98,26 +98,17 @@
                 "usr" : "c:@EA@DISS_KIND@JACCARD"
             },
             {
-                "column" : 5,
-                "file" : "/Users/laurasymul/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/TB-Public-Repo/Code/Scripts/cluster_package/cluster/src/cluster.h",
-                "kind" : 5,
-                "line" : 19,
-                "name" : "CUSTOM_JACCARD",
-                "parent_name" : "",
-                "usr" : "c:@EA@DISS_KIND@CUSTOM_JACCARD"
-            },
-            {
                 "column" : 3,
                 "file" : "/Users/laurasymul/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/TB-Public-Repo/Code/Scripts/cluster_package/cluster/src/cluster.h",
                 "kind" : 8,
-                "line" : 20,
+                "line" : 19,
                 "name" : "DISS_KIND",
                 "parent_name" : "",
                 "usr" : "c:cluster.h@T@DISS_KIND"
             }
         ],
         "file" : "/Users/laurasymul/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/TB-Public-Repo/Code/Scripts/cluster_package/cluster/src/cluster.h",
-        "file_last_write" : 1545711904
+        "file_last_write" : 1559926438
     },
     {
         "definitions" : [
@@ -128,7 +119,7 @@
                 "line" : 31,
                 "name" : "cl_fanny(int *, int *, int *, double *, double *, int *, double *, int *, int *, int *, int *, int *, double *, double *, double *, double *, int *, double *, double *, double *, double *, double *, int *, double *, double *, double *, int *)",
                 "parent_name" : "",
-                "usr" : "c:@F@cl_fanny"
+                "usr" : "c:@F@cl_fanny#*I#S0_#S0_#*d#S1_#S0_#S1_#S0_#S0_#S0_#S0_#S0_#S1_#S1_#S1_#S1_#S0_#S1_#S1_#S1_#S1_#S1_#S0_#S1_#S1_#S1_#S0_#"
             },
             {
                 "column" : 6,
@@ -137,7 +128,7 @@
                 "line" : 75,
                 "name" : "dysta3(int *, int *, double *, double *, int *, int *, double *, int *)",
                 "parent_name" : "",
-                "usr" : "c:@F@dysta3"
+                "usr" : "c:@F@dysta3#*I#S0_#*d#S1_#S0_#S0_#S1_#S0_#"
             },
             {
                 "column" : 6,
@@ -146,7 +137,7 @@
                 "line" : 112,
                 "name" : "fuzzy(int, int, double *, double *, double *, double *, double *, double *, double *, double, double, int *, int)",
                 "parent_name" : "",
-                "usr" : "c:fanny.c@F@fuzzy"
+                "usr" : "c:fanny.c@F@fuzzy#I#I#*d#S0_#S0_#S0_#S0_#S0_#S0_#d#d#*I#I#"
             },
             {
                 "column" : 6,
@@ -155,7 +146,7 @@
                 "line" : 289,
                 "name" : "caddy(int, int, double *, int *, int *, int *, double *, int)",
                 "parent_name" : "",
-                "usr" : "c:fanny.c@F@caddy"
+                "usr" : "c:fanny.c@F@caddy#I#I#*d#*I#S1_#S1_#S0_#I#"
             },
             {
                 "column" : 6,
@@ -164,11 +155,11 @@
                 "line" : 376,
                 "name" : "fygur(int, int, int *, double *, double, int *, int *, int *, double *, double *, double *, double *, double *)",
                 "parent_name" : "",
-                "usr" : "c:fanny.c@F@fygur"
+                "usr" : "c:fanny.c@F@fygur#I#I#*I#*d#d#S0_#S0_#S0_#S1_#S1_#S1_#S1_#S1_#"
             }
         ],
         "file" : "/Users/laurasymul/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/TB-Public-Repo/Code/Scripts/cluster_package/cluster/src/fanny.c",
-        "file_last_write" : 1523050204
+        "file_last_write" : 1549999011
     },
     {
         "definitions" : [
@@ -209,7 +200,7 @@
                 "line" : 21,
                 "name" : "iabs(int)",
                 "parent_name" : "",
-                "usr" : "c:mona.c@F@iabs"
+                "usr" : "c:mona.c@F@iabs#I#"
             },
             {
                 "column" : 6,
@@ -218,11 +209,11 @@
                 "line" : 26,
                 "name" : "clmona_(int *, int *, int *, int *, int *, int *, int *, int *, int *)",
                 "parent_name" : "",
-                "usr" : "c:@F@clmona_"
+                "usr" : "c:@F@clmona_#*I#S0_#S0_#S0_#S0_#S0_#S0_#S0_#S0_#"
             }
         ],
         "file" : "/Users/laurasymul/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/TB-Public-Repo/Code/Scripts/cluster_package/cluster/src/mona.c",
-        "file_last_write" : 1523050204
+        "file_last_write" : 1556708726
     },
     {
         "definitions" : [
@@ -233,7 +224,7 @@
                 "line" : 105,
                 "name" : "cl_Pam(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP)",
                 "parent_name" : "",
-                "usr" : "c:@F@cl_Pam"
+                "usr" : "c:@F@cl_Pam#*$@S@SEXPREC#S0_#S0_#S0_#S0_#S0_#S0_#S0_#S0_#S0_#S0_#S0_#S0_#"
             },
             {
                 "column" : 6,
@@ -242,29 +233,29 @@
                 "line" : 292,
                 "name" : "bswap(int, int, int *, Rboolean, Rboolean, int, double *, double *, double *, const double *, double, double *, int)",
                 "parent_name" : "",
-                "usr" : "c:@F@bswap"
+                "usr" : "c:@F@bswap#I#I#*I#$@EA@Rboolean#S1_#I#*d#S2_#S2_#*1d#d#S2_#I#"
             },
             {
                 "column" : 6,
                 "file" : "/Users/laurasymul/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/TB-Public-Repo/Code/Scripts/cluster_package/cluster/src/pam.c",
                 "kind" : 6,
-                "line" : 577,
+                "line" : 810,
                 "name" : "cstat(int, int, int *, int *, Rboolean, double *, double *, double *, double *, double *, double *, int *, int *, int *, int *)",
                 "parent_name" : "",
-                "usr" : "c:@F@cstat"
+                "usr" : "c:@F@cstat#I#I#*I#S0_#$@EA@Rboolean#*d#S2_#S2_#S2_#S2_#S2_#S0_#S0_#S0_#S0_#"
             },
             {
                 "column" : 6,
                 "file" : "/Users/laurasymul/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/TB-Public-Repo/Code/Scripts/cluster_package/cluster/src/pam.c",
                 "kind" : 6,
-                "line" : 751,
+                "line" : 984,
                 "name" : "dark(int, int, const int *, const double *, double, int *, int *, int *, double *, double *, double *, double *, double *)",
                 "parent_name" : "",
-                "usr" : "c:@F@dark"
+                "usr" : "c:@F@dark#I#I#*1I#*1d#d#*I#S2_#S2_#*d#S3_#S3_#S3_#S3_#"
             }
         ],
         "file" : "/Users/laurasymul/Google Drive/Ladies & Gentlemen/Papers/Tender_Breasts/TB-Public-Repo/Code/Scripts/cluster_package/cluster/src/pam.c",
-        "file_last_write" : 1523050204
+        "file_last_write" : 1554134956
     },
     {
         "definitions" : [

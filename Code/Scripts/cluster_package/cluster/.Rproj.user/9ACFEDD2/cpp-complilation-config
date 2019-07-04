@@ -2,14 +2,14 @@
     "args" : [
         "-I/Applications/RStudio.app/Contents/Resources/resources/libclang/builtin-headers/3.5",
         "-I/Applications/RStudio.app/Contents/Resources/resources/libclang/builtin-headers/libc++/3.5",
-        "-I/usr/local/Cellar/r/3.5.2/lib/R/include",
+        "-std=gnu++11",
+        "-I/Library/Frameworks/R.framework/Resources/include",
         "-DNDEBUG",
-        "-I/usr/local/opt/gettext/include",
-        "-I/usr/local/opt/readline/include",
+        "-isysroot",
         "-I/usr/local/include",
         "-fPIC"
     ],
-    "hash" : "1523281983",
+    "hash" : "1560942603",
     "is_cpp" : false,
     "pch" : ""
 }

@@ -15,8 +15,7 @@
 typedef enum {
     EUCLIDEAN = 1,
     MANHATTAN = 2,
-    JACCARD = 3,
-    CUSTOM_JACCARD = 4
+    JACCARD = 3
 } DISS_KIND;
 
 /* --------- ./clara.c ------------------*/
@@ -36,7 +35,7 @@ void cl_clara(int *n,  /* = number of objects */
 	      int *mdata,	/*= {0,1}; 1: min(x) is missing value (NA);  0: no NA */
 	      double *valmd,/*[j]= missing value code (instead of NA) for x[,j]*/
 	      int *jtmd,	/* [j]= {-1,1};	 -1: x[,j] has NA; 1: no NAs in x[,j] */
-	      DISS_KIND *diss_kind, // = {EUCLIDEAN, MANHATTAN, JACCARD, CUSTOM_JACCARD}
+	      DISS_KIND *diss_kind, // = {EUCLIDEAN, MANHATTAN, JACCARD}
 	      int/*logical*/ *rng_R,/*= {0,1};  0 : use clara's internal weak RNG;
 				     *	        1 : use R's RNG (and seed) */
 	      int/*logical*/ *pam_like,/* if (1), we do "swap()" as in pam(), otherwise
@@ -55,14 +54,12 @@ void cl_clara(int *n,  /* = number of objects */
 	      double *avsyl, double *ttsyl, double *sylinf,
 	      int *jstop, int *trace_lev,
 	      double *tmp, /* = double [ 3 * nsam ] */
-	      int *itmp,	/* = integer[ 6 * nsam ] */
-        double *w, /* = weight for the CUSTOM_JACCARD */
-        double *cjratio /* = ratio between the two similarity index for the CUSTOM_JACCARD */
+	      int *itmp	/* = integer[ 6 * nsam ] */
     );
 
 void dysta2(int nsam, int jpp, int *nsel,
-	    double *x, int n, double *dys, DISS_KIND diss_kind, 
-	    int *jtmd, double *valmd, Rboolean has_NA, Rboolean *toomany_NA,double *w, double *cjratio);
+	    double *x, int n, double *dys, DISS_KIND diss_kind,
+	    int *jtmd, double *valmd, Rboolean has_NA, Rboolean *toomany_NA);
 
 
 void bswap2(int kk, int nsam, double s, const double dys[],
@@ -77,7 +74,7 @@ void selec(int kk, int n, int jpp, DISS_KIND diss_kind,
 	   int *nrepr, int *nsel, double *dys, double *x, int *nr,
 	   Rboolean *nafs, double *ttd, double *radus, double *ratt,
 	   int *nrnew, int *nsnew, int *npnew, int *ns, int *np, int *new,
-	   double *ttnew, double *rdnew, int correct_d, double *w, double *cjratio);
+	   double *ttnew, double *rdnew, int correct_d);
 
 void resul(int kk, int n, int jpp, DISS_KIND diss_kind, Rboolean has_NA,
 	   int *jtmd, double *valmd, double *x, int *nrx, int *mtt, int correct_d);
@@ -90,7 +87,7 @@ void black(int kk, int jpp, int nsam, int *nbest,
 	   double *syl, double *srank);
 
 /* -------- ./dysta.f --- (was in pam.f) -------------------- */
-int F77_NAME(dysta)(int *nn, int *jpp, double *x, double *dys, int *ndyst,
+void F77_NAME(dysta)(int *nn, int *jpp, double *x, double *dys, int *ndyst,
 		    int *jtmd, double *valmd, int *jhalt);
 /* --------- ./pam.c ------------------*/
 
@@ -174,8 +171,9 @@ void cl_fanny(int *nn, int *jpp, int *kk,
 /* ================= Fortran things (remainder) ======================== */
 
 /* -------- ./daisy.f ---------------------------------- */
-int F77_NAME(cldaisy)(int *nn, int *jpp, double *x,
-		       double *valmd, int *jtmd, int *jdat, int *vtype,
+void F77_NAME(cldaisy)(int *nn, int *jpp, double *x,
+		       double *valmd, double *weights,
+		       int *jtmd, int *jdat, int *vtype,
 		       int *ndyst, int *mdata, double *disv);
 
 /* -------- ./fanny.c ---------------------------------- */
@@ -184,7 +182,7 @@ void dysta3(int *nn, int *p, double *x, double *dys,
 	    int *ndyst, int *jtmd, double *valmd, int *jhalt);
 
 /* -------- ./mona.f ---------------------------------- */
-int F77_NAME(clmona)(int *nn, int *pp, int *x, int *jerr,
+void F77_NAME(clmona)(int *nn, int *pp, int *x, int *jerr,
 		      int *nban, int *ner, int *kwan, int *lava, int *jlack);
 
 /* -------- ./twins.c ---------------------------------- */

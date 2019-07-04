@@ -7,12 +7,6 @@ output: html_document
 
 
 
-
-
-```{r child = '_users_description.Rmd', cache=TRUE}
-```
-
-
 ```{r child = '_cycle_clustering.Rmd', cache=TRUE}
 ```
 
@@ -22,10 +16,27 @@ output: html_document
 
 
 
+######################
+
+
+
+```{r child = '_cycle_clust_optimal_cluster_number.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_cycle_clust_clustering.Rmd', cache=TRUE}
+```
+
+
+```{r child = '_cycle_clust_users_descr_cluster_info.Rmd', cache=TRUE}
+```
 
 
 
 ######################
+
+
+
 
 
 

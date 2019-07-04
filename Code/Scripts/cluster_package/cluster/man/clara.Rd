@@ -6,9 +6,7 @@
   the data into \code{k} clusters.
 }
 \usage{
-clara(x, k, 
-      metric = c("euclidean", "manhattan", "jaccard","custom_jaccard"), 
-      w = NA, cjratio = 0.7,
+clara(x, k, metric = c("euclidean", "manhattan", "jaccard"),
       stand = FALSE, samples = 5,
       sampsize = min(n, 40 + 2 * k), trace = 0, medoids.x = TRUE,
       keep.data = medoids.x, rngR = FALSE, pamLike = FALSE, correct.d = TRUE)
@@ -29,18 +27,13 @@ clara(x, k,
 
     Euclidean distances are root sum-of-squares of differences, and
     manhattan distances are the sum of absolute differences.
-    
-    + custom_jaccard
   }
-  \item{w}{For custom_jaccard only: numeric vector giving the weight for the distance calculation.}
-  \item{cjratio}{For custom_jaccard only: ratio (in [0,1]) between the 2 similarity index.}
   \item{stand}{logical, indicating if the measurements in \code{x} are
     standardized before calculating the dissimilarities.  Measurements
     are standardized for each variable (column), by subtracting the
     variable's mean value and dividing by the variable's mean absolute
     deviation.
   }
-  
   \item{samples}{integer, say \eqn{N}, the number of samples to be drawn from the
     dataset.  The default, \code{N = 5}, is rather small for historical (and
     now back compatibility) reasons and we \emph{recommend to set
@@ -87,7 +80,6 @@ clara(x, k,
     Because the new correct formula is not back compatible, for the time
     being, a warning is signalled in this case, unless the user explicitly
     specifies \code{correct.d}.}
- 
 }
 \value{
   an object of class \code{"clara"} representing the clustering.  See
@@ -144,7 +136,8 @@ clara(x, k,
 }
 \author{
   Kaufman and Rousseeuw (see \code{\link{agnes}}), originally.
-  Metric \code{"jaccard"}: Kamil Kozlowski and Kamil Jadeszko (from \url{ownedoutcomes.com}).
+  Metric \code{"jaccard"}: Kamil Kozlowski (\code{@ownedoutcomes.com})
+  and Kamil Jadeszko.
   All arguments from \code{trace} on, and most \R documentation and all
   tests by Martin Maechler.
 }
@@ -165,7 +158,7 @@ all.equal(clarax[-8],
           clara(x, 2, samples=50, pamLike = TRUE)[-8])
 plot(clarax)
 
-## `xclara' is an artificial data set with 3 clusters of 1000 bivariate
+## 'xclara' is an artificial data set with 3 clusters of 1000 bivariate
 ## objects each.
 data(xclara)
 (clx3 <- clara(xclara, 3))
