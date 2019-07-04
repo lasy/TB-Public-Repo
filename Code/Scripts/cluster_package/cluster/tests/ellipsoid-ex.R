@@ -1,8 +1,7 @@
 library(cluster)
 
-tools::assertWarning(eh <- ellipsoidhull(cbind(x=1:4, y = 1:4)), verbose=TRUE) #singular
+eh <- ellipsoidhull(cbind(x=1:4, y = 1:4)) #singular
 eh ## center ok, shape "0 volume" --> Warning
-stopifnot(volume(eh) == 0)
 
 set.seed(157)
 for(n in 4:10) { ## n=2 and 3 still differ -- platform dependently!
@@ -26,9 +25,3 @@ stopifnot(all.equal(e.$sqdist,
 d5 <- cbind(d3o, 2*abs(y)^1.5 + rt(100,3), 3*x - sqrt(abs(y)))
 (e5 <- ellipsoidhull(d5, ret.sq = TRUE))
 tail(sort(e5$sqdist)) ## 4 values 5.00039 ... 5.0099
-
-(e5.1e77 <- ellipsoidhull(1e77*d5))
-stopifnot(# proof correct scaling c^5
-    all.equal(volume(e5.1e77, log=TRUE) - volume(e5, log=TRUE),
-              ncol(d5) *  77* log(10))
-)
