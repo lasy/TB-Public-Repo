@@ -18,6 +18,9 @@ source("Scripts/00_setup.R")
 ```
 
 
+```{r user_phenotyping knitr setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
 
 # User clustering
 
