@@ -63,6 +63,8 @@ save(c_wide, file = paste0(IO$tmp_data, "c_wide_selected_users.Rdata"))
 #load(file = paste0(IO$tmp_data, "c_wide_selected_users.Rdata"), verbose = TRUE)
 # load(file = paste0(IO$output_data,"users.Rdata"), verbose = TRUE)
 
+source("Scripts/00_functions_distance.R")
+
 c_wide_BC = users$BC[match(c_wide$user_id, users$user_id)]
 
 #BC = as.character(par$BC_dict$name)[1] # NC
