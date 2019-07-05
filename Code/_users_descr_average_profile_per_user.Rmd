@@ -36,7 +36,7 @@ load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 
 We only compute the average profile for users that had as least 1 TB ever logged
 
-```{r users_descr_avg_profile reshape d - function, cache = TRUE}
+```{r users_descr_avg_profile average profile - function, cache = TRUE}
 average_profile_per_user = function(n = 1){
   cat(n,"\n")
   load(paste0(input_folder,days_files[n]), verbose = TRUE)
