@@ -12,6 +12,9 @@ copy_days_tmp2out = function(dir_path){
 
 
 
+re_scale_range = function(x, ...){(x - min(x, ...)) / (max(x, ...) - min(x, ...))}
+
+
 tac = function(chunck_name = "chunk_name"){
   elapsed = toc()
   df = data.frame(datetime = Sys.time(),

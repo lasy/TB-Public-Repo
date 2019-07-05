@@ -71,7 +71,7 @@ user_ids = intersect(user_ids_users, user_ids_cycles_m)
 
 
 ```{r users_descr_evolution classifying users initial TB groups}
-agg = aggregate(n_TB ~ user_id, cycles_m[(cycles_m$cycle_nb_m_rel<=6),], mean)
+agg = aggregate(n_TB ~ user_id, cycles_m[(cycles_m$cycle_nb_m_rel<=6),], median)
 agg$init_TB_group = cut(agg$n_TB, breaks = c(0, 1, 3, Inf), right = FALSE)
 cycles_m$init_TB_group = agg$init_TB_group[match(cycles_m$user_id, agg$user_id)]
 users$init_TB_group = agg$init_TB_group[match(users$user_id, agg$user_id)]

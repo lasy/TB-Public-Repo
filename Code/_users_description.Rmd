@@ -20,11 +20,15 @@ output:
 ```
 
 
-```{r child = '_users_descr_average_dist_per_user.Rmd', cache=TRUE}
+```{r child = '_users_descr_average_profile_per_user.Rmd', cache=TRUE}
 ```
 
 
 ```{r child = '_users_descr_selecting_user_examples.Rmd', cache=TRUE}
 ```
  
+
+
+
+
 

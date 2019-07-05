@@ -36,7 +36,16 @@ output: html_document
 ######################
 
 
-
+  
+  
+  kNNdistplot(dist, k = ncol(M)+1)
+  
+  this_dbscan = dbscan(dist, eps = 0.25, minPts = 10)
+  this_dbscan
+  round(apply(this_c_wide[this_dbscan$cluster == 2,-1],2,mean),2)
+  round(apply(this_c_wide[this_dbscan$cluster == 1,-1],2,mean),2)
+  
+  
 
 
 

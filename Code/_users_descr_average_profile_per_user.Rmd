@@ -1,0 +1,122 @@
+---
+title: "Average profile per users"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r users_descr_avg_profile librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r users_descr_avg_profile setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+
+```{r users_descr_avg_profile loading cycles_m and users}
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+```
+
+
+## Average profile per users
+
+We only compute the average profile for users that had as least 1 TB ever logged
+
+```{r users_descr_avg_profile reshape d - function, cache = TRUE}
+average_profile_per_user = function(n = 1){
+  cat(n,"\n")
+  load(paste0(input_folder,days_files[n]), verbose = TRUE)
+  #impute and transform all cycles to wide format, including cycles without TB logs
+  user_ids = unique(days$user_id[days$type == "tender_breasts"])
+  i = (days$user_id %in% user_ids) & (!is.na(days$cycleday_m_D))
+  j = which(i & (days$type == TB))
+  i = which(i)
+
+  days$n_tender_breast = 1
+  agg = aggregate(n_tender_breast ~ user_id + cycleday_m_D, days[j,], sum)
+  agg_n_cycles = aggregate(cycle_id_m ~ user_id, days[i,], lu)
+  agg$n_cycles = agg_n_cycles$cycle_id_m[match(agg$user_id, agg_n_cycles$user_id)]
+  agg$avg_tender_breast = agg$n_tender_breast / agg$n_cycles
+  
+  rm(days)
+  cat(n," : done \n")
+  return(agg)
+}
+```
+
+
+
+```{r users_descr_avg_profile average profile from days, cache = TRUE}
+
+input_folder = paste0(IO$output_data,"days/")
+days_files = list.files(input_folder)
+days_files = days_files
+N = length(days_files)
+
+tic()
+cl = makeCluster(min(par$n_cores, N), outfile="")
+registerDoParallel(cl)
+avg_profile_per_user = foreach(n = 1:N, .combine = rbind)%dopar%{average_profile_per_user(n = n)}
+stopImplicitCluster()
+tac("users_descr_avg_profile average profile from days")
+
+save(avg_profile_per_user, file = paste0(IO$tmp_data, "avg_profile_per_user.Rdata"))
+```
+
+
+```{r users_descr_avg_profile consistency}
+
+
+avg_profile_per_user$consistency = (avg_profile_per_user$n_tender_breast - 1)/(avg_profile_per_user$n_cycles - 1)
+
+agg = aggregate(consistency ~ user_id, avg_profile_per_user, max, na.rm = TRUE) # function(x){weighted.mean(x = x, w = 100*x+1)}
+users$consistency = agg$consistency[match(users$user_id, agg$user_id)]
+
+
+j = which(((users$f_pre.menstrual_tracking >= 0.75) | (users$f_regular_tracking >= 0.75))&
+            (users$init_TB_group != "[0,1)")&
+            (users$BC != "unclear"))
+
+
+selected_users = users[j,]
+
+table_BC_consistency = table(as.character(selected_users$BC),as.character(selected_users$init_TB_group), round(selected_users$consistency,1))
+table_BC_consistency
+df = melt(table_BC_consistency)
+colnames(df) =  c("BC","init_TB_group","consistency","n_users")
+df
+
+df_agg = aggregate(n_users ~ BC + init_TB_group,df, sum)
+colnames(df_agg) = c("BC","init_TB_group","n_users_tot")
+
+df = merge(df, df_agg, all =TRUE)
+df$fraction_of_users = df$n_users / df$n_users_tot
+
+save(df, file = paste0(IO$out_Rdata,"consistency_summary.Rdata"))
+
+
+```
+
+
+```{r users_descr_avg_profile consistency}
+
+save(users, file = paste0(IO$output_data, "users.Rdata"))
+file.copy(from = paste0(IO$output_data, "users.Rdata") , to = paste0(IO$tmp_data, "users_with_consistency.Rdata"), overwrite = TRUE)
+
+```
+
+

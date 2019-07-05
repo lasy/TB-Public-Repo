@@ -112,6 +112,7 @@ par$r = 0.75
 
 par$D = 18
 par$Df = 7
+par$cycleday_m_D = c(-par$D:par$Df)
 
 par$bmi_cat_exclude = c("(0,15]")
 par$age_cat_exclude = c("(10,15]","(40,45]")
@@ -119,4 +120,9 @@ par$age_cat_exclude = c("(10,15]","(40,45]")
 par$clara = list()
 par$clara$samples = 50
 par$clara$sampsize = 200
+
+
+
+special_pill_user = "6ef947aeb9cfe0468bd1efd26b8a10dca0a1e645"
+
 

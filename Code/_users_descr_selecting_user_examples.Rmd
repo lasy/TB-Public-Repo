@@ -32,43 +32,6 @@ load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 load(paste0(IO$output_data,"cycles_m.Rdata"), verbose=  TRUE)
 ```
 
-## Are users consistent?
-
-We consider users that have logged Breast Tenderness in at least 50% of their and that have tracked regularly.
-
-```{r users_descr_examples selecting users}
-
-j = which((users$f_regular_tracking >= 0.8) & (users$perc_cycles_with_TB >= 0.8) & (users$n_stretches == 1))
-length(j)
-
-table(round(users$avg_d[j],1))
-table(round(users$median_d[j],1))
-
-
-table_by_BC = table(users$BC[j], round(users$avg_d[j],1))
-t(table_by_BC)
-table_by_BC_norm = table_by_BC/apply(table_by_BC, 1, sum)
-t(round(100*table_by_BC_norm,1))
-
-
-table_by_BC = table(users$BC[j], round(users$avg_d[j],2))
-t(table_by_BC)
-table_by_BC_norm = table_by_BC/apply(table_by_BC, 1, sum)
-t(round(100*table_by_BC_norm,1))
-
-df = melt(table_by_BC)
-df_norm = melt(table_by_BC_norm)
-colnames(df) =  c("BC","avg_d","n_users")
-colnames(df_norm) =  c("BC","avg_d","fraction_of_users")
-df = merge(df, df_norm)
-
-
-save(df, file = paste0(IO$out_Rdata,"consistency_summary.Rdata"))
-
-
-```
-
-
 
 
 
@@ -92,24 +55,30 @@ for(bc in par$BC_dict$name){
   length(j)
   sub_users = users[j,]
   
-  o = order(sub_users$avg_d, decreasing = FALSE)
+  o = order(sub_users$consistency, decreasing = FALSE)
   sub_users[o[1],]
   
   
-  N_users_n = min(N_users, ceiling(nrow(sub_users)/2))
+  N_users_n = min(N_users, ceiling(nrow(sub_users)/3))
   if(N_users_n >= 1){
-    average_users = rbind(average_users, sub_users[o[round((length(o) - N_users_n)/2):round((length(o) + N_users_n)/2)],])
-    consistent_users = rbind(consistent_users, sub_users[o[1:N_users_n],])
-    inconsistent_users = rbind(inconsistent_users, sub_users[o[(length(o)-N_users_n+1) : length(o)],])
+    j_avg = which(round(sub_users$consistency,1) == 0.5)[1:N_users_n]
+    average_users = rbind(average_users, sub_users[j_avg,])
+    consistent_users = rbind(consistent_users, sub_users[o[(length(o)-N_users_n+1) : length(o)],])
+    inconsistent_users = rbind(inconsistent_users, sub_users[o[1:N_users_n],])
   }
   
 }
+
+consistent_users = rbind(consistent_users, users[which(users$user_id == special_pill_user),])
+
 average_users$consistent = "average"
 consistent_users$consistent = "consistent"
 inconsistent_users$consistent = "inconsistent"
 
 
 selected_users = rbind(consistent_users, average_users, inconsistent_users)
+
+
 
 ```
 

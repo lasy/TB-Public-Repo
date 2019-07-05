@@ -412,10 +412,12 @@ if((nrow(sel_d_inconsistent)>0)&(nrow(sel_d_consistent)>0)&(nrow(sel_d_average)>
 load(file = paste0(IO$out_Rdata,"consistency_summary.Rdata"), verbose = TRUE)
 
 df$BC = factor(df$BC, levels = c(as.character(par$BC_dict$name),"both"))
+df$BC_x_init_TB_group =  interaction(df$init_TB_group, df$BC)
 
-g = ggplot(df, aes(x = avg_d, y = n_users, fill = BC)) + 
+
+g = ggplot(df, aes(x = consistency, y = n_users, fill = BC)) + 
   geom_area(position = "identity", alpha = 0.75) + 
-  facet_grid(BC ~ ., scale = "free_y")+
+  facet_grid(BC ~ init_TB_group, scale = "free_y")+
   scale_fill_manual(values = cols$BC3)
 g
 

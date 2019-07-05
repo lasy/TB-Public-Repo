@@ -1,4 +1,39 @@
 
+
+cppFunction(
+  'NumericMatrix user_distance_Rccp(NumericMatrix M) {
+  
+  int N = M.nrow();
+  NumericMatrix J(N,N);
+  for(int i = 0; i < (N-1); i++){
+  for(int j = i+1; j < (N); j++){
+
+
+  NumericVector Overlap = pmin(M(i,_),M(j,_));
+  NumericVector Union = pmax(M(i,_),M(j,_));
+  double  d = 1 - sum(Overlap) / sum(Union);
+
+  J(i,j) = d;
+  J(j,i) = d;
+  }
+  }
+  return J;
+  }'
+)
+
+
+user_distance = function(M){
+  M = as.matrix(M)
+  J = user_distance_Rccp(M)
+  return(J)
+}
+
+
+
+
+
+
+
 # The function below cmpute the distance between 2 cycles as
 # - a weighted average between the Symptoms distance and the Tracking behavior distance (Symptom distance has more weight)
 # - the Symptom distance is the Jaccard distance between the smoothed symptoms (the Symtoms are smoothed to allow a little bit of flexibility regarding the cycleday)
@@ -71,7 +106,7 @@ TB_distance = function(M, r = 0.75, w = NA, smooth = TRUE, filter = c(1/4,1/2,1/
 
 
 cppFunction(
-'NumericMatrix new_jaccard_Rcpp(NumericMatrix M_symptoms, NumericMatrix M_any_log , double r) {
+  'NumericMatrix new_jaccard_Rcpp(NumericMatrix M_symptoms, NumericMatrix M_any_log , double r) {
   int N = M_symptoms.nrow();
   NumericMatrix J(N,N);
   for(int i = 0; i < (N-1); i++){
