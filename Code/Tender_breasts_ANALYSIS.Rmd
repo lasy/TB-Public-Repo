@@ -62,9 +62,7 @@ source("Scripts/00_init_0.R")
 ```
 
 
-
-
-```{r child = '_cycle_clustering.Rmd', cache=TRUE}
+```{r child = '_users_phenotyping.Rmd', cache=TRUE}
 ```
 
 
