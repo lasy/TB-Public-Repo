@@ -69,7 +69,7 @@ ggplot_imputed_TB = function(sel_d, facet_grid = NULL, facet_grid_x = NULL, face
       sel_d$short_cycle_ids =paste0(substr(cycle_ids,1,4),"...",substr(cycle_ids ,nchar(cycle_ids)-4,nchar(cycle_ids)))
       sel_d$y = factor(sel_d$short_cycle_ids, levels = levels_short)
     }
-  }else{sel_d$y = factor(sel_d$cycle_nb_m, levels = sort(unique(sel_d$cycle_nb_m))); ylab = "cycle number"}
+  }else{sel_d$y = factor(sel_d$cycle_nb_m, levels = sort(unique(as.numeric(sel_d$cycle_nb_m)), decreasing = TRUE)); ylab = "cycle number"}
   
   g = ggplot(sel_d, 
              aes(x = cycleday_m_D, y = y, col = color, size = 1))+

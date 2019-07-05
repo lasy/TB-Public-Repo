@@ -426,7 +426,7 @@ g
 ggsave(filename = paste0(IO$panels, "consistency_summary.pdf"), 
        plot = g, 
        width = viz$full_width/2.5, 
-       height = 0.4*viz$full_width/2.5,
+       height = 0.6*viz$full_width/2.5,
        scale = viz$scale)
 
 ```
@@ -435,258 +435,144 @@ ggsave(filename = paste0(IO$panels, "consistency_summary.pdf"),
 
 
 
-## Defining a metric to cluster cycles and take tracking behavior into account
+# Phenotyping
+
+
+```{r phenotyping}
+
+for(bc in c("NC","pill")){
+  i = (bc == "pill")+1
+  BC = par$BC_dict$name[i]
+  load(file = paste0(IO$tmp_data,"user_phenotyping_",bc,".Rdata"), verbose = TRUE)
+  
+  # screeplot
+  eig_df = data.frame(x = 1:10, eig = mds$eig[1:10])
+  g = ggplot(eig_df, aes(x = x, y = eig)) + geom_bar(stat = "identity", fill = cols$BC[i])
+  g
+  
+  ggsave(filename = paste0(IO$panels, "S_screeplot_",bc,".pdf"), 
+         plot = g, 
+         width = viz$full_width/3, 
+         height = 0.75*viz$full_width/3,
+         scale = viz$scale)
+  
+  
+  # interactive 3D
+  
+  plot_ly(mds_df, x = ~X1, y = ~X2, z = ~X3,
+          color = ~n_days,
+          type = "scatter3d", mode = "markers",
+          marker = list(size = 4),
+          text = ~paste('ID: ', user_id))
+  
+  
+  plot_ly(mds_df, x = ~X1, y = ~X2, z = ~X3,
+          color = ~time,
+          type = "scatter3d", mode = "markers",
+          marker = list(size = 4),
+          text = ~paste('ID: ', user_id))
+  
+  
+  plot_ly(mds_df, x = ~X1, y = ~X2, z = ~X3,
+          color = ~max,
+          type = "scatter3d", mode = "markers",
+          marker = list(size = 4),
+          text = ~paste('ID: ', user_id))
+  
+  plot_ly(mds_df, x = ~X1, y = ~X2, z = ~X3,
+          color = ~time_last_symptoms,
+          type = "scatter3d", mode = "markers",
+          marker = list(size = 4),
+          text = ~paste('ID: ', user_id))
+  
+  # interactive 2D
+  
+  
+  plot_ly(mds_df, x = ~X1, y = ~X2,
+          color = ~X3,
+          type = "scatter", mode = "markers",
+          marker = list(size = 4),
+          text = ~paste('ID: ', user_id))
+  
+  plot_ly(mds_df, x = ~X1, y = ~X3,
+          color = ~X2,
+          type = "scatter", mode = "markers",
+          marker = list(size = 4),
+          text = ~paste('ID: ', user_id))
+  
+  
+  
+  
+  if(bc == "pill"){
+    #mds_df$user_id[grep("65035d",mds_df$user_id)]
+    user_ids = c("0ceafb77c214fb6e45d069e6c645083a9f7799d0","d0fcb8602f237946a56162f047c8ef3ef254541c",special_pill_user,
+                 "73266275a3d6f3898cf58269070edb4d4edd2034","e610274623760e9c4f1a50e0ed5a00f17117ed0b",
+                 "65035d05a6ccabaaeb82ecd4e17bde1c096adc2f",
+                 "c45cd0e050cf6d704da32cbab899bacf51a519a3")
+  }else{
+    user_ids = c("2ac70e8def770369d086e9249fee9d5b3485ad0d","cb2700ea5a33499b1c97113444e1b2e5d0d09162",
+                 "c4bf18fef2f8db48d6f4a881b1a23be849cbbc06","b70dde8d03e0f39bdb4cb67c88b0d26ad6002bd1",
+                 "2eedf35808effb0a40381e11d1c94257096ab8de","cffcd394d8f769d363f67eada7f16b0106c3191a",
+                 "b9590a55307d916d4aabc8e386bc76586a28ae0b")
+    
+    user_ids = c("2ac70e8def770369d086e9249fee9d5b3485ad0d","cb2700ea5a33499b1c97113444e1b2e5d0d09162",
+                 "cffcd394d8f769d363f67eada7f16b0106c3191a","b70dde8d03e0f39bdb4cb67c88b0d26ad6002bd1",
+                 "c4bf18fef2f8db48d6f4a881b1a23be849cbbc06","34c8890de2da03e29a7f93771ea9ecaf12cf4c88",
+                 "2eedf35808effb0a40381e11d1c94257096ab8de")
+  }
+  
+  j_mds = which(mds_df$user_id %in% user_ids)
+  mds_df_subset = mds_df[j_mds,]
+  mds_df_subset$user_id = factor(as.character(mds_df_subset$user_id), levels = user_ids)
+  
+  # MDS
+  g_12 = ggplot(mds_df, aes(x = X1, y = X2)) + coord_fixed()+
+    geom_point(alpha = 0.5, size = 0.3, col = "gray40")+
+    geom_point(data = mds_df_subset, aes(x = X1, y = X2, col = user_id), size = 2, alpha = 0.7)+
+    guides(col = FALSE)
+  
+  g_13 = ggplot(mds_df, aes(x = X1, y = X3)) + coord_fixed()+
+    geom_point(alpha = 0.5, size = 0.3, col = "gray40") +
+    geom_point(data = mds_df_subset, aes(x = X1, y = X3, col = user_id), size = 2, alpha = 0.7)+
+    guides(col = FALSE)
+  
+  grid.arrange(g_12, g_13, nrow = 1)
+  g_mds = arrangeGrob(g_12, g_13, nrow = 1)
+  g_mds
+  
+  ggsave(filename = paste0(IO$panels, "mds_",bc,".pdf"), 
+         plot = g_mds, 
+         width = viz$full_width/2, 
+         height = 0.5*viz$full_width/2,
+         scale = viz$scale)
+  
+  
+  avg_profiles = this_avg_profile_per_user[which(this_avg_profile_per_user$user_id %in%  user_ids),]
+  
+  c_wide_subset = this_c_wide[which(this_c_wide$user_id %in%  user_ids),]
+  avg_profiles = melt(c_wide_subset)
+  avg_profiles$avg_tender_breast = avg_profiles$value
+  avg_profiles$user_id = factor(as.character(avg_profiles$user_id), levels = user_ids)
+  
+  g_profiles = ggplot(avg_profiles, aes(x = cycleday_m_D, y = avg_tender_breast, fill = user_id, col = user_id))+
+    #geom_point()+
+    #geom_line()+
+    geom_area(position = "identity", alpha = 0.75)+
+    facet_grid(user_id ~ .)+
+    guides(col = FALSE, fill = FALSE)+
+    theme(strip.text = element_blank())+
+    scale_y_continuous(breaks = c(0,0.5,1))+
+    scale_x_continuous(breaks = par$x.axis)
+  g_profiles
+  
+  ggsave(filename = paste0(IO$panels, "profiles_",bc,".pdf"), 
+         plot = g_profiles, 
+         width = viz$full_width/4, 
+         height = 0.65*viz$full_width/4,
+         scale = viz$scale*1.5)
+  
+}
 
-
-```{r weight for distance}
-
-
-load(file = paste0(IO$tmp_Rdata, "weight_for_distance.Rdata"), verbose = TRUE)
-
-g = ggplot(ww, aes(x = cycleday_m_D, y = w)) + 
-  #geom_point() + 
-  #geom_line() + 
-  geom_area(fill = "gray30")+
-  scale_x_continuous(breaks = par$x.axis)+ ylim(c(0,1))+
-  xlab("") + ylab("")
-g
-
-
-ggsave(filename = paste0(IO$panels, "S2_weight.pdf"), plot = g, width = viz$full_width/2, height = viz$full_width/10)
-
-
-
-```
-
-
-## Cycle clusters
-
-
-### Clusters representative examples and silhouette plot
-
-```{r load cluster examples and silhouette plot}
-load(file = paste0(IO$out_Rdata, "representative_cycles_clusters.Rdata"), verbose = TRUE)
-load(file = paste0(IO$out_Rdata, "silhouette_width.Rdata"), verbose = TRUE)
-```
-
-
-```{r cluster examples and silhouette plot}
-
-g_samples = ggplot_imputed_TB(d_subset, facet_grid = NULL)+scale_size(range = c(2,2)) + scale_color_manual(values = cols$clusters_4)
-
-
-g_silh = ggplot(silh, aes(fill = factor(cluster),x = factor(x, levels =rev(x)), y = sil_width)) + coord_flip()+
-  geom_bar(stat = "identity")+
-  geom_point(aes( col = factor(neighbor),y = pmax(0,sil_width) + 0.025), size = 1.5)+
-  geom_hline(yintercept = mean(silh$sil_width), linetype = 2)+ 
-  guides(fill = FALSE, color = FALSE)+
-  scale_fill_manual(values = cols$clusters_4) + scale_color_manual(values = cols$clusters_4)+ 
-  xlab("")+ylab("silhouette width")+  #scale_x_discrete(position = "top") +
-  theme(axis.text.y=element_blank(), plot.margin=unit(c(5.5,5.5,5.5,-15), "pt")) 
-
-
-grid.arrange(g_samples, g_silh, nrow = 1, widths = c(2,1))
-
-g_cluster = arrangeGrob(g_samples, g_silh, nrow = 1, widths = c(2,1))
-g_cluster
-
-ggsave(file=paste0(IO$panels,"2_representative_cluster_samples.pdf"), g_cluster, width = viz$full_width/2, height = viz$full_width/1.5)
-
-
-```
-
-```{r MDS cycle clusters, fig.width=12, fig.height= 4}
-
-load(file = paste0(IO$out_Rdata, "mds_representative_samples.Rdata"), verbose = TRUE)
-load(file = paste0(IO$out_Rdata, "mds_eig.Rdata"), verbose = TRUE)
-
-g_mds_xy = ggplot(mds, aes(x = d1, y = d2, col = cluster_num)) + coord_fixed(xlim = range(mds[,1:3]), ylim = range(mds[,1:3]))+
-  geom_point(size = 4, alpha = 0.5) + 
-  geom_text(label = 1:nrow(mds))+
-  guides(color = FALSE)+ggtitle("MDS d1-d2")+xlab("d1")+ylab("d2")+ scale_color_manual(values = cols$clusters_4)
-
-
-g_mds_xz = ggplot(mds, aes(x = d1, y = d3, col = cluster_num)) + coord_fixed(xlim = range(mds[,1:3]), ylim = range(mds[,1:3]))+
-  geom_point(size = 4, alpha = 0.5) + 
-  geom_text(label = 1:nrow(mds))+
-  guides(color = FALSE)+ggtitle("MDS d1-d3")+xlab("d1")+ylab("d3")+ scale_color_manual(values = cols$clusters_4)
-
-
-g_mds_zy = ggplot(mds, aes(x = d3, y = d2, col = cluster_num)) + coord_fixed(xlim = range(mds[,1:3]), ylim = range(mds[,1:3]))+
-  geom_point(size = 4, alpha = 0.5) + 
-  geom_text(label = 1:nrow(mds))+
-  guides(color = FALSE)+ggtitle("MDS d3-d2")+xlab("d3")+ylab("d2")+ scale_color_manual(values = cols$clusters_4)
-
-
-grid.arrange(g_mds_xy, g_mds_xz, g_mds_zy, nrow = 1)
-
-
-g_mds = arrangeGrob(g_mds_xy, g_mds_xz, g_mds_zy, nrow = 1)
-g_mds
-
-ggsave(file=paste0(IO$panels,"S2_mds_representative_samples.pdf"), g_mds, width = viz$full_width, height = viz$full_width/3)
-
-
-g_mds_eig = ggplot(data.frame(i = 1:length(mds_eig$eig), eig = mds_eig$eig), aes(x = i, y = eig)) + geom_bar(stat = "identity") + xlab("n dimensions")
-g_mds_eig
-
-ggsave(file=paste0(IO$panels,"S2_mds_eigen_values.pdf"), g_mds_eig, width = viz$full_width/2, height = viz$full_width/6)
-
-
-```
-
-
-
-### Symptoms and tracking behavior profiles per cluster
-
-```{r  cluster profiles symptoms and tracking}
-
-load(file = paste0(IO$out_Rdata, "breast_tenderness_and_tracking_profiles_per_clusters_clara.Rdata"), verbose = TRUE)
-
-
-g_symptom_profiles = ggplot(agg, aes(x = cycleday_m_D, y = fraction_of_cycles, col = factor(cluster_num))) + 
-  geom_vline(xintercept = 0, lwd = 1.5, col = "gray90")+
-  geom_point(size = 0.6) + geom_line() + 
-  scale_x_continuous(breaks = par$x.axis)+
-  scale_y_continuous(labels = scales::percent)+
-  ylab("% cycles with TB")+
-  xlab("cycleday from menstruation")+
-  guides(col = FALSE)+ scale_color_manual(values = cols$clusters_4)
-
-g_tracking_profiles = ggplot(agg, aes(x = cycleday_m_D, y = fraction_of_cycles_with_logs, col = factor(cluster_num))) + 
-  geom_vline(xintercept = 0, lwd = 1.5, col = "gray90")+
-  geom_point(size = 0.6) + geom_line() +  
-  scale_x_continuous(breaks = par$x.axis)+
-  scale_y_continuous(labels = scales::percent, limits = c(0,1))+
-  ylab("% cycles with logs")+
-  xlab("cycleday from menstruation")+
-  guides(col = FALSE)+ scale_color_manual(values = cols$clusters_4)
-
-grid.arrange(g_symptom_profiles, g_tracking_profiles)
-
-
-g_profiles = arrangeGrob(g_symptom_profiles, g_tracking_profiles)
-g_profiles
-
-ggsave(file=paste0(IO$panels,"2_cluster_profiles_symptoms_and_tracking.pdf"), g_profiles, width = viz$full_width/2, height = viz$full_width/3)
-
-
-```
-
-
-
-
-## Clusters by age and BC
-
-
-
-```{r cluster profiles by age and BC }
-
-load(file = paste0(IO$out_Rdata, "TB_profiles_by_cluster_age_cat_and_BC.Rdata"), verbose = TRUE)
-
-
-g_profiles = ggplot(agg[!((agg$age_cat == "(40,45]") | ((agg$birth_control == "pill") & (agg$age_cat == "(35,40]"))),], 
-                    aes(x = cycleday_m_D, y = perc_tender_breasts, col = factor(cluster_num))) +
-  geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
-  geom_line() + facet_grid( age_cat ~ birth_control) + 
-  guides(col = FALSE)+ scale_x_continuous(breaks = par$x.axis)+ scale_color_manual(values = cols$clusters_4)
-g_profiles
-
-ggsave(filename = paste0(IO$panels, "2_cluster_profiles_by_age_and_BC_cat.pdf"), plot = g_profiles, width = viz$full_width/2, height = viz$full_width/2)
-
-
-load( file = paste0(IO$tmp_Rdata, "cycles_clusters.Rdata"), verbose = TRUE)
-
-
-g = ggplot(cycles_cluster, aes(x = age_cat, fill = as.factor(cluster_num)))+
-  facet_grid( . ~ birth_control)+
-  geom_bar(position = "fill") + 
-  guides(fill = FALSE)+ scale_fill_manual(values = cols$clusters_4)+
-  xlab("age categories") + ylab("fraction of cycles")
-g
-
-
-ggsave(filename = paste0(IO$panels, "2_clusters_by_age_and_BC_cat.pdf"), plot = g, width = viz$full_width/2, height = viz$full_width/4)
-
-
-```
-
-
-
-
-
-# Figure 3 SYMPTOMS CHARACTERIZATION AT USERS LEVEL
-
-## Examples of consistent vs in-consistent users
-
-```{r consistent users}
-
-load(file = paste0(IO$out_Rdata, "selected_users_for_clusters_examples.Rdata"), verbose = TRUE)
-
-g = ggplot_imputed_TB(d_selected_users, facet_grid = c("cluster_num","user_id"), cycle_id = FALSE) #+scale_size(range = c(2,2))
-g = g + scale_color_manual(values = cols$clusters_4)
-g
-
-ggsave(file=paste0(IO$panels,"3_consistent_users.pdf"), g, width = viz$full_width/2, height = viz$full_width/1.5)
-
-```
-
-
-```{r inconsistent users}
-
-load(file = paste0(IO$out_Rdata, "inconsistent_users_examples.Rdata"), verbose = TRUE)
-
-g = ggplot_imputed_TB(d_selected_users, facet_grid = c("user_id"), cycle_id = FALSE) #+scale_size(range = c(2,2))
-g = g + scale_color_manual(values = cols$clusters_6)
-g
-
-ggsave(file=paste0(IO$panels,"3_inconsistent_users.pdf"), g, width = viz$full_width/2, height = viz$full_width/1.5)
-
-```
-
-
-## Cluster transition frequencies
-
-```{r cluster transition frequencies}
-
-load(file = paste0(IO$out_Rdata,"cluster_transition_frequencies.Rdata"), verbose = TRUE)
-load(file = paste0(IO$out_Rdata,"cluster_transition_counts.Rdata"), verbose = TRUE)
-
-
-
-g = ggplot(rel_freq, aes(x = factor(clust_to), y = factor(clust_from, levels = rev(CL)), col = factor(clust_to), size = rel_freq)) + 
-  coord_fixed()+
-  geom_point()+ scale_size(range = c(0,25), limits = c(0.01,1)) + scale_alpha(range = c(0.3,1), limits = c(0,0.8))+ #, size = rel_freq  + 
-  geom_text(aes(label = round(100*rel_freq)),size = 5, col = "black") + 
-  scale_color_manual(values = cols$clusters_6) + 
-  xlab("")+ ylab("") + theme(axis.text = element_blank())+
-  guides(size = FALSE, col = FALSE, alpha = FALSE)
-
-
-ggsave(file=paste0(IO$panels,"3_cluster_transitions.pdf"), g, width = viz$full_width/3, height = viz$full_width/3)
-
-rm(g, freq, rel_freq)
-
-```
-
-
-
-
-```{r frequency of clusters per most prevalent cluster}
-
-load(file = paste0(IO$out_Rdata,"frequency_of_other_clusters.Rdata"), verbose = TRUE)
-
-g = ggplot(agg, aes(x = factor(most_preval_clust), y = perc_cycles, fill = factor(cluster),  group = factor(cluster))) +
-  geom_bar(stat = "identity", position = "stack")+
-  geom_text(aes(label = round(perc_cycles), col = (perc_cycles>=6)), position = "stack", vjust = 1.5)+
-  scale_fill_manual(values = cols$clusters_6)+ scale_color_manual(values = c("transparent","white"))+
-  guides(fill = FALSE, col = FALSE)+
-  xlab("") + ylab("% of cycles")+
-  theme(axis.text.x = element_blank())
-g
-
-
-ggsave(file=paste0(IO$panels,"3_cluster_freq_per_most_prevalent_cluster.pdf"), g, width = viz$full_width/2, height = viz$full_width/3.2)
 
 ```
 
@@ -697,157 +583,19 @@ ggsave(file=paste0(IO$panels,"3_cluster_freq_per_most_prevalent_cluster.pdf"), g
 
 
 
-```{r frequency of clusters for consistent and inconsistent users }
-
-load(file = paste0(IO$out_Rdata,"frequency_of_other_clusters.Rdata"), verbose = TRUE)
-agg$is_consistent = ifelse(agg$is_consistent, "consistent users","inconsistent")
-# frequency
-load(file = paste0(IO$out_Rdata,"n_users_by_most_prevalent_cluster.Rdata"), verbose = TRUE)
-agg2$is_consistent = ifelse(agg2$is_consistent, "consistent users","inconsistent")
-agg2$perc_users = agg2$n_users/sum(agg2$n_users)
 
 
-g = ggplot(agg, aes(x = factor(most_preval_clust), y = perc_cycles, fill = factor(cluster))) +
-  geom_bar(stat = "identity", position = "stack")+
-  scale_fill_manual(values = cols$clusters_6)+
-  scale_y_continuous(labels = scales::percent)+
-  guides(fill = FALSE)+
-  facet_grid( . ~ is_consistent)+
-  theme(
-    strip.background = element_blank(),
-    strip.text.x = element_blank(),
-    axis.text.x=element_blank(),
-    axis.ticks.x=element_blank(),
-    plot.margin=unit(c(-15,5.5,5.5,5.5), "pt"))+
-  ylab("% of cycles") + xlab("most prevalent cluster per user")
-g
-
-g2 = ggplot(agg2, aes(x =  factor(most_preval_clust), y = perc_users, fill = factor(most_preval_clust))) +
-  geom_bar(stat = "identity")+
-  scale_fill_manual(values = cols$clusters_6)+
-  scale_y_continuous(labels = scales::percent)+
-  guides(fill = FALSE)+
-  facet_grid( . ~ is_consistent)+
-  theme(
-    axis.text.x=element_blank(),
-    axis.ticks.x=element_blank())+
-  ylab("# users") + xlab("")
-g2
-
-grid.arrange(g2, g, ncol = 1, heights = c(2,3))
 
 
-g_freq_clusters = arrangeGrob(g2, g, heights = c(2,3))
-g_freq_clusters
 
-ggsave(file=paste0(IO$panels,"3_cluster_freq_for_consistent_and_inconsistent_users.pdf"), g_freq_clusters, width = viz$full_width/3*2, height = viz$full_width/3.5)
+# Figure 3 PILL TRANSITION
 
 
+```{r}
+
+load(file = paste0(IO$out_Rdata,"transition_profiles.Rdata"), verbose = TRUE)
+load(file = paste0(IO$out_Rdata,"transition_profiles_with_inc_dec.Rdata"), verbose = TRUE)
 
 ```
 
-```{r consistency}
-
-load(file = paste0(IO$out_Rdata, "distribution_perc_main_cluster.Rdata"), verbose= TRUE)
-
-
-g1 = ggplot(agg, aes(x = perc_main_cluster_r, y = perc_users, fill = factor(most_preval_clust)))+
-  geom_bar(stat = "identity", width = 10) + facet_grid( most_preval_clust ~ . , scale = "free_y" ) + 
-  scale_fill_manual(values = cols$clusters_6) + expand_limits(x = 0) + guides(fill = FALSE)+
-  xlab("% of cycles in the most prevalent cluster")+ ylab("% of users")+
-  theme(strip.text = element_blank())
-g1
-
-agg = aggregate(n_users ~ most_preval_clust, agg, sum)
-agg$perc_users = 100*agg$n_users/sum(agg$n_users)
-
-g2 = ggplot(agg, aes(x = factor(most_preval_clust, levels = sort(unique(most_preval_clust), decreasing = TRUE)), 
-                     y = perc_users, fill = factor(most_preval_clust)))+ 
-  coord_flip()+
-  geom_bar(stat = "identity") +
-  scale_fill_manual(values = cols$clusters_6) + guides(fill = FALSE)+
-  ylab("% of users") + xlab("")+ scale_y_continuous(breaks = c(0,25,50))+
-  theme(axis.text.y = element_blank())
-g2
-
-grid.arrange(g1, g2, nrow = 1, widths = c(4,1) )
-
-
-g_consistency = arrangeGrob(g1, g2, nrow = 1, widths = c(3,1))
-g_consistency
-
-ggsave(file=paste0(IO$panels,"3_distribution_perc_main_cluster.pdf"), g_consistency, width = viz$full_width/2.5, height = viz$full_width/3)
-
-
-
-```
-
-
-
-
-
-## Variability of symptoms
-
-```{r TB standard deviation histograms}
-
-load(file = paste0(IO$tmp_Rdata, "users.Rdata"), verbose = TRUE)
-
-users = users[!is.na(users$most_preval_clust),]
-
-
-
-g = ggplot(users, aes(x = sd_TB, fill = factor(most_preval_clust))) + 
-  geom_histogram(aes(y = ..density..), binwidth = 0.5) + 
-  facet_grid(most_preval_clust ~ ., scale = 'free_y', drop = TRUE) + 
-  scale_fill_manual(values = cols$clusters_6) + guides(fill = FALSE)
-g
-
-
-
-g = ggplot(users, aes(x = perc_main_cluster, fill = factor(most_preval_clust))) + 
-  geom_histogram(aes(y = ..density..), binwidth = 0.05) + 
-  facet_grid(most_preval_clust ~ ., scale = 'free_y') + expand_limits(x = 0)+ 
-  scale_fill_manual(values = cols$clusters_6)+ guides(fill = FALSE)+
-  xlab("% of cycles in the most prevalent cluster, per user")
-g
-
-
-
-ggsave(file=paste0(IO$panels,"3_percent_of_cycles_in_most_prevalent_cluster.pdf"), g, width = viz$full_width/3, height = viz$full_width/3)
-
-```
-
-
-
-## Evolution of symptoms in time
-
-```{r evolution of symptoms in time}
-
-load(file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time.Rdata"), verbose = TRUE)
-load(file = paste0(IO$out_Rdata,"evolution_of_symptom_tracking_in_time_min_n_cycles.Rdata"), verbose = TRUE)
-
-g = ggplot(fraction_TB, aes(x = cycle_nb_m, y = median_n_TB, col = most_preval_clust, fill = most_preval_clust)) + 
-  geom_line(size = 0.75) + 
-  geom_line(aes(y = avg_n_TB), linetype = 2, size = 0.25) + 
-  geom_ribbon(aes(ymin = q_05_n_TB , ymax = q_95_n_TB), alpha = 0.2, col = NA)+
-  geom_ribbon(aes(ymin = q_25_n_TB , ymax = q_75_n_TB), alpha = 0.3, col = NA)+
-  geom_text(data = min_n_cycles, aes(label = paste0("(",min_n_cycles,")")), x = 5, y = 0.95*max(fraction_TB$q_95_n_TB), size = 3, vjust = 0, hjust = 0)+
-  facet_grid(birth_control  ~ most_preval_clust)+
-  scale_color_manual(values = cols$clusters_6) + scale_fill_manual(values = cols$clusters_6)+ 
-  guides(col = FALSE, fill = FALSE) +
-  theme(strip.text.x = element_blank())+
-  xlab("Cycle number") + ylab("# of reported TB")
-
-g
-
-
-ggsave(filename = paste0(IO$panels, "3_evolution_of_symptom_tracking_in_time.pdf"), plot = g, width = viz$full_width/2.5, height = viz$full_width/4, scale = viz$scale)
-
-```
-
-
-
-
-
-# Figure 4 PILL TRANSITION
 
