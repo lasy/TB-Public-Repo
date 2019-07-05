@@ -152,11 +152,21 @@ reshape_and_impute = function(days){
   
   #reshape
   d_wide = reshape(as.data.frame(d[,c("cycle_id_m","cycleday_m_D","n")]),
-                          idvar = "cycle_id_m", timevar = "cycleday_m_D",
-                          direction = "wide")
+                   idvar = "cycle_id_m", timevar = "cycleday_m_D",
+                   direction = "wide")
   d_wide[is.na(d_wide)] = -1
   o = order(as.numeric(sapply(strsplit(colnames(d_wide)[2:ncol(d_wide)],"\\."), "[[", 2)))
   d_wide = data.frame(user_id = d$user_id[match(d_wide$cycle_id_m,d$cycle_id_m)], cycle_id_m = d_wide$cycle_id_m, d_wide[,o+1] )
+  
+  # check that all the columns are there
+  colnames = paste0("n.",gsub("-",".",as.character(par$cycleday_m_D)))
+  j = which(!(colnames %in% colnames(d_wide)))
+  if(length(j)>0){
+    for(i in 1:length(j)){eval(parse(text = paste0("d_wide$",colnames[j[i]]," = 0")))}
+    o = order(as.numeric(gsub("\\.","-",(gsub("n.","",colnames(d_wide[3:ncol(d_wide)]))))))
+    o = c(1,2,o+2)
+    d_wide = d_wide[,o]
+  }
   
   #impute
   d_wide_imputed = t(apply(d_wide[,-c(1,2)], 1, impute))
