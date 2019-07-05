@@ -591,8 +591,7 @@ for(bc in c("NC","pill")){
 # Figure 3 PILL TRANSITION
 
 
-```{r}
-
+```{r pill transition average profiles}
 
 
 load(file = paste0(IO$out_Rdata,"pill_transition_profiles.Rdata"), verbose = TRUE)
@@ -625,8 +624,18 @@ ggsave(filename = paste0(IO$panels, "profiles_pill_transition.pdf"),
        scale = viz$scale)
 
 
+```
+
+
+```{r pill transition examples}
+
+load(file = paste0(IO$out_Rdata,"days_selected_users_for_pill_transition_examples.Rdata"), verbose = TRUE)
+
+
 
 
 ```
+
+
 
 
