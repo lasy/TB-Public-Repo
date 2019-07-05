@@ -55,7 +55,7 @@ if(file.exists(days_pill_trans_file)){
       
       j = which((pill_trans_stretches$BC == trans) & (pill_trans_stretches$TB_change_cat == change))
       
-      stretch_ids = pill_trans_stretches$stretch_id[1:10]
+      stretch_ids = pill_trans_stretches$stretch_id[j][1:10]
       
       for(stretch_id in stretch_ids){
         cat("\t\t",stretch_id,"\n")
