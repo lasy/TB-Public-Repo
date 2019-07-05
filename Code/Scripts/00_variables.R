@@ -71,6 +71,14 @@ cols$BC_x_init_TB_group = c(scales::seq_gradient_pal(cols$NC, "black")(seq(0,1,l
 rm(N)
 
 
+N = 2
+cols$BC_x_init_TB_group2 = c(scales::seq_gradient_pal(cols$NC, "black")(seq(0,1,length.out=N+2))[1:N],
+                            scales::seq_gradient_pal(cols$pill, "black")(seq(0,1,length.out=N+2))[1:N],
+                            scales::seq_gradient_pal(hsv(0.77,0.4,0.8), "black")(seq(0,1,length.out=N+2))[1:N])
+rm(N)
+
+
+
 cols$pill_trans = c("gray40","royalblue1")
 
 viz = list()
