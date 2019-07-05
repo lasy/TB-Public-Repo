@@ -112,7 +112,7 @@ save(df, file = paste0(IO$out_Rdata,"consistency_summary.Rdata"))
 ```
 
 
-```{r users_descr_avg_profile consistency}
+```{r users_descr_avg_profile save users}
 
 save(users, file = paste0(IO$output_data, "users.Rdata"))
 file.copy(from = paste0(IO$output_data, "users.Rdata") , to = paste0(IO$tmp_data, "users_with_consistency.Rdata"), overwrite = TRUE)
