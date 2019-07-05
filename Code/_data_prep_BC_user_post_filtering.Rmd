@@ -125,11 +125,11 @@ round(table_BC_trans/sum(table_BC_trans)*100,2)
 stretches = aggregate(BC ~ stretch_id, cycles_BC[which(cycles_BC$BC %in% par$BC_dict$name),], function(x){paste0(rle(x)$values, collapse = " - ")})
 
 stretches$BC_o = stretches$BC
+stretches$BC[nchar(stretches$BC) > 38 ] = "mult. trans."
+stretches$BC[grep("none / condoms - pill - none / condoms",stretches$BC)] = "on-off pill"
+stretches$BC[grep("pill - none / condoms - pill",stretches$BC)] = "off-on pill"
 stretches$BC[grep("none / condoms - pill",stretches$BC)] = "on pill"
 stretches$BC[grep("pill - none / condoms",stretches$BC)] = "off pill"
-stretches$BC[grep("pill - none / condoms - pill",stretches$BC)] = "off-on pill"
-stretches$BC[grep("none / condoms - pill - none / condoms",stretches$BC)] = "on-off pill"
-stretches$BC[nchar(stretches$BC) > 38 ] = "mult. trans."
 
 table_BC = table(stretches$BC)
 table_BC
@@ -143,10 +143,6 @@ df$categories = factor(df$categories, levels = df$categories[order(df$n)])
 ggplot(df, aes(x = categories, y = n)) + geom_bar(stat = "identity") + coord_flip() + geom_text(aes(label = n))
 rm(df)
 
-```
-
-
-```{r data_prep_BC_user_post_filtering saving stretches}
 save(stretches, file = paste0(IO$output_data, "stretches.Rdata"))
 file.copy(from = paste0(IO$output_data, "stretches.Rdata"), to = paste0(IO$tmp_data,"stretches.Rdata"), overwrite = TRUE)
 ```

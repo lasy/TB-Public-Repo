@@ -593,8 +593,39 @@ for(bc in c("NC","pill")){
 
 ```{r}
 
-load(file = paste0(IO$out_Rdata,"transition_profiles.Rdata"), verbose = TRUE)
-load(file = paste0(IO$out_Rdata,"transition_profiles_with_inc_dec.Rdata"), verbose = TRUE)
+
+
+load(file = paste0(IO$out_Rdata,"pill_transition_profiles.Rdata"), verbose = TRUE)
+
+transition_profiles$TB_change_cat_simple = factor(transition_profiles$TB_change_cat_simple  , levels = c("increase","no change","decrease"))
+
+agg = unique(transition_profiles[,c("TB_change_cat_simple","transition","n_users")])
+agg$cycle_nb_m_from_trans = -4
+agg
+
+agg_sum = aggregate( n_users ~ transition, agg, FUN = sum )
+colnames(agg_sum) = c("transition","n_users_tot")
+agg = merge(agg, agg_sum, all = TRUE)
+agg$perc_users = paste0(round(100*agg$n_users/agg$n_users_tot),"%")
+agg$text = paste0(agg$n_users, "\n",agg$perc_users)
+
+g = ggplot(transition_profiles, aes(x = cycleday_m_D, y = fraction_cycles_with_TB, col = BC)) + 
+  geom_line()+ facet_grid(transition + TB_change_cat_simple ~ cycle_nb_m_from_trans) +
+  scale_x_continuous(breaks = par$x.axis, limits = c(-par$D,par$Df))+ guides(col = FALSE)+
+  geom_text(data = agg, aes(x = -par$D, y = 0.5*max(transition_profiles$fraction_cycles_with_TB), col = transition, label = text), 
+            nudge_x = 7, nudge_y = 0, size = 3.5)+
+  scale_color_manual(values = rep(cols$BC,2))
+print(g)
+
+
+ggsave(filename = paste0(IO$panels, "profiles_pill_transition.pdf"), 
+       plot = g, 
+       width = viz$full_width/2, 
+       height = 0.75*viz$full_width/2,
+       scale = viz$scale)
+
+
+
 
 ```
 

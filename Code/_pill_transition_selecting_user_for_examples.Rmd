@@ -32,96 +32,84 @@ options(scipen=999)
 load(file = paste0(IO$output_data,"users.Rdata"), verbose = TRUE)
 dim(users)
 
+load( file = paste0(IO$output_data,"stretches.Rdata"), verbose = TRUE)
+
 days_pill_trans_file = paste0(IO$tmp_data, "days_pill_trans.Rdata")
 if(file.exists(days_pill_trans_file)){
-load(file = days_pill_trans_file , verbose = TRUE)
+  load(file = days_pill_trans_file , verbose = TRUE)
   dim(days)
 }
-
-
-
 
 ```
 
 
 ```{r  pill_trans_users_selection  selecting specific examples}
 if(file.exists(days_pill_trans_file)){
-
-pill_trans_users = users[users$user_id %in% unique(days$user_id),]
-
-for(trans in c("on pill","off pill")){
-  cat(trans, "\n")
-  for(change in c("increase","decrease")){
-    cat("\t",change, "\n")
-    if(trans == "on pill"){
-      pill_trans_users$n_TB_diff = pill_trans_users$n_TB_diff_on_pill
-      pill_trans_users$TB_diff = pill_trans_users$TB_diff_on_pill
-    }else{
-      pill_trans_users$n_TB_diff = pill_trans_users$n_TB_diff_off_pill
-      pill_trans_users$TB_diff = pill_trans_users$TB_diff_off_pill
-    }
-    
-    j = which((pill_trans_users$BC == trans) & (pill_trans_users$TB_diff == change))
-    this_cat_users = pill_trans_users[j,]
-    o = order(abs(this_cat_users$n_TB_diff), decreasing = TRUE)
-    user_ids = this_cat_users$user_id[o][1:10]
-    
-    for(user in user_ids){
-      cat("\t\t",user,"\n")
-      this_user_days = days[days$user_id == user,]
+  
+  pill_trans_stretches = stretches[stretches$stretch_id %in% unique(days$stretch_id),]
+  
+  for(trans in c("on pill","off pill")){
+    cat(trans, "\n")
+    for(change in c("complete appearance","complete disapearance")){
+      cat("\t",change, "\n")
       
-      g = ggplot_user_history(this_user_days, pill_transition = trans)
-      print(g)
+      j = which((pill_trans_stretches$BC == trans) & (pill_trans_stretches$TB_change_cat == change))
+      
+      stretch_ids = pill_trans_stretches$stretch_id[1:10]
+      
+      for(stretch_id in stretch_ids){
+        cat("\t\t",stretch_id,"\n")
+        this_stretch_days = days[days$stretch_id == stretch_id,]
+        
+        g = ggplot_user_history(this_stretch_days, pill_transition = trans)
+        print(g)
+      }
     }
   }
-}
+} 
 
-
-
-
-}
 ```
 
 
 ### Selected users
 
-```{r pill_trans_users_selection selected users plots and save}
+```{r pill_trans_users_selection selected users plots and save, eval = FALSE}
 
 if(file.exists(days_pill_trans_file)){
   
-user_ids = c("1e373dfaa7f3f5ddba01073bccc2c1fd566dfded", # on-pill increase
-             "77ee91ac45472d126f2582b6fc5899768ee501be", # on-pill decrease
-             "1e54913ee421d364f831da6ace198d2e8deff7d9", # off-pill increase
-             "8a03c607cf058ea0a649cd63c2d09d3d2198c7d6" ) # off-pill decrease
-
-
-
-for(user in user_ids){
-  cat(user,"\n")
-  this_user_days = days[days$user_id == user,]
-  j = which(users$user_id == user)
-  trans = users$BC[j]
+  stretch_ids = c("1e373dfaa7f3f5ddba01073bccc2c1fd566dfded", # on-pill increase
+               "77ee91ac45472d126f2582b6fc5899768ee501be", # on-pill decrease
+               "1e54913ee421d364f831da6ace198d2e8deff7d9", # off-pill increase
+               "8a03c607cf058ea0a649cd63c2d09d3d2198c7d6" ) # off-pill decrease
   
-  cat(trans,"\n")
-  if(length(j)>0){
-    if(trans %in% c("on pill","off pill")){
-      g = ggplot_user_history(this_user_days, pill_transition = trans)
-      print(g)
+  
+  
+  for(user in user_ids){
+    cat(user,"\n")
+    this_user_days = days[days$user_id == user,]
+    j = which(users$user_id == user)
+    trans = users$BC[j]
+    
+    cat(trans,"\n")
+    if(length(j)>0){
+      if(trans %in% c("on pill","off pill")){
+        g = ggplot_user_history(this_user_days, pill_transition = trans)
+        print(g)
+      }
     }
   }
+  
+  
+  
+  selected_users_days = days[days$user_id %in% user_ids, ]
+  selected_users_days$user_id = factor(selected_users_days$user_id, levels = unique(selected_users_days$user_id))
+  selected_users_days$user_id = paste0("user_", as.numeric(selected_users_days$user_id ))
+  selected_users_days$user_BC = users$BC[match(selected_users_days$user_id, users$user_id)]
+  
+  save(selected_users_days, file = paste0(IO$tmp_data,"days_selected_users_for_pill_transition_examples.Rdata"))
+  
 }
 
-
-
-selected_users_days = days[days$user_id %in% user_ids, ]
-selected_users_days$user_id = factor(selected_users_days$user_id, levels = unique(selected_users_days$user_id))
-selected_users_days$user_id = paste0("user_", as.numeric(selected_users_days$user_id ))
-selected_users_days$user_BC = users$BC[match(selected_users_days$user_id, users$user_id)]
-
-save(selected_users_days, file = paste0(IO$tmp_data,"days_selected_users_for_pill_transition_examples.Rdata"))
-
-}
-      
 ```
 
 
