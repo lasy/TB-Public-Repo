@@ -105,8 +105,7 @@ for(user_id in user_ids){
   g = ggplot_user_example(d = d, title = FALSE, size_factor = 1.5)
   print(g)
   
-  ggsave(filename = paste0(IO$panels, "1A_example_",d$user_id[1],".pdf"), plot = g, width = viz$full_width/2.8, height = viz$full_width/4)
-  
+  ggsave(filename = paste0(IO$panels, "example_",d$user_id[1],".pdf"), plot = g, width = viz$full_width/2.8, height = viz$full_width/4)
 }
 
 
@@ -158,13 +157,13 @@ ggsave(file = paste0(IO$panels, "tracking_profile_perc_cycles_with_logs_per_trac
        plot = g, 
        width = viz$full_width/2,
        height = 0.3*viz$full_width/2,
-       scale = viz$scale)
+       scale = viz$scale*1.2)
 
 ggsave(file = paste0(IO$panels, "tracking_profile_avg_log_per_tracking_group_and_BC.pdf"),
        plot = g_n, 
        width = viz$full_width/2,
        height = 0.3*viz$full_width/2,
-       scale = viz$scale)
+       scale = viz$scale*1.2)
 
 
 ```
@@ -197,7 +196,7 @@ ggsave(file = paste0(IO$panels, "symptoms_profile_per_tracking_group_and_BC.pdf"
        plot = g, 
        width = viz$full_width/2,
        height = 0.3*viz$full_width/2,
-       scale = viz$scale)
+       scale = viz$scale*1.2)
 
 
 ```
@@ -611,28 +610,93 @@ agg$text = paste0(agg$n_users, "\n",agg$perc_users)
 g = ggplot(transition_profiles, aes(x = cycleday_m_D, y = fraction_cycles_with_TB, col = BC)) + 
   geom_line()+ facet_grid(transition + TB_change_cat_simple ~ cycle_nb_m_from_trans) +
   scale_x_continuous(breaks = par$x.axis, limits = c(-par$D,par$Df))+ guides(col = FALSE)+
-  geom_text(data = agg, aes(x = -par$D, y = 0.5*max(transition_profiles$fraction_cycles_with_TB), col = transition, label = text), 
+  geom_text(data = agg, aes(x = -par$D, y = 0.25*max(transition_profiles$fraction_cycles_with_TB), col = transition, label = text), 
             nudge_x = 7, nudge_y = 0, size = 3.5)+
-  scale_color_manual(values = rep(cols$BC,2))
+  scale_color_manual(values = rep(cols$BC,2))+
+  scale_y_continuous(labels = scales::percent)+
+  xlab("cycleday from menstruation")+
+  ylab("% of cycles with reported breast tenderness")
 print(g)
 
 
 ggsave(filename = paste0(IO$panels, "profiles_pill_transition.pdf"), 
        plot = g, 
        width = viz$full_width/2, 
-       height = 0.75*viz$full_width/2,
-       scale = viz$scale)
+       height = 0.85*viz$full_width/2,
+       scale = viz$scale*1.1)
 
 
 ```
+
+
+
+```{r pill transition changes}
+load(file = paste0(IO$out_Rdata,"table_TB_change_cat_x_BC_df.Rdata"), verbose = TRUE)
+load(file = paste0(IO$out_Rdata,"hist_log2_TB_ratio_x_BC.Rdata"), verbose = TRUE)
+
+g = ggplot(table_TB_change_cat_x_BC_df, aes(x = TB_change_cat_wrap, y = n_users, fill = BC))+
+  geom_bar(stat = "identity")+
+  facet_grid(BC ~., scale = "free")+
+  xlab("")+ylab("# of users")+
+  scale_fill_manual(values = cols$BC)
+g
+
+
+g_hist = ggplot(hist_log2_TB_ratio_x_BC, aes(x = log2_TB_ratio, y = n_users, fill = transition))+
+  geom_bar(stat = "identity", width = 0.5)+
+  facet_grid(transition ~., scale = "free")+
+  xlab("log2(TB ratio: after/before)")+ylab("# of users")+
+  #geom_vline(xintercept = c(-value_inf+0.5,-1.5,-0.5,0.5,1.5,value_inf-0.5), col = "gray20", linetype = 2, size = 0.2)+
+  geom_vline(xintercept = c(-0.5,0.5), col = "gray20", linetype = 2, size = 0.2)+
+  geom_vline(xintercept = 0, col = "gray20", linetype = 1, size = 0.5)+
+  scale_fill_manual(values = cols$BC)+
+  scale_x_continuous(breaks = seq(-6,6,by = 1))
+g_hist
+
+
+
+ggsave(filename = paste0(IO$panels, "pill_transition_TB_change_cat_x_BC.pdf"), 
+       plot = g, 
+       width = viz$full_width/2, 
+       height = 0.4*viz$full_width/2,
+       scale = viz$scale)
+
+
+ggsave(filename = paste0(IO$panels, "pill_transition_hist_log2_TB_ratio_x_BC.pdf"), 
+       plot = g_hist, 
+       width = viz$full_width/2, 
+       height = 0.33*viz$full_width/2,
+       scale = viz$scale)
+
+
+
+```
+
+
 
 
 ```{r pill transition examples}
 
 load(file = paste0(IO$out_Rdata,"days_selected_users_for_pill_transition_examples.Rdata"), verbose = TRUE)
 
+selected_users_days$user_id =   selected_users_days$stretch_id
 
-
+stretch_ids = unique(selected_users_days$stretch_id)
+for(stretch_id in stretch_ids){
+  cat("\t\t",stretch_id,"\n")
+  this_stretch_days = selected_users_days[selected_users_days$stretch_id == stretch_id,]
+  trans = unique(this_stretch_days$transition)
+  g = ggplot_user_history(this_stretch_days, pill_transition = trans, print_x_lab = FALSE, print_title = FALSE, make_x_axis_symmetrical = TRUE)
+  print(g)
+  
+  ggsave(filename = paste0(IO$panels, "profiles_pill_transition_example_",stretch_id,".pdf"), 
+         plot = g, 
+         width = viz$full_width/2, 
+         height = 0.18*viz$full_width/2,
+         scale = viz$scale*1.2)
+  
+  
+}
 
 ```
 

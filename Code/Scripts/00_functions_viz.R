@@ -102,7 +102,9 @@ ggplot_imputed_TB = function(sel_d, facet_grid = NULL, facet_grid_x = NULL, face
 
 
 
-ggplot_user_history = function(d, pill_transition = c("no trans","on pill","off pill")){
+ggplot_user_history = function(d, pill_transition = c("no trans","on pill","off pill"),
+                               replace_pain_by_symptom = TRUE, 
+                               print_x_lab = TRUE, print_title = TRUE, make_x_axis_symmetrical = FALSE){
   
   if(uniqueN(d$user_id)>1){stop("this function is only suited for a single user table\n")}
   
@@ -119,27 +121,43 @@ ggplot_user_history = function(d, pill_transition = c("no trans","on pill","off 
     d = d[d$rel_date %in% -180:180,]
   }
   
+  number_max = max(d$number[which(d$type == "n_logs")], na.rm = TRUE)
   d = d[d$type %in% cols_feature$type,]
-  d$number[is.na(d$number)] = 3
-  d$number[d$type == "heavy"] = 4
-  d$number[d$type == "medium"] = 3
-  d$number[d$type == "light"] = 2
-  d$number[d$type == "spotting"] = 1
+  d$number[is.na(d$number)] = 0.75*number_max
+  d$number[d$type == "heavy"] = number_max
+  d$number[d$type == "medium"] = 0.75*number_max
+  d$number[d$type == "light"] = 0.5*number_max
+  d$number[d$type == "spotting"] = 0.25*number_max
   
   d$type = factor(d$type, levels = cols_feature$type)
   colors = cols_feature$col[cols_feature$type %in% unique(d$type)]
   
-  g = ggplot(d, aes(x = rel_date, y = category, col = type, size = number)) + 
+  if(replace_pain_by_symptom){
+    d$category2 = gsub("pain",TB,d$category)
+    d$category2 = factor(d$category2, levels = rev(c("pill_hbc","period",TB,"n_logs")))
+  }else{
+    d$category2 = d$category
+  }
+  
+  if(print_x_lab){x_lab = "relative dates (in days)"}else{x_lab = ""}
+  if(print_title){title = unique(d$user_id)}else{title = ""}
+  if(make_x_axis_symmetrical){x_limits = c(-max(abs(d$rel_date)),max(abs(d$rel_date)))}else{x_limits = range(d$rel_date )}
+  
+  
+  g = ggplot(d, aes(x = rel_date, y = category2, col = type, size = number)) + 
     geom_vline(xintercept = d$rel_date[d$cycleday == 1], col = "gray90")+
     geom_point(shape = "|")+
     scale_color_manual(values = colors)+
+    scale_size(range = c(1,5))+
+    scale_x_continuous(breaks = seq(-10*30,10*30,by = 30), limits = x_limits)+
     theme(axis.ticks.x = element_blank(),
           panel.grid.major.x = element_blank(),
           panel.grid.minor.x = element_blank(),
           legend.position="bottom")+
-    ggtitle(unique(d$user_id))+
+    ggtitle(title)+
+    ylab("")+xlab(x_lab)+
     guides(size = FALSE, col = FALSE)
-
+  
   return(g)
 }
 

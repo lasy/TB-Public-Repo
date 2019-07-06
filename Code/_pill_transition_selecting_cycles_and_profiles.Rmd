@@ -131,23 +131,67 @@ if(length(stretch_ids)>0){
   stretches$after = agg_long$after[m]
   stretches$TB_ratio = stretches$after / stretches$before
   
+  change_cat_breaks = c(-Inf, 2^c( -10, -1.5,-0.5,0.5,1.5,10),Inf)
+  
   stretches$TB_change_cat = cut(stretches$TB_ratio, 
-                                breaks = c(-Inf, 2^c( -10, -1.5,-0.5,0.5,1.5,10),Inf), 
+                                breaks = change_cat_breaks, 
                                 labels = c("complete disapearance","large descrease","small decrease","no change","small increase","large increase","complete appearance"))
   
-  table_ratio = table(round(log2(stretches$TB_ratio[stretches$valid_transition])))
+  
+  v_stretches = stretches[which(stretches$valid_transition),]
+  
+  table_ratio = table(round(log2(v_stretches$TB_ratio)))
   table_ratio
   
   round(100*table_ratio/sum(table_ratio),1)
   
-  table_ratio_x_BC = table(stretches$BC, round(log2(stretches$TB_ratio)))
+  table_ratio_x_BC = table(v_stretches$BC, round(log2(v_stretches$TB_ratio)))
   table_ratio_x_BC
   round(100*table_ratio_x_BC/apply(table_ratio_x_BC,1,sum),1)
   
   
-  table_TB_change_cat_x_BC = table(stretches$BC, stretches$TB_change_cat)
+  table_TB_change_cat_x_BC = table(v_stretches$BC, v_stretches$TB_change_cat)
   table_TB_change_cat_x_BC
   round(100*table_TB_change_cat_x_BC/apply(table_TB_change_cat_x_BC,1,sum),1)
+  
+  
+  table_TB_change_cat_x_BC_df = melt(table_TB_change_cat_x_BC)
+  colnames(table_TB_change_cat_x_BC_df) = c("BC","TB_change_cat","n_users")
+  table_TB_change_cat_x_BC_df = table_TB_change_cat_x_BC_df[table_TB_change_cat_x_BC_df$BC %in% c("on pill", "off pill"),]
+  
+  table_TB_change_cat_x_BC_df$TB_change_cat_wrap = str_wrap(table_TB_change_cat_x_BC_df$TB_change_cat, width = 12)
+  table_TB_change_cat_x_BC_df$TB_change_cat_wrap = factor(table_TB_change_cat_x_BC_df$TB_change_cat_wrap, levels = str_wrap(levels(stretches$TB_change_cat), width = 12))
+  
+  
+  g = ggplot(table_TB_change_cat_x_BC_df, aes(x = TB_change_cat_wrap, y = n_users, fill = BC))+
+    geom_bar(stat = "identity")+
+    facet_grid(BC ~., scale = "free")+
+    xlab("")+ylab("# of users")
+  g
+  
+  bw = 0.5
+  
+  v_stretches$TB_ratio_log2 = log2(v_stretches$TB_ratio)
+  value_inf = round(max(abs(v_stretches$TB_ratio_log2[!is.infinite(v_stretches$TB_ratio_log2)]), na.rm = TRUE),1)+bw/2
+  v_stretches$TB_ratio_log2[is.infinite(v_stretches$TB_ratio_log2)] = value_inf*sign(v_stretches$TB_ratio_log2[is.infinite(v_stretches$TB_ratio_log2)])
+  
+  g_hist = ggplot(v_stretches, aes(x = TB_ratio_log2, fill = BC))+
+    geom_histogram(binwidth = bw)+
+    facet_grid(BC ~., scale = "free")+
+    xlab("")+ylab("# of users")+
+    geom_vline(xintercept = c(-value_inf+0.5,-1.5,-0.5,0.5,1.5,value_inf-0.5), col = "gray20", linetype = 2, size = 0.2)+
+    geom_vline(xintercept = 0, col = "gray20", linetype = 1, size = 0.5)
+  g_hist
+  
+  
+  v_stretches$TB_ratio_log2_cut = as.numeric(as.character(cut(v_stretches$TB_ratio_log2, breaks = seq(-value_inf-bw/2,value_inf+bw/2,by = bw), labels =  seq(-value_inf,value_inf,by = bw))))
+  
+  hist_log2_TB_ratio_x_BC = aggregate(stretch_id ~ TB_ratio_log2_cut + BC, v_stretches, length)
+  colnames(hist_log2_TB_ratio_x_BC) = c("log2_TB_ratio","transition","n_users")
+  
+  save(table_TB_change_cat_x_BC_df, file = paste0(IO$out_Rdata,"table_TB_change_cat_x_BC_df.Rdata"))
+  save(hist_log2_TB_ratio_x_BC, file = paste0(IO$out_Rdata,"hist_log2_TB_ratio_x_BC.Rdata"))
+  
   
   
   save(stretches, file = paste0(IO$output_data,"stretches.Rdata"))
@@ -210,7 +254,7 @@ if(length(stretch_ids)>0){
 
 ```{r pill_trans_select TB profiles at pill transitions}
 if(length(stretch_ids)>0){
-
+  
   days$TB_change_cat_simple = case_when(
     as.numeric(days$TB_change_cat) %in% c(4) ~ as.character(days$TB_change_cat),
     as.numeric(days$TB_change_cat) %in% c(1,2,3) ~ "decrease",

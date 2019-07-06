@@ -79,26 +79,28 @@ if(file.exists(days_pill_trans_file)){
   
   stretch_ids = c("0913c6ab49af4800057ecfb6985a3f14fa46abcc_1","027150fe4baf0614104c806788dab3c3fb89bf58_1",
                   "069fe98a03c523a1405c4755e7d203e0a4af35f3_1", # on-pill increase
-               "00498284ac86f6b8750fcfec5500b0f2405cdac9_1","00c3da5f81d0a0447025ed3e3d112c90db5ae72e_1",
-               "01d6afce0c89175ddac9ac982ffc1b99df4e4b68_1","05480317a6dc8bc2bc8a0d87747f8a1ff5c8ae5f_1", # on-pill decrease
-               "02aa15b548b80916e0c304b234639f0a399b0005_1", # off-pill increase
-               "1cb635f016aa90f657dc2c5a5fa14ffe23999ccc_1","01fb4e1e771434555ed4fa0548e210ba5fce6f92_1" ) # off-pill decrease
+                  "00498284ac86f6b8750fcfec5500b0f2405cdac9_1","00c3da5f81d0a0447025ed3e3d112c90db5ae72e_1",
+                  "01d6afce0c89175ddac9ac982ffc1b99df4e4b68_1","05480317a6dc8bc2bc8a0d87747f8a1ff5c8ae5f_1", # on-pill decrease
+                  "02aa15b548b80916e0c304b234639f0a399b0005_1", # off-pill increase
+                  "1cb635f016aa90f657dc2c5a5fa14ffe23999ccc_1","01fb4e1e771434555ed4fa0548e210ba5fce6f92_1" ) # off-pill decrease
   
   
-   for(stretch_id in stretch_ids){
-        cat("\t\t",stretch_id,"\n")
-        this_stretch_days = days[days$stretch_id == stretch_id,]
-        trans = unique(this_stretch_days$transition)
-        g = ggplot_user_history(this_stretch_days, pill_transition = trans)
-        print(g)
-      }
+  for(stretch_id in stretch_ids){
+    cat("\t\t",stretch_id,"\n")
+    this_stretch_days = days[days$stretch_id == stretch_id,]
+    trans = unique(this_stretch_days$transition)
+    g = ggplot_user_history(this_stretch_days, pill_transition = trans)
+    print(g)
+  }
   
   
   
   selected_users_days = days[which(days$stretch_id %in% stretch_ids), ]
   selected_users_days$stretch_id = factor(selected_users_days$stretch_id, levels = unique(selected_users_days$stretch_id))
   selected_users_days$stretch_id = paste0("user_", as.numeric(selected_users_days$stretch_id ))
+  selected_users_days$user_id =   selected_users_days$stretch_id
 
+  
   save(selected_users_days, file = paste0(IO$out_Rdata,"days_selected_users_for_pill_transition_examples.Rdata"))
   
 }
