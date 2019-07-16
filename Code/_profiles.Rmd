@@ -43,19 +43,29 @@ tracking_pattern = function(file = "", cycles_m = cycles_m){
   load(paste0(IO$output_data,"days/",file), verbose = TRUE)
   days$tracking_group = cycles_m$tracking_group[match(days$cycle_id_m, cycles_m$cycle_id_m)]
   
+  
   # number of cycles with logs at each cycle day
   agg_n_cycles_with_log = aggregate(cycle_id_m ~ cycleday_m_D +  BC + tracking_group, days, lu)
   colnames(agg_n_cycles_with_log)[which(colnames(agg_n_cycles_with_log) == "cycle_id_m")] = "n_cycles"
   
-  # sum of n_logs at each cycle days=
+  # sum of n_logs at each cycle days
   days$n_logs = days$number
   agg_n_logs = aggregate(n_logs ~ cycleday_m_D + BC + tracking_group, days[days$type == "n_logs",], sum)
   agg = merge(agg_n_cycles_with_log, agg_n_logs, all = TRUE)
   
+  
   # total number of cycles (to get the proportions)
   agg_tot_n_cycles = aggregate(cycle_id_m ~  BC + tracking_group, days[!is.na(days$cycleday_m_D),], lu)
   colnames(agg_tot_n_cycles)[which(colnames(agg_tot_n_cycles) == "cycle_id_m")] = "tot_n_cycles"
-  agg = merge(agg, agg_tot_n_cycles, all = TRUE)
+  
+  # making sure the agg table has all cycleday_m_D
+  n_days = (par$Df+par$D+1)
+  agg_tot_exp = as.data.frame(lapply(agg_tot_n_cycles, rep, each = n_days), stringsAsFactors = FALSE)
+  agg_tot_exp$cycleday_m_D = rep(-par$D:par$Df,nrow(agg_tot_n_cycles))
+  agg = merge(agg, agg_tot_exp, all = TRUE)
+  agg$n_cycles[is.na(agg$n_cycles)] = 0
+  agg$n_logs[is.na(agg$n_logs)] = 0
+  
   cat(file," : done \n")
   return(agg)
 }
@@ -120,7 +130,14 @@ symptoms_pattern = function(file = "", cycles_m = cycles_m){
   # total number of cycles (to get the proportions)
   agg_tot_n_cycles = aggregate(cycle_id_m ~  BC + tracking_group, days[!is.na(days$cycleday_m_D),], lu)
   colnames(agg_tot_n_cycles)[which(colnames(agg_tot_n_cycles) == "cycle_id_m")] = "tot_n_cycles"
-  agg = merge(agg_n_cycles_with_log, agg_tot_n_cycles, all = TRUE)
+  
+  # making sure the agg table has all cycleday_m_D
+  n_days = (par$Df+par$D+1)
+  agg_tot_exp = as.data.frame(lapply(agg_tot_n_cycles, rep, each = n_days), stringsAsFactors = FALSE)
+  agg_tot_exp$cycleday_m_D = rep(-par$D:par$Df,nrow(agg_tot_n_cycles))
+  agg = merge(agg_n_cycles_with_log, agg_tot_exp, all = TRUE)
+  agg$n_cycles_with_TB[is.na(agg$n_cycles_with_TB)] = 0
+
   cat(file," : done \n")
   return(agg)
 }
@@ -177,7 +194,7 @@ symptoms_pattern_age_cat = function(file = "", cycles_m = cycles_m){
   i = (!is.na(days$cycleday_m_D)) & (days$tracking_group %in% c("regular tracking", "pre-menstrual tracking"))
   j = which(i & (days$type == TB))
   i = which(i)
-
+  
   
   # number of cycles with TB at each cycle day
   agg_n_cycles_with_log = aggregate(cycle_id_m ~ cycleday_m_D +  BC + age_cat + tracking_group , days[j,], lu)

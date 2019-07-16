@@ -16,3 +16,6 @@ datetime,local_user,chunck_name,duration_sec,duration_min,duration_hour
 2019-06-21T00:20:08Z,laurasymul,data_prep_BC_re_class viterbi on init model,12,0.19,0.0032,full
 2019-06-21T00:28:34Z,laurasymul,data_prep_BC_re_class viterbi on init model,12,0.2,0.0033,full
 2019-06-21T00:44:20Z,laurasymul,data_prep_BC_re_class viterbi on init model,4,0.06,0.001,full
+2019-07-07T22:06:47Z,laurasymul,profiles tracking patterns by tracking group and BC categories,498,8.29,0.1382,full
+2019-07-07T22:34:19Z,laurasymul,profiles tracking patterns by tracking group and BC categories,493,8.22,0.1371,full
+2019-07-08T18:00:44Z,laurasymul,profiles symptoms patterns by tracking group and BC categories,309,5.15,0.0859,full

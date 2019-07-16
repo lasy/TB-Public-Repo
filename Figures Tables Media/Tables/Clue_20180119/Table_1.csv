@@ -1,0 +1,19 @@
+"field","original_dataset","filtered_dataset"
+"Number of users",216484,210529
+"Number of cycles",3686977,3056348
+"Number of breast tenderness symptoms",4530662,4132033
+"Average app usage duration (in year)",1.54,1.55
+"Average app usage duration (sd)",0.65,0.65
+"Average # of cycles per users",17.03,17.15
+"Average # of cycles (sd)",7.45,7.48
+"Average # of breast tenderness per users",20.93,21.27
+"Median # of breast tenderness",8,8
+"Average # of breast tenderness (sd)",36.06,36.43
+"Average # of breast tenderness per cycle",1.23,1.35
+"Average # of breast tenderness per cycle (sd) ",2.94,3.12
+"% of cycles per BC as logged by the users (none / condoms)",28.42,31.5
+"% of cycles per BC as logged by the users (pill)",39.08,39.29
+"% of cycles per BC as logged by the users (did not enter)",32.5,29.21
+"% of cycles per BC as re-assigned (none / condoms)",48.94,59.04
+"% of cycles per BC as re-assigned (pill)",33.95,40.96
+"% of cycles per BC as re-assigned (unclear)",17.1,0

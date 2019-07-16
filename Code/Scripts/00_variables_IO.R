@@ -32,6 +32,10 @@ IO$panels = paste0("../Figures Tables Media/Figures/panels/",folder_name)
 if(!dir.exists(IO$panels)){dir.create(IO$panels, recursive = TRUE)}
 
 
+IO$tables = paste0("../Figures Tables Media/Tables/",folder_name)
+if(!dir.exists(IO$tables)){dir.create(IO$tables, recursive = TRUE)}
+
+
 
 IO$public_output_data = paste0("../Data/",folder_name)
 IO$out_Rdata = paste0(IO$public_output_data, "Rdata/")

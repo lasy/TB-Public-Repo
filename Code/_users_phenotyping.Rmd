@@ -13,7 +13,7 @@ output:
     fig_caption: true
 ---
 
-```{r user_phenotyping librairies and stuff, include = FALSE, eval = TRUE}
+```{r user_phenotyping librairies and stuff, include = FALSE, eval = TRUE, cache = FALSE}
 source("Scripts/00_setup.R")
 ```
 
