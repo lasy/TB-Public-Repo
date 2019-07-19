@@ -1,0 +1,241 @@
+---
+title: "Adding cluster info on the users table"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r users_descr_avg_dist librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r users_descr_avg_dist setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+
+```{r users_descr_avg_dist loading cycles_m and users}
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+```
+
+
+## Average distance between a user's cycles
+
+We only compute the average distance for users that had as least 1 TB ever logged
+
+```{r users_descr_avg_dist reshape d - function, cache = TRUE}
+reshape_d = function(n = 1){
+  output_file = paste0(output_folder, "d_",n,".Rdata")
+  if(!file.exists(output_file)){
+    load(paste0(input_folder,days_files[n]), verbose = TRUE)
+    #impute and transform all cycles to wide format, including cycles without TB logs
+    user_ids = unique(days$user_id[days$type == "tender_breasts"])
+    days = days[which(days$user_id %in% user_ids),]
+    d = reshape_and_impute(days)
+    save(d, file = output_file)
+    rm(d, days)
+  }
+}
+```
+
+
+
+```{r users_descr_avg_dist reshape d, cache = TRUE}
+
+output_folder = paste0(IO$tmp_data,"avg_dist_per_user/")
+if(!dir.exists(output_folder)){dir.create(output_folder)}
+input_folder = paste0(IO$output_data,"days/")
+days_files = list.files(input_folder)
+days_files = days_files
+N = length(days_files)
+
+tic()
+cl = makeCluster(min(par$n_cores, N), outfile="")
+registerDoParallel(cl)
+foreach(n = 1:N)%dopar%{reshape_d(n = n)}
+stopImplicitCluster()
+tac("users_descr_avg_dist reshape d")
+```
+
+
+```{r users_descr_avg_dist average distance}
+
+compute_average_distance_for_file_n = function(n = 1){
+  source("Scripts/00_functions_distance.R")
+  output_file = paste0(output_folder,"users_with_avg_distance_",n,".Rdata")
+  if(!file.exists(output_file)){
+    load(file = paste0(output_folder, "d_",n,".Rdata"), verbose = TRUE)
+    # compute average distance
+    users_with_avg_distance = foreach(u = unique(d$user_id), .combine = rbind) %do% {
+      #cat("user: ",u,"\n")
+      dist_summary = compute_average_distance(d = d[which(d$user_id == u),])
+      #cat("\tdist_summary: ",dist_summary$mean,"\n")
+      return(data.frame(user_id = u, avg_d = dist_summary$mean, median_d = dist_summary$median, sd_d = dist_summary$sd, file = n))
+    }
+    cat(n," : users_with_avg_distance computed\n")
+    head(users_with_avg_distance)
+    save(users_with_avg_distance, file = output_file)
+    rm(d, users_with_avg_distance)
+  }
+}
+
+
+
+cl = makeCluster(min(par$n_cores, N), outfile="")
+registerDoParallel(cl)
+tic()
+foreach(n = 1:N,.packages = c("foreach","Rcpp"),.noexport = "TB_distance_Rccp")%dopar%{compute_average_distance_for_file_n(n = n)}
+tac("users_descr_avg_dist average distance 1")
+stopImplicitCluster()
+
+
+registerDoParallel(par$n_cores)
+tic()
+avg_dist_per_user = foreach(n = 1:N,.combine = rbind)%dopar%{
+  load(file = paste0(output_folder,"users_with_avg_distance_",n,".Rdata"), verbose = TRUE)
+  return(users_with_avg_distance)
+}
+tac("users_descr_avg_dist average distance 2")
+stopImplicitCluster()
+
+save(avg_dist_per_user, file = paste0(IO$tmp_data,"avg_dist_per_user.Rdata"))
+
+```
+
+
+
+### Checking the median distance for 10 ordered users
+
+
+```{r users_descr_avg_dist prep test viz, cache = TRUE}
+
+load(file = paste0(output_folder, "d_1.Rdata"), verbose = TRUE)
+load(paste0(IO$tmp_data,"avg_dist_per_user.Rdata"), verbose = TRUE)
+
+avg_dist_per_user = avg_dist_per_user[which(avg_dist_per_user$user_id %in% unique(d$user_id)),]
+
+o  = order(avg_dist_per_user$median_d)
+user_ids =  as.character(avg_dist_per_user$user_id[o[seq(1,nrow(avg_dist_per_user),length.out = min(nrow(avg_dist_per_user), 10))]])
+
+avg_dist_per_user = avg_dist_per_user[match(user_ids,avg_dist_per_user$user_id),]
+avg_dist_per_user$user_id = factor(avg_dist_per_user$user_id, levels = user_ids)
+
+d = melt(d)
+d$cycleday_m_D = as.numeric(gsub("\\.","-",gsub("n\\.","",d$variable)))
+d$cycle_nb_m = unlist(strsplit(as.character(d$cycle_id_m), "_"))[(1:nrow(d))*2]
+d$tender_breasts = d$value
+
+d = d[,c("user_id","cycle_nb_m","cycleday_m_D","tender_breasts")]
+
+sel_d = d[d$user_id %in% user_ids ,]
+sel_d$user_id = factor(sel_d$user_id, levels = user_ids)
+
+
+```
+
+
+
+```{r users_descr_avg_dist test viz, fig.height=12, fig.width=6, cache = TRUE}
+g = ggplot_imputed_TB(sel_d = sel_d, facet_grid = "user_id", cycle_id = FALSE)
+g
+
+avg_dist_per_user
+```
+
+
+### Consistency metrics
+
+
+```{r users_descr_avg_dist saving users, cache = TRUE}
+
+load(file = paste0(IO$tmp_data,"avg_dist_per_user.Rdata"), verbose=  TRUE)
+load(paste0(IO$output_data, "users.Rdata"), verbose=  TRUE)
+
+
+m = match(users$user_id, as.character(avg_dist_per_user$user_id))
+users$avg_d = avg_dist_per_user$avg_d[m]
+users$median_d = avg_dist_per_user$median_d[m]
+users$sd_d = avg_dist_per_user$sd_d[m]
+
+save(users, file = paste0(IO$output_data, "users.Rdata"))
+file.copy(from = paste0(IO$output_data, "users.Rdata"), to = paste0(IO$tmp_data, "users_with_average_dist.Rdata"), overwrite = TRUE)
+
+```
+
+
+
+```{r users_descr_avg_dist dist_viz}
+
+user_selection = which(
+  (users$tracking_consistency >= 0.75)&
+    (users$BC %in% par$BC_dict$name) &
+    (users$perc_cycles_with_TB >= 0.5)
+)
+
+users$TB_freq = users$n_tender_breasts/users$n_cycles
+users$high_TB_freq = users$TB_freq>=2.5
+
+ggplot(users[user_selection,], aes(x = median_d, fill = BC)) +
+  geom_histogram(position = "identity", col = NA)+
+  facet_grid(BC ~. )
+
+
+ggplot(users[user_selection,], aes(x = avg_d, fill = BC)) +
+  geom_histogram(position = "identity", col = NA)+
+  facet_grid(BC ~ high_TB_freq)
+
+
+ggplot(users[user_selection,], aes(x = sd_d, fill = BC)) +
+  geom_histogram(position = "identity", col = NA)+
+  facet_grid(BC ~ high_TB_freq )
+
+```
+
+
+
+
+
+```{r users_descr_avg_dist dist_viz_old, eval = FALSE}
+
+
+ggplot(users, aes(x = median_d, fill = factor(most_preval_clust))) +
+  geom_histogram(position = "identity", col = NA) + 
+  facet_grid(most_preval_clust ~ ., scale = "free_y")#+
+#scale_fill_manual(values = cols$clusters_6)
+
+
+
+ggplot(users, aes(x = median_d, fill = factor(most_preval_clust))) +
+  geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
+  facet_grid(most_preval_clust ~ ., scale = "free_y")#+
+#scale_fill_manual(values = cols$clusters_6)
+
+
+ggplot(users, aes(x = avg_d, fill = factor(most_preval_clust))) +
+  geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
+  facet_grid(most_preval_clust ~ ., scale = "free_y")#+
+#scale_fill_manual(values = cols$clusters_6)
+
+
+
+ggplot(users, aes(x = sd_d, fill = factor(most_preval_clust))) +
+  geom_density(aes(y = ..density..),alpha = 0.5, position = "identity", col = NA) + 
+  facet_grid(most_preval_clust ~ ., scale = "free_y")#+
+#scale_fill_manual(values = cols$clusters_6)
+
+```
+
+

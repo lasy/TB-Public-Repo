@@ -20,7 +20,7 @@ source("Scripts/00_setup.R")
 ```
 
 
-# Profiles
+# Average profiles
 
 We saw that cycles can be classified into 3 groups depending on the tracking behavior.
 Here we will describe the average tracking and symptoms profiles for these 3 groups and by BC.

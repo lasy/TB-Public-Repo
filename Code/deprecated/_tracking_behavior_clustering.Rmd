@@ -1,0 +1,214 @@
+---
+title: "Clustering cycles according to the tracking behavior"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r clust_tracking_behavior librairies and stuff, include = FALSE, eval = TRUE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r clust_tracking_behavior setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+# Clustering cycles according to the tracking behavior
+
+```{r clust_tracking_behavior load data}
+load(paste0(IO$output_data, "cycles_m.Rdata"), verbose =TRUE)
+colnames(cycles_m)
+```
+
+```{r clust_tracking_behavior data prep}
+cycles_m$n_days_obs_D_Df = cycles_m$n_days_obs_lut_D+cycles_m$n_days_obs_foll_Df
+
+cycles_m$n_days_obs_lut_D_7 = cycles_m$n_days_obs_lut_D - cycles_m$n_days_obs_lut_7
+
+
+cycles_m$f_D_7 = (cycles_m$n_days_obs_lut_D_7 ) / (par$D-7)
+cycles_m$f_7_0 = (cycles_m$n_days_obs_lut_7) / 7
+cycles_m$f_0_7 = (cycles_m$n_days_obs_foll_Df) / (par$Df+1)
+
+cycles_m[sample(1:nrow(cycles_m),10), c("n_days_obs_D_Df","f_D_7","f_7_0","f_0_7")]
+
+X = as.data.frame(as.matrix(cycles_m[, c("f_D_7","f_7_0","f_0_7")]))
+X_wide = X
+X_wide$rows = 1:nrow(X_wide)
+X_long = melt(X_wide, id.vars = "rows")
+
+```
+
+
+
+```{r clust_tracking_behavior viz}
+
+X_long$cycle_phase = c(paste0("[-",par$D," to -7["),"[-7,0[",paste0("[0,",par$Df,"]"))[match(X_long$variable,c("f_D_7","f_7_0","f_0_7"))]
+
+ggplot(X_long, aes(x = value, fill = cycle_phase)) +
+  geom_histogram(position = "identity",alpha = 0.5, binwidth = 0.2)+
+  facet_grid(cycle_phase ~.)+xlab("Fraction of days with logs in that cycle phase")
+
+ggplot(X, aes(x = f_D_7, y = f_7_0)) +
+  geom_bin2d(bins = c(par$D-7, 7), drop = TRUE)+
+  xlab(paste0("[-",par$D," to -7["))+ylab("[-7,0[")
+
+round(100*table(X$f_D_7, X$f_7_0)/nrow(X))
+
+```
+
+
+
+```{r clust_tracking_behavior optimal number of clusters}
+
+y = data.frame()
+
+for(i in 1:5){
+  set.seed(i)
+  g_clara = fviz_nbclust(X[sample(1:round(nrow(X)/i),5000),], FUNcluster = clara, metric = "euclidean",samples = 50, sampsize = 200, method = "silhouette")
+  print(g_clara)
+  y = rbind(y, g_clara$data$y)
+}
+colnames(y) = g_clara$data$clusters
+
+y_average =  apply(y, 2, mean)
+y_sd = apply(y, 2, sd)
+n_clust = as.numeric(colnames(y)[which.max(y_average)])
+y_average = melt(y_average)
+y_average$n_clust = 1:nrow(y_average)
+y_average$sd = y_sd
+ggplot(y_average, aes(x =n_clust, y = value))+ 
+  geom_segment(aes(xend = n_clust,  y = value - sd, yend = value + sd), col = "gray70", size = 1)+
+  geom_point()
+
+
+
+```
+
+
+
+
+```{r clust_tracking_behavior clustering, fig.width= 10, fig.height= 4}
+
+
+cat(n_clust,"\n")
+tracking_clustering = clara(x = X, 
+                            k = n_clust, 
+                            metric = "euclidean",
+                            samples = 50,
+                            sampsize = 200)
+cat("\t\t",tracking_clustering$silinfo$avg.width,"\n")
+
+silh = as.data.frame(tracking_clustering$silinfo$widths)
+silh$x = 1:nrow(silh)
+silh$rows = as.numeric(rownames(tracking_clustering$silinfo$widths))
+
+X_long$cluster_num = tracking_clustering$clustering[match(X_long$rows, X_wide$rows)]
+
+# show the samples chosen by clara FOR SILHOUETTE
+
+m = which(!is.na(match( X_long$rows, silh$rows)))
+X_long_subset = X_long[m,]
+X_long_subset$rows = factor(X_long_subset$rows, levels = rev(silh$rows))
+g_samples = ggplot(X_long_subset,aes(x = variable, y = rows, col = value))+ geom_point() + 
+  guides(color = FALSE) + scale_color_gradient(low = "white",high = "blue4")+ggtitle(paste("n_clust = ",n_clust))
+
+g_silh = ggplot(silh, aes(fill = factor(cluster),x = factor(x, levels =rev(x)), y = sil_width)) + coord_flip()+
+  geom_bar(stat = "identity")+
+  #ylim(c(-1,1))+
+  geom_hline(yintercept = tracking_clustering$silinfo$avg.width, linetype = 2)+ 
+  ggtitle(paste0("avg. silh score = ",round(tracking_clustering$silinfo$avg.width,digits = 3)))+
+  guides(fill = FALSE, color = FALSE)+
+  xlab("")+ylab("silh width")+ theme(axis.text.y = element_blank())
+
+grid.arrange(g_samples, g_silh, nrow = 1, widths = c(2,1))
+
+```
+
+
+
+
+```{r clust_tracking_behavior saving tracking_behavior_clusters}
+cycles_m$tracking_cluster_n = tracking_clustering$clustering
+cycles_m$tracking_cluster = c("regular_tracking","menstrual_tracking")[tracking_clustering$clustering]
+
+cycles_m$tracking_group = ifelse((cycles_m$n_days_obs_lut_D < 2) & (cycles_m$n_days_obs_lut_7 < 2), "menstrual tracking",
+                                 ifelse((cycles_m$f_D_7 >= 0.5) & (cycles_m$f_7_0 >= 0.5) & (cycles_m$f_0_7 >= 0.5),"regular tracking",
+                                        ifelse((cycles_m$f_D_7 < 0.5) & (cycles_m$f_7_0 >= 0.5) & (cycles_m$f_0_7 >= 0.3),"pre-menstrual tracking",
+                                               "sporadic tracking"))) 
+
+save(cycles_m, file = paste0(IO$output_data,"cycles_m.Rdata"))
+file.copy(from = paste0(IO$output_data,"cycles_m.Rdata") , to = paste0(IO$tmp_data, "cycles_m_with_tracking_clust.Rdata"), overwrite = TRUE)
+```
+
+
+
+
+
+
+```{r clust_tracking_behavior users average tracking behavior}
+load(paste0(IO$output_data,"users.Rdata"))
+
+cycles_m$tracking_group_f = factor( gsub(" " ,"_",cycles_m$tracking_group), levels = gsub(" ","_",sort(unique(cycles_m$tracking_group))))
+agg = aggregate(tracking_group_f ~ user_id, cycles_m, table)
+rel = as.data.frame(agg$tracking_group_f/apply(agg$tracking_group_f,1,sum))
+colnames(rel) = paste0("f_",colnames(rel))
+max_rel = apply(rel,1,max)
+
+agg2 = data.frame(user_id = agg$user_id, 
+                  as.data.frame(agg$tracking_group_f), 
+                  rel, 
+                  tracking_consistency = max_rel, 
+                  main_tracking_group = sort(unique(cycles_m$tracking_group))[apply(rel,1,which.max)]
+)
+
+
+m = match(users$user_id, agg2$user_id)
+columns_to_add = colnames(agg2)[-1]
+for(column in columns_to_add){
+  eval(parse(text = paste0("users$",column,"= agg2$",column,"[m]")))
+}
+
+
+save(users, file = paste0(IO$output_data,"users.Rdata"))
+file.copy(from =  paste0(IO$output_data,"users.Rdata"), to = paste0(IO$tmp_data, "users_with_tracking_behavior.Rdata"), overwrite = TRUE)
+
+ggplot(users, aes(x = tracking_consistency, fill = main_tracking_group))+
+  geom_histogram(binwidth = 0.05)+
+  facet_grid(main_tracking_group ~ .)+ expand_limits(x = 0)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

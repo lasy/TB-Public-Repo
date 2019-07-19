@@ -1,7 +1,7 @@
 ---
-title: "Breasts tenderness: data analysis"
+title: "Phenotyping menstrual breast tenderness from large-scale self-tracked data: data analysis"
 author: "Laura Symul"
-date: "10/12/2018"
+date: "last update: `r format(Sys.time(), '%d %B, %Y')`"
 output: 
   bookdown::html_document2: 
     theme: flatly

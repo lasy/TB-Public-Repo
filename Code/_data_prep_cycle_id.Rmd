@@ -127,7 +127,7 @@ summary(days)
 
 
 
-## Defining menstruation-centered cycles
+### Defining menstruation-centered cycles
 
 
 We consider the luteal phase to be "fixed" so that any day within D days from the next menses will belong to the next cycle.

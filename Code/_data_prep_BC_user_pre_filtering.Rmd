@@ -25,8 +25,9 @@ knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 options(scipen=999)
 ```
 
+## Birth control re-assignement per cycles (prep)
 
-## Removing users with any other form of BC than the pill or condoms (from the tracking table info)
+### Removing users with any other form of BC than the pill or condoms (from the tracking table info)
 
 
 ```{r data_prep_BC_user_pre_filtering loading users}

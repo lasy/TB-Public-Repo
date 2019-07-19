@@ -1,5 +1,5 @@
 ---
-title: "Tender Breasts FIGURES"
+title: "TABLES and FIGURES for 'Phenotyping menstrual tenderness from large-scale self-tracked data'"
 author: "Laura Symul"
 date: "1/16/2019"
 output: 
@@ -9,7 +9,7 @@ output:
     toc: yes
     toc_float: true
     toc_depth: 5
-    number_sections: true
+    number_sections: false
     fig_caption: true
 
 ---
@@ -20,12 +20,13 @@ knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 ```
 
 
-```{r setup librairies and stuff, include = FALSE, eval = TRUE}
+```{r setup librairies and stuff, results = "hide", eval = TRUE, cache = FALSE}
 source("Scripts/00_setup.R")
 ```
 
+# Loading data
 
-```{r load users and cycles, cache = FALSE, eval = TRUE}
+```{r load users and cycles, cache = TRUE, eval = TRUE}
 
 load(file = paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
 load(file = paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
@@ -45,7 +46,6 @@ m = match(users$user_id, agg$user_id)
 agg = agg[m,]
 agg$app_duration_in_days = as.numeric(agg$end_last_cycle - agg$start_first_cycle)
 agg$app_duration_in_years = agg$app_duration_in_days / 365
-
 
 ```
 
@@ -124,7 +124,7 @@ table_BC_CLUE_o_perc = round(100*table_BC_CLUE_o/nrow(cycles),2)
 
 table_BC_CLUE_f = table(cycles$birth_control_CLUE[jc])
 table_BC_CLUE_f_perc = round(100*table_BC_CLUE_f/length(jc),2)
-  
+
 df = rbind(df,
            data.frame(field = paste0("% of cycles per BC as logged by the users (",names(table_BC_CLUE_o_perc),")"),
                       original_dataset = as.numeric(table_BC_CLUE_o_perc), 
@@ -137,7 +137,7 @@ table_BC_o_perc = round(100*table_BC_o/nrow(cycles),2)
 
 table_BC_f = table(cycles$BC[jc])
 table_BC_f_perc = round(100*table_BC_f/length(jc),2)
-  
+
 df = rbind(df,
            data.frame(field = paste0("% of cycles per BC as re-assigned (",names(table_BC_o_perc),")"),
                       original_dataset = as.numeric(table_BC_o_perc), 
@@ -176,7 +176,7 @@ write.csv(table_BC, file = paste0(IO$tables, "Supplementary_Table_BC_table.csv")
 
 ```
 
-# users' features
+# Table 2: users' features
 
 ```{r}
 
@@ -233,7 +233,7 @@ round(100*sort(table(users$BC[ju]))/length(ju),2)
 
 
 
-# Demographics (Supplementary)
+# Demographics (Supplementary viz)
 
 
 ```{r data_presentation_demographics number of users in each considered category}
@@ -281,13 +281,13 @@ ggsave(filename = paste0(IO$panels, "S1_X_number_of_cycles_per_cat.pdf"), plot =
 ```
 
 
-# Number of Breast Tenderness per users
+# Figure 1: Number of Breast Tenderness per users
 
 ```{r}
 
 ju = which(users$BC %in% as.character(par$BC_dict$name))
 g = ggplot(users[ju,], aes(x = n_tender_breasts, fill = BC))+
-  geom_histogram(binwidth = 1, position = "identity", alpha = 0.5)+xlim(c(0,20))
+  geom_histogram(binwidth = 1, position = "identity", alpha = 0.5)+xlim(c(-1,20))
 g
 
 j = which((users$BC %in% as.character(par$BC_dict$name)) & 
@@ -331,7 +331,7 @@ ggsave(file = paste0(IO$panels, "perc of users vs perc of cycles with at least o
 
 
 
-# Examples
+# Figure 1: Examples
 
 
 ```{r TB examples fig 1A}
@@ -361,7 +361,7 @@ rm(days, user_id, user_ids, g, d, j)
 ```
 
 
-# Tracking groups
+# Figure 1: Tracking groups
 
 ```{r tracking groups average tracking profile, fig.width=6, fig.height=2.5}
 
@@ -386,6 +386,12 @@ g = ggplot(agg, aes(x = cycleday_m_D, y = fraction_cycles_with_logs, col = BC, s
   facet_grid( . ~ tracking_group)
 g
 
+ggsave(file = paste0(IO$panels, "tracking_profile_perc_cycles_with_logs_per_tracking_group_and_BC.pdf"),
+       plot = g, 
+       width = viz$full_width/2,
+       height = 0.3*viz$full_width/2,
+       scale = viz$scale*1.2)
+
 
 g_n = ggplot(agg, aes(x = cycleday_m_D, y = avg_n_logs, col = BC, shape = BC)) + 
   geom_vline(xintercept = 0, col = "gray90", size = 1.5)+
@@ -393,32 +399,28 @@ g_n = ggplot(agg, aes(x = cycleday_m_D, y = avg_n_logs, col = BC, shape = BC)) +
   scale_x_continuous(breaks = par$x.axis)+
   scale_colour_manual(values= cols$BC , name="BC")+
   scale_fill_manual(values= cols$BC , name="BC")+
-  guides(col = FALSE, fill = FALSE, shape = FALSE)+
+  guides()+
   xlab("cycleday from 1st day of menstruation") + ylab("average # of logs")+
   theme(legend.position="bottom",legend.background = element_rect(color="gray90", fill = NA))+
   facet_grid( . ~ tracking_group)+
-  geom_text(aes(x = par$Df, y = 0+ 0.1*(match(BC, par$BC_dict$name)-1), label = paste0("n: ",tot_n_cycles)),
-            hjust = 1, vjust = 1)
+  geom_text(aes(x = -par$D, y = 9.25+ 1*(match(BC, par$BC_dict$name)-1), label = paste0("n: ",tot_n_cycles)),
+            hjust = 0, vjust = 0,show.legend = FALSE)
 g_n
 
 
-ggsave(file = paste0(IO$panels, "tracking_profile_perc_cycles_with_logs_per_tracking_group_and_BC.pdf"),
-       plot = g, 
-       width = viz$full_width/2,
-       height = 0.3*viz$full_width/2,
-       scale = viz$scale*1.2)
+
 
 ggsave(file = paste0(IO$panels, "tracking_profile_avg_log_per_tracking_group_and_BC.pdf"),
        plot = g_n, 
        width = viz$full_width/2,
-       height = 0.3*viz$full_width/2,
+       height = 0.4*viz$full_width/2,
        scale = viz$scale*1.2)
 
 
 ```
 
 
-#  Overall tender breasts profiles per tracking groups
+#  Figure 1: Overall tender breasts profiles per tracking groups
 
 ```{r tracking groups average symptoms profile, fig.width=6, fig.height=2.5}
 
@@ -456,7 +458,7 @@ ggsave(file = paste0(IO$panels, "symptoms_profile_per_tracking_group_and_BC.pdf"
 ```
 
 
-# Overall tender breasts profiles per age categories and BC for cycles with regular tracking
+# Figure 1: Overall tender breasts profiles per age categories and BC for cycles with regular tracking
 
 ```{r overall_profile profile by BC and age cat}
 
@@ -535,7 +537,7 @@ ggsave(filename = paste0(IO$panels, "1_number_of_TB_per_cycle.pdf"), plot = g, w
 
 ```
 
-# Predictor of Breast Tenderness.
+# Figure S2: Predictor of Breast Tenderness.
 
 
 
@@ -636,7 +638,7 @@ ggsave(filename = paste0(IO$panels, "predictors_p_countries.pdf"),
 
 
 
-# Evolution in time
+# Figure 2: Evolution in time
 
 ```{r evolution in time}
 
@@ -675,7 +677,7 @@ ggsave(filename = paste0(IO$panels, "evolution_in_time.pdf"),
 
 
 
-# Consistency of Symptoms
+# Figure 2: Consistency of Symptoms
 
 ```{r consistency of symptoms - all examples, fig.width= 12, fig.height=10 }
 
@@ -786,7 +788,7 @@ ggsave(filename = paste0(IO$panels, "consistency_summary.pdf"),
 
 
 
-# Phenotyping
+# Figure 2: Phenotyping
 
 
 ```{r phenotyping}
@@ -797,15 +799,16 @@ for(bc in c("NC","pill")){
   load(file = paste0(IO$tmp_data,"user_phenotyping_",bc,".Rdata"), verbose = TRUE)
   
   # screeplot
-  #eig_df = data.frame(x = 1:10, eig = mds$eig[1:10])
-  #g = ggplot(eig_df, aes(x = x, y = eig)) + geom_bar(stat = "identity", fill = cols$BC[i])
-  #g
   
-  # ggsave(filename = paste0(IO$panels, "S_screeplot_",bc,".pdf"), 
-  #        plot = g, 
-  #        width = viz$full_width/3, 
-  #        height = 0.75*viz$full_width/3,
-  #        scale = viz$scale)
+  g = ggplot(eig_df, aes(x = as.factor(x), y = eig)) + geom_bar(stat = "identity", fill = cols$BC[i])+
+    xlab("dimensions")+ggtitle(BC)
+  g
+  
+  ggsave(filename = paste0(IO$panels, "S_screeplot_",bc,".pdf"),
+         plot = g,
+         width = viz$full_width/4,
+         height = 0.75*viz$full_width/4,
+         scale = viz$scale)
   
   
   # interactive 3D
@@ -880,21 +883,42 @@ for(bc in c("NC","pill")){
   g_12 = ggplot(mds_df, aes(x = X1, y = X2)) + coord_fixed()+
     geom_point(alpha = 0.5, size = 0.3, col = "gray40")+
     geom_point(data = mds_df_subset, aes(x = X1, y = X2, col = user_id), size = 2, alpha = 0.7)+
+    scale_x_continuous(breaks = seq(-1,1,by = 0.2))+
+    scale_y_continuous(breaks = seq(-1,1,by = 0.2))+
+    xlab(paste0("X1 (",round(100*eig_df$eig[1]/sum(eig_df$eig),1),"% variance)"))+
+    ylab(paste0("X2 (",round(100*eig_df$eig[2]/sum(eig_df$eig),1),"% variance)"))+
     guides(col = FALSE)
   
   g_13 = ggplot(mds_df, aes(x = X1, y = X3)) + coord_fixed()+
     geom_point(alpha = 0.5, size = 0.3, col = "gray40") +
     geom_point(data = mds_df_subset, aes(x = X1, y = X3, col = user_id), size = 2, alpha = 0.7)+
+    scale_x_continuous(breaks = seq(-1,1,by = 0.2))+
+    scale_y_continuous(breaks = seq(-1,1,by = 0.2))+
+    xlab(paste0("X1 (",round(100*eig_df$eig[1]/sum(eig_df$eig),1),"% variance)"))+
+    ylab(paste0("X3 (",round(100*eig_df$eig[3]/sum(eig_df$eig),1),"% variance)"))+
     guides(col = FALSE)
   
   grid.arrange(g_12, g_13, nrow = 1)
-  g_mds = arrangeGrob(g_12, g_13, nrow = 1)
+  g_mds = arrangeGrob(g_12, g_13, nrow = 2)
   g_mds
   
   ggsave(filename = paste0(IO$panels, "mds_",bc,".pdf"), 
          plot = g_mds, 
-         width = viz$full_width/2, 
-         height = 0.5*viz$full_width/2,
+         width = viz$full_width/4, 
+         height = viz$full_width/2.2,
+         scale = viz$scale)
+  
+    
+  ggsave(filename = paste0(IO$panels, "mds_",bc,"_12.pdf"), 
+         plot = g_12, 
+         width = viz$full_width/4, 
+         height = viz$full_width/4,
+         scale = viz$scale)
+  
+    ggsave(filename = paste0(IO$panels, "mds_",bc,"_13.pdf"), 
+         plot = g_13, 
+         width = viz$full_width/4, 
+         height = viz$full_width/4,
          scale = viz$scale)
   
   
@@ -913,7 +937,9 @@ for(bc in c("NC","pill")){
     guides(col = FALSE, fill = FALSE)+
     theme(strip.text = element_blank())+
     scale_y_continuous(breaks = c(0,0.5,1))+
-    scale_x_continuous(breaks = par$x.axis)
+    scale_x_continuous(breaks = par$x.axis)+
+    xlab("cycleday from menstruation")+
+    ylab("average breast tenderness")
   g_profiles
   
   ggsave(filename = paste0(IO$panels, "profiles_",bc,".pdf"), 
@@ -936,10 +962,7 @@ for(bc in c("NC","pill")){
 
 
 
-
-
-
-# PILL TRANSITION
+# Figure 3: PILL TRANSITION
 
 
 ```{r pill transition average profiles}

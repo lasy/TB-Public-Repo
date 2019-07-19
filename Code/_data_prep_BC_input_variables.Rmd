@@ -26,7 +26,7 @@ options(scipen=999)
 ```
 
 
-## Input variables for BC re-classification
+### Input variables for BC re-classification
 
 load data
 
@@ -66,7 +66,7 @@ if(length(j)>0){cycles = cycles[,-j]}
 ```
 
 
-## Additional input variables to reflect non-linear differences in distributions
+### Additional input variables to reflect non-linear differences in distributions
 
 ```{r data_prep_BC_input n_cycles_tot}
 
@@ -77,7 +77,7 @@ colnames(df_n_cycles) = c("birth_control_CLUE","n_cycles_tot")
 
 
 
-### Cycle length
+#### Cycle length
 
 
 
@@ -102,7 +102,7 @@ inputs = c(inputs, "cycle_length_score")
 
 ```
 
-### N days of observations
+#### N days of observations
 
 
 
@@ -128,7 +128,7 @@ inputs = c(inputs, "n_days_obs_score")
 ```
 
 
-## Save
+### Save
 
 
 ```{r data_prep_BC_input save cycles}

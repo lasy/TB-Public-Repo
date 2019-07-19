@@ -26,6 +26,7 @@ options(scipen=999)
 ```
 
 
+## Number of logs per day
 
 Checking for duplicates in the original dataset that Clue provided.
 
@@ -62,7 +63,7 @@ rm(TRACKING, tracking, files, file, j)
 ```
 
 
-## First we need to remove the duplicated rows in the tracking tables
+### First we need to remove the duplicated rows in the tracking tables
 
 ```{r data_prep_n_logs remove duplicated rows function}
 
@@ -124,7 +125,7 @@ copy_days_tmp2out(output_days_folder)
 
 
 
-## Counting the number of logs per day of observation (and adding these rows to the tables)
+### Counting the number of logs per day of observation (and adding these rows to the tables)
 
 
 ```{r data_prep_n_logs counting and saving n_logs}

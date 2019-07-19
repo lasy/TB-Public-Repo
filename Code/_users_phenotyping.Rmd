@@ -22,9 +22,13 @@ source("Scripts/00_setup.R")
 knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 ```
 
-# User clustering
+# Users phenotyping
 
-We want to cluster average profiles of users that were found to track and report symptoms consistently. 
+
+## Multidimensional scaling and clustering
+
+We want to represent users in a lower dimensional space and potentially identify clusters based on the average profiles of users that were found to track and report symptoms consistently. 
+
 We will do this by BC group and merge the "regular tracking" with the "pre-menstrual tracking" groups.
 
 To compare two user's average profiles, we will use the [weighted jaccard distance](https://en.wikipedia.org/wiki/Jaccard_index). 
@@ -61,30 +65,40 @@ save(c_wide, file = paste0(IO$tmp_data, "c_wide_selected_users.Rdata"))
 ```
 
 
+```{r user_phenotyping c_wide_BC}
+c_wide_BC = users$BC[match(c_wide$user_id, users$user_id)]
+```
 
-```{r user_phenotyping phenotyping}
+
+
+```{r user_phenotyping characteristics}
 #load(file = paste0(IO$tmp_data, "c_wide_selected_users.Rdata"), verbose = TRUE)
 # load(file = paste0(IO$output_data,"users.Rdata"), verbose = TRUE)
 
-source("Scripts/00_functions_distance.R")
-
-c_wide_BC = users$BC[match(c_wide$user_id, users$user_id)]
 
 #BC = as.character(par$BC_dict$name)[1] # NC
 #BC = as.character(par$BC_dict$name)[2] # pill
 
+
+characteristics_both = data.frame()
+
 for(BC in as.character(par$BC_dict$name)){
+  
   k = which(c_wide_BC == BC)
   this_c_wide = c_wide[k,]
-  this_avg_profile_per_user = avg_profile_per_user[which(avg_profile_per_user$user_id %in% this_c_wide$user_id),]
   M = this_c_wide[,-1]
-  dist = user_distance(M = M)
-  dist = as.dist(dist)
+  
+  if(BC != "pill"){bc = "NC"}else{bc = BC}
+  save(M, file = paste0(IO$tmp_data,"user_phenotyping_M_",bc,".Rdata"))
+  
   
   characteristics = data.frame(user_id = this_c_wide$user_id)
-  characteristics$age = users$age[match(characteristics$user_id, users$user_id)]
-  characteristics$bmi_cat = users$bmi_cat[match(characteristics$user_id, users$user_id)]
+  m = match(characteristics$user_id, users$user_id)
+  characteristics$BC = users$BC[m]
+  characteristics$age = users$age[m]
+  characteristics$bmi_cat = users$bmi_cat[m]
   characteristics$bmi_cat_num = as.numeric(characteristics$bmi_cat)
+  
   
   characteristics$sum = apply(M, 1, sum)
   characteristics$max = apply(M, 1, max)
@@ -96,54 +110,169 @@ for(BC in as.character(par$BC_dict$name)){
   characteristics$discontinuity = characteristics$time_last_symptoms -  characteristics$time_first_symptoms  - characteristics$n_days 
   characteristics$variability = apply(M, 1, function(x){sum(abs(diff(x)))}) # sum(rle(sign(diff(x)))$values == -1)
   
+  save(characteristics, file = paste0(IO$tmp_data,"user_phenotyping_characteristics_",bc,".Rdata"))
+  
+  characteristics_both = rbind(characteristics_both, characteristics)
+  
+  print(ggplot(characteristics, aes(x = age, y = time_max)) + geom_point(alpha = 0.05) + geom_smooth()+ggtitle(BC))
+  print(ggplot(characteristics, aes(x = age, y = time_last_symptoms)) + geom_point(alpha = 0.01)+ geom_smooth()+ggtitle(BC))
+  print(ggplot(characteristics, aes(x = age, y = n_days)) + geom_point(alpha = 0.01)+ geom_smooth()+ggtitle(BC))
+  
+} 
+
+
+characteristics_both_long = melt(characteristics_both, id.vars = c("user_id","BC","age","bmi_cat","bmi_cat_num"))
+ggplot(characteristics_both_long, aes(x = value, col = BC, fill = BC))+
+  geom_histogram(aes(y = ..density..),position = "identity", alpha = 0.4, bins = 26)+
+  facet_wrap(variable ~., scale = "free")
+
+ggplot(characteristics_both, aes(x = n_days, fill = BC))+
+  geom_histogram(binwidth = 1)+
+  facet_grid(BC ~., scale = "free")
+
+
+ggplot(users[users$user_id %in% characteristics_both$user_id,], aes(x = consistency, fill = BC))+
+  geom_histogram(bins = 10)+
+  facet_grid(BC ~., scale = "free")
+
+```
+
+
+
+```{r user_phenotyping adding characteristics to users table}
+
+col_to_add = colnames(characteristics_both)
+j = which(col_to_add %in% colnames(users))
+if(length(j)>0){col_to_add = col_to_add[-j]}
+m = match(users$user_id, characteristics_both$user_id)
+for(col in col_to_add){
+  eval(parse(text = paste0("users$",col," = characteristics_both$",col,"[m]")))
+}
+
+save(users, file = paste0(IO$output_data,"users.Rdata"))
+file.copy(from = paste0(IO$output_data,"users.Rdata"), to = paste0(IO$tmp_data,"users_with_characteristics.Rdata") )
+
+
+```
+
+
+### Distance (weighted Jaccard)
+
+```{r user_phenotyping distance}
+
+source("Scripts/00_functions_distance.R")
+
+
+for(BC in as.character(par$BC_dict$name)){
+  
+  if(BC != "pill"){bc = "NC"}else{bc = BC}
+  load(file = paste0(IO$tmp_data,"user_phenotyping_M_",bc,".Rdata"), verbose = TRUE)
+  
+  # DISTANCE
+  dist = user_distance(M = M)
+  dist = as.dist(dist)
+  
+  save(dist, file = paste0(IO$tmp_data,"user_phenotyping_dist_",bc,".Rdata"))
+  
+}  
+
+```
+
+### Multidimensional scaling
+
+
+```{r user_phenotyping multidimensional scaling}
+
+
+for(BC in as.character(par$BC_dict$name)){
+  
+  if(BC != "pill"){bc = "NC"}else{bc = BC} 
+  load(file = paste0(IO$tmp_data,"user_phenotyping_dist_",bc,".Rdata"), verbose = TRUE)
+  load(file = paste0(IO$tmp_data,"user_phenotyping_characteristics_",bc,".Rdata"), verbose = TRUE)
+  
+  
+  # MULTIDIMENSIONAL SCALING
   
   mds = cmdscale(dist, k = 26, eig = TRUE)
   #screeplot
   barplot(mds$eig[1:10])
+  eig_df = data.frame(x = 1:length(mds$eig), eig = mds$eig)
   # data frame for viz
   mds_df = data.frame(characteristics, mds$points)
   
-  ggplot(mds_df, aes(x = X1, y = X2)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X3)) + geom_point(alpha = 0.5)
-  
-
-  ggplot(mds_df, aes(x = X1, y = X2, col = sum)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X3, col = sum)) + geom_point(alpha = 0.5)
-  
-  ggplot(mds_df, aes(x = X1, y = X2, col = max)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X3, col = max)) + geom_point(alpha = 0.5)
-  
-  ggplot(mds_df, aes(x = X1, y = X2, col = time)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X3, col = time)) + geom_point(alpha = 0.5)
-  
-  ggplot(mds_df, aes(x = X1, y = X2, col = time_max)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X3, col = time_max)) + geom_point(alpha = 0.5)
+  print(ggplot(mds_df, aes(x = X1, y = X2)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  print(ggplot(mds_df, aes(x = X1, y = X3)) + geom_point(alpha = 0.5)+ggtitle(BC))
   
   
-  ggplot(mds_df, aes(x = X1, y = X2, col = n_days)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X3, col = n_days)) + geom_point(alpha = 0.5)
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = sum)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  print(ggplot(mds_df, aes(x = X1, y = X3, col = sum)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = max)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  print(ggplot(mds_df, aes(x = X1, y = X3, col = max)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = time)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  print(ggplot(mds_df, aes(x = X1, y = X3, col = time)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = time_max)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  print(ggplot(mds_df, aes(x = X1, y = X3, col = time_max)) + geom_point(alpha = 0.5)+ggtitle(BC))
   
   
-  ggplot(mds_df, aes(x = X1, y = X2, col = time_first_symptoms)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X3, col = time_first_symptoms)) + geom_point(alpha = 0.5)
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = n_days)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  print(ggplot(mds_df, aes(x = X1, y = X3, col = n_days)) + geom_point(alpha = 0.5)+ggtitle(BC))
   
   
-  ggplot(mds_df, aes(x = X1, y = X2, col = time_last_symptoms)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X3, col = time_last_symptoms)) + geom_point(alpha = 0.5)
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = time_first_symptoms)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  print(ggplot(mds_df, aes(x = X1, y = X3, col = time_first_symptoms)) + geom_point(alpha = 0.5)+ggtitle(BC))
   
   
-  ggplot(mds_df, aes(x = X1, y = X2, col = discontinuity)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X3, col = discontinuity)) + geom_point(alpha = 0.5)
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = time_last_symptoms)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  print(ggplot(mds_df, aes(x = X1, y = X3, col = time_last_symptoms)) + geom_point(alpha = 0.5)+ggtitle(BC))
   
   
-  ggplot(mds_df, aes(x = X1, y = X2, col = variability)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X3, col = variability)) + geom_point(alpha = 0.5)
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = discontinuity)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  print(ggplot(mds_df, aes(x = X1, y = X3, col = discontinuity)) + geom_point(alpha = 0.5)+ggtitle(BC))
   
+  
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = variability)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  print(ggplot(mds_df, aes(x = X1, y = X3, col = variability)) + geom_point(alpha = 0.5)+ggtitle(BC))
+  
+  
+  k = which(round(mds$points[,1],1) == 0) 
+  o = order(mds$points[k,2])
+  
+  first = k[o[1:5]]
+  last = k[o[(length(k)-5):length(k)]]
+  
+  ggplot(mds_df, aes(x = X1, y = X2, col = time)) + geom_point(alpha = 0.5)+
+    geom_point(data = mds_df[first,], aes(x = X1, y = X2), col = "deeppink", shape = "+", size = 3)+
+    geom_point(data = mds_df[last,], aes(x = X1, y = X2), col = "orange", shape = "+", size = 3)
+  
+  
+  matplot(par$cycleday_m_D, t(M[first,]), type = "l", lty = 1, col = "deeppink")
+  matplot(par$cycleday_m_D, t(M[last,]), type = "l", lty = 2, col = "orange", add = TRUE)
+  
+  par$cycleday_m_D * M[first[1],]
+  mean(as.numeric(par$cycleday_m_D * M[first[1],]))
+  
+  mds_df$time[first]
+  mds_df$time[last]
+  
+  j = which(this_c_wide$user_id == special_pill_user)
+  as.matrix(dist)[j,]
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = time)) + geom_point(alpha = 0.5)+
+          geom_point(data = mds_df[j,], aes(x = X1, y = X2), col = "deeppink", shape = "+", size = 3))
+  
+  
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = variability)) + geom_point(alpha = 0.5))
+  print(ggplot(mds_df, aes(x = X1, y = X2, col = variability)) + geom_point(alpha = 0.5)+
+          geom_point(data = mds_df[j,], aes(x = X1, y = X2), col = "deeppink", shape = "+", size = 3))
+  
+  # interactive 3d views
   
   plot_ly(mds_df, x = ~X1, y = ~X2, z = ~X3,
           color = ~X4,
           type = "scatter3d", mode = "markers",
-          marker = list(size = 4))
+          marker = list(size = 4), title = )%>% layout(title = BC)
   
   
   
@@ -204,50 +333,22 @@ for(BC in as.character(par$BC_dict$name)){
           marker = list(size = 4))
   
   
-  k = which(round(mds$points[,1],1) == 0) 
-  o = order(mds$points[k,2])
-  
-  first = k[o[1:5]]
-  last = k[o[(length(k)-5):length(k)]]
-  
-  ggplot(mds_df, aes(x = X1, y = X2, col = time)) + geom_point(alpha = 0.5)+
-    geom_point(data = mds_df[first,], aes(x = X1, y = X2), col = "deeppink", shape = "+", size = 3)+
-    geom_point(data = mds_df[last,], aes(x = X1, y = X2), col = "orange", shape = "+", size = 3)
   
   
-  matplot(par$cycleday_m_D, t(M[first,]), type = "l", lty = 1, col = "deeppink")
-  matplot(par$cycleday_m_D, t(M[last,]), type = "l", lty = 2, col = "orange", add = TRUE)
-  
-  par$cycleday_m_D * M[first[1],]
-  mean(as.numeric(par$cycleday_m_D * M[first[1],]))
-  
-  mds_df$time[first]
-  mds_df$time[last]
-  
-  
-  j = which(this_c_wide$user_id == special_pill_user)
-  as.matrix(dist)[j,]
-  ggplot(mds_df, aes(x = X1, y = X2, col = time)) + geom_point(alpha = 0.5)+
-    geom_point(data = mds_df[j,], aes(x = X1, y = X2), col = "deeppink", shape = "+", size = 3)
-  
-  
-  ggplot(mds_df, aes(x = X1, y = X2, col = variability)) + geom_point(alpha = 0.5)
-  ggplot(mds_df, aes(x = X1, y = X2, col = variability)) + geom_point(alpha = 0.5)+
-    geom_point(data = mds_df[j,], aes(x = X1, y = X2), col = "deeppink", shape = "+", size = 3)
-  
+  # t-SNE
   
   rtsne_out = Rtsne(dist, is_distance = TRUE, perplexity = 30, theta = 0.5)
   rtsne_out_df = data.frame(characteristics, rtsne_out$Y)
-
-  ggplot(rtsne_out_df, aes(x = X1, y = X2, col = sum)) + geom_point(alpha = 0.5)
-
-  ggplot(rtsne_out_df, aes(x = X1, y = X2, col = max)) + geom_point(alpha = 0.5)
-
-  ggplot(rtsne_out_df, aes(x = X1, y = X2, col = time)) + geom_point(alpha = 0.5)
-
-  ggplot(rtsne_out_df, aes(x = X1, y = X2, col = n_days)) + geom_point(alpha = 0.5)
   
-  ggplot(rtsne_out_df, aes(x = X1, y = X2, col = time_max)) + geom_point(alpha = 0.5)
+  print(ggplot(rtsne_out_df, aes(x = X1, y = X2, col = sum)) + geom_point(alpha = 0.5))
+  
+  print(ggplot(rtsne_out_df, aes(x = X1, y = X2, col = max)) + geom_point(alpha = 0.5))
+  
+  print(ggplot(rtsne_out_df, aes(x = X1, y = X2, col = time)) + geom_point(alpha = 0.5))
+  
+  print(ggplot(rtsne_out_df, aes(x = X1, y = X2, col = n_days)) + geom_point(alpha = 0.5))
+  
+  print(ggplot(rtsne_out_df, aes(x = X1, y = X2, col = time_max)) + geom_point(alpha = 0.5))
   
   
   rtsne_out_df$color = rgb(
@@ -258,20 +359,45 @@ for(BC in as.character(par$BC_dict$name)){
   
   plot(rtsne_out_df$X1, rtsne_out_df$X2,  col = rtsne_out_df$color, pch = 16, cex = 0.5)
   
+  
   if(BC != "pill"){bc = "NC"}else{bc = BC}
-  save(mds_df,rtsne_out_df,this_avg_profile_per_user, this_c_wide, file = paste0(IO$tmp_data,"user_phenotyping_",bc,".Rdata"))
+  save(mds_df, eig_df,rtsne_out_df, file = paste0(IO$tmp_data,"user_phenotyping_mds_",bc,".Rdata"))
+}
+
+
+```
+
+### Clustering
+
+```{r user_phenotyping clustering}
+
+for(BC in as.character(par$BC_dict$name)){
+  
+  if(BC != "pill"){bc = "NC"}else{bc = BC} 
+  load(file = paste0(IO$tmp_data,"user_phenotyping_dist_",bc,".Rdata"), verbose = TRUE)
+  load(file = paste0(IO$tmp_data,"user_phenotyping_characteristics_",bc,".Rdata"), verbose = TRUE)
+  
+  
+  # CLUSTERING
+  
+  ## optimal number of clusters
+  silh_k = data.frame()
+  for(k in 2:10){
+    pam_k = pam(x = dist, k = k, diss = TRUE)
+    silh_df = data.frame(pam_k$silinfo$widths, x =  nrow(pam_k$silinfo$widths):1)
+    g_silh = ggplot(silh_df,aes(x = x, y = sil_width, fill = factor(cluster)))+geom_bar(stat = "identity")+coord_flip()+guides(col = FALSE)+ggtitle(BC)
+    medoid_df = avg_profile_per_user[which(avg_profile_per_user$user_id %in% characteristics$user_id[pam_k$medoids]),]
+    g_med = ggplot(medoid_df, aes(x = cycleday_m_D, y = avg_tender_breast, col = user_id))+geom_line()+guides(col = FALSE)+facet_grid(user_id~.)+ggtitle(BC)
+    grid.arrange(g_med, g_silh, nrow = 1)
+    silh_k = rbind(silh_k, data.frame(n_clust = k, avg_width = pam_k$silinfo$avg.width))
+  }
+
+  print(ggplot(silh_k, aes(x =n_clust, y = avg_width))+ 
+    geom_point()+geom_line()+ggtitle(BC)+ylim(c(0,1)))
+  
 }
 
 ```
 
-
-```{r user_phenotyping expl}
-
-ggplot(characteristics, aes(x = age, y = time_max)) + geom_point(alpha = 0.05) + geom_smooth()
-ggplot(characteristics, aes(x = age, y = time_last_symptoms)) + geom_point(alpha = 0.01)+ geom_smooth()
-ggplot(characteristics, aes(x = age, y = n_days)) + geom_point(alpha = 0.01)+ geom_smooth()
-
-```
-
-
+We observe that the average silhouette width is still low even at its maximum > users cannot be separated very well.
 
