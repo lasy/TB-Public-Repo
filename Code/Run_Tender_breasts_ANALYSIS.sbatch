@@ -8,7 +8,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem-per-cpu=8G
+#SBATCH --mem-per-cpu=6G
 #SBATCH --mail-type=ALL
 
 module load R/3.5.1
