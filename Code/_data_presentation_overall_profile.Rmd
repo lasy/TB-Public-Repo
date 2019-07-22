@@ -74,19 +74,25 @@ rm(agg, agg2, j, d)
 
 ```{r data_presentation_overall_profile examples fig 1A}
 
-load(paste0(IO$output,"days/days_1.Rdata"), verbose = TRUE)
 
 
 user_ids = c("40f6e582b35ef42ef3b2e9a783e8194b2f0a78aa","4bceeb21dd3142bedaed8abc54a7b2bcd076684b","94f55bdf0d9578f67b0081e323ac4a450c3566f3","2dd96c502ae01790d3ff2b1ba82c789dfd7d67fb", "04d477f475a1ceda17530be0722ceaa51463e10c", "deca57f4123bc1ba0838f5664f5a5326157c3ed5","18c77b19e053e094a752e28b99bc3c9c61e9a343")
 
-sub_days = days[days$user_id %in% user_ids,]
+batches = users$batch[users$user_id %in% user_ids ]
+sub_days = data.frame()
+for(b in batches){
+  load(paste0(IO$output,"days/days_",b,".Rdata"), verbose = TRUE)
+  this_sub_days = days[days$user_id %in% user_ids,]
+  sub_days = rbind(sub_days ,this_sub_days)
+}
+
 save(sub_days, file = paste0(IO$out_Rdata,"sub_days_examples_input_data.Rdata"))
 
 user_ids = intersect(user_ids, unique(sub_days$user_id))
 
 for(user_id in user_ids){
-  j = which((days$user_id == user_id)&(!is.na(days$cycle_id_m)) & (days$category != "pill_hbc"))
-  d = days[j,]
+  j = which((sub_days$user_id == user_id)&(!is.na(sub_days$cycle_id_m)) & (sub_days$category != "pill_hbc"))
+  d = sub_days[j,]
   g = ggplot_user_example(d = d)
   print(g)
   
@@ -95,7 +101,6 @@ for(user_id in user_ids){
 }
 
 rm(user_id, user_ids)
-
 
 ```
 
@@ -251,8 +256,8 @@ ggplot(agg[agg$BC != "unclear",], aes(x = tender_breasts_ul, y = perc_cycles, fi
   geom_bar(stat = "identity", position = "dodge") + 
   scale_fill_manual(values = cols$BC3) + guides(fill = FALSE)+
   xlab("# of reported Tender Breast symptoms per cycle")+ ylab("% of cycles")
-  
-  
+
+
 
 
 

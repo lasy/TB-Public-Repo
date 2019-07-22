@@ -349,7 +349,7 @@ for(user_id in user_ids){
   g = ggplot_user_example(d = d, title = FALSE, size_factor = 1.5)
   print(g)
   
-  ggsave(filename = paste0(IO$panels, "example_",d$user_id[1],".pdf"), plot = g, width = viz$full_width/2.8, height = viz$full_width/4)
+  ggsave(filename = paste0(IO$panels, "example_",user_id,".pdf"), plot = g, width = viz$full_width/2.8, height = viz$full_width/4)
 }
 
 
