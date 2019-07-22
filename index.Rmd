@@ -20,8 +20,7 @@ output:
 
 # Pre-print
 
-
-The current version of the paper can be downloaded on !! [bioRxiv](XXX) !!
+The current version of the paper can be downloaded on !! [medRxiv](XXX) !!
 
 
 # Peer-reviewed published article
