@@ -796,13 +796,25 @@ ggsave(filename = paste0(IO$panels, "consistency_summary.pdf"),
 for(bc in c("NC","pill")){
   i = (bc == "pill")+1
   BC = par$BC_dict$name[i]
-  load(file = paste0(IO$tmp_data,"user_phenotyping_",bc,".Rdata"), verbose = TRUE)
+  load(file = paste0(IO$tmp_data,"user_phenotyping_mds_",bc,".Rdata"), verbose = TRUE)
+  load(file = paste0(IO$tmp_data,"user_phenotyping_this_c_wide_",bc,".Rdata"), verbose = TRUE)
+
   
   # screeplot
   
-  g = ggplot(eig_df, aes(x = as.factor(x), y = eig)) + geom_bar(stat = "identity", fill = cols$BC[i])+
+  g = ggplot(eig_df[1:10,], aes(x = as.factor(x), y = eig)) + 
+    geom_bar(stat = "identity", fill = cols$BC[i])+
     xlab("dimensions")+ggtitle(BC)
   g
+  
+  eig_df$var_expl = round(100*eig_df$eig/sum(eig_df$eig),1)
+  g = ggplot(eig_df[1:10,], aes(x = as.factor(x), y = var_expl)) + 
+    geom_bar(stat = "identity", fill = cols$BC[i])+
+    xlab("dimensions")+
+    ylab("% of variance explained")+
+    ggtitle(BC)
+  g
+  
   
   ggsave(filename = paste0(IO$panels, "S_screeplot_",bc,".pdf"),
          plot = g,
@@ -921,8 +933,6 @@ for(bc in c("NC","pill")){
          height = viz$full_width/4,
          scale = viz$scale)
   
-  
-  avg_profiles = this_avg_profile_per_user[which(this_avg_profile_per_user$user_id %in%  user_ids),]
   
   c_wide_subset = this_c_wide[which(this_c_wide$user_id %in%  user_ids),]
   avg_profiles = melt(c_wide_subset)

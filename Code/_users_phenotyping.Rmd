@@ -111,6 +111,8 @@ for(BC in as.character(par$BC_dict$name)){
   characteristics$variability = apply(M, 1, function(x){sum(abs(diff(x)))}) # sum(rle(sign(diff(x)))$values == -1)
   
   save(characteristics, file = paste0(IO$tmp_data,"user_phenotyping_characteristics_",bc,".Rdata"))
+  save(this_c_wide, file = paste0(IO$tmp_data,"user_phenotyping_this_c_wide_",bc,".Rdata"))
+
   
   characteristics_both = rbind(characteristics_both, characteristics)
   
@@ -257,8 +259,8 @@ for(BC in as.character(par$BC_dict$name)){
   mds_df$time[first]
   mds_df$time[last]
   
-  j = which(this_c_wide$user_id == special_pill_user)
-  as.matrix(dist)[j,]
+  j = which(characteristics$user_id == special_pill_user)
+  #as.matrix(dist)[j,]
   print(ggplot(mds_df, aes(x = X1, y = X2, col = time)) + geom_point(alpha = 0.5)+
           geom_point(data = mds_df[j,], aes(x = X1, y = X2), col = "deeppink", shape = "+", size = 3))
   
@@ -272,7 +274,7 @@ for(BC in as.character(par$BC_dict$name)){
   plot_ly(mds_df, x = ~X1, y = ~X2, z = ~X3,
           color = ~X4,
           type = "scatter3d", mode = "markers",
-          marker = list(size = 4), title = )%>% layout(title = BC)
+          marker = list(size = 4))%>% layout(title = BC)
   
   
   

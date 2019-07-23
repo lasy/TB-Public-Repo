@@ -85,7 +85,7 @@ selected_users = rbind(consistent_users, average_users, inconsistent_users)
 
 
 
-```{r users_descr_examples showing the examples of consistent and inconsistent users from each TB cluster, fig.height=12, fig.width=12}
+```{r users_descr_examples showing the examples of consistent and inconsistent users, fig.height=12, fig.width=12}
 
 dd = data.frame()
 for(b in unique(selected_users$batch)){
@@ -103,15 +103,15 @@ m = match(d$user_id, selected_users$user_id)
 d$BC = selected_users$BC[m]
 d$consistent = selected_users$consistent[m]
 d$init_TB_group = selected_users$init_TB_group[m]
-d$avg_d = selected_users$avg_d[m]
+#d$avg_d = selected_users$avg_d[m]
 
-sel_d = melt(d, id.vars = c("user_id","cycle_id_m","BC","consistent","avg_d","init_TB_group"))
+sel_d = melt(d, id.vars = c("user_id","cycle_id_m","BC","consistent","init_TB_group")) #"avg_d",
 
 sel_d$cycleday_m_D = as.numeric(gsub("\\.","-",gsub("n\\.","",sel_d$variable)))
 sel_d$cycle_nb_m = unlist(strsplit(as.character(sel_d$cycle_id_m), "_"))[(1:nrow(sel_d))*2]
 sel_d$tender_breasts = sel_d$value
 
-sel_d = sel_d[,c("user_id","cycle_nb_m","cycleday_m_D","tender_breasts","BC","consistent","avg_d","init_TB_group")]
+sel_d = sel_d[,c("user_id","cycle_nb_m","cycleday_m_D","tender_breasts","BC","consistent","init_TB_group")] # ,"avg_d"
 
 save(sel_d, file = paste0(IO$out_Rdata,"consistent_and_inconsistent_users.Rdata"))
 
