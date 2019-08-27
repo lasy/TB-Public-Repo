@@ -60,6 +60,10 @@ source("Scripts/00_init_0.R")
 ```
 
 
+```{r child = '_cyclicity_variability_duration_timing.Rmd', cache=TRUE}
+```
+
+
 ```{r child = '_users_phenotyping.Rmd', cache=TRUE}
 ```
 
