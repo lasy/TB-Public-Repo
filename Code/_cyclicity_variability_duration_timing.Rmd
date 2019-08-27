@@ -337,32 +337,30 @@ stretch_ids = unique(d_wide$stretch_id)
 Nt = length(stretch_ids)
 Ns = round(Nt/100)
 
-for(i in 1:Nt){
+average_profiles_with_cvdt = foreach(i = 1:Nt, .combine = rbind) %do%{
   if((i %% Ns) == 0){cat(i%/%Ns,"\n")}
   #cat("\t",i,"\n")
   stretch_id = stretch_ids[i]
   
   j = which(d_wide$stretch_id == stretch_id)
   XX = as.matrix(d_wide[j,grep("n\\.",colnames(d_wide))])
-  average_profiles_this_stretch = data.frame()
-  for(i in 1:(nrow(XX)-n_consecutive_cycles+1)){
+  NXX = (nrow(XX)-n_consecutive_cycles+1)
+  average_profiles_this_stretch = foreach(i = 1:NXX, .combine = rbind) %do%{
     X = XX[i:(i+n_consecutive_cycles-1),]
-    average_profiles_this_stretch = rbind(average_profiles_this_stretch,
-                                          data.frame(stretch_id = stretch_id, 
+    average_profiles_this_stretch_i = data.frame(stretch_id = stretch_id, 
                                                      cycle_nb = d_wide$cycle_nb_m[j[1]+i-1], 
                                                      duration = cvdt_duration(X), 
                                                      timing = cvdt_timing(X), 
                                                      variability = cvdt_variability(X), 
                                                      cyclicity  = cvdt_cyclicity(X),
                                                      cycleday_m_D = -par$D:par$Df,
-                                                     average_profile = apply(X,2,mean))
+                                                     average_profile = apply(X,2,mean)
     )
+    return(average_profiles_this_stretch_i)
   }
-  average_profiles_with_cvdt = rbind(average_profiles_with_cvdt,
-                                     average_profiles_this_stretch)
+  return(average_profiles_this_stretch)
 }
 toc()
-
 
 average_profiles_with_cvdt$BC = cycles_m$BC[match(average_profiles_with_cvdt$stretch_id,  cycles_m$stretch_id)]
 cvdt_col = c("duration","timing","variability","cyclicity")
