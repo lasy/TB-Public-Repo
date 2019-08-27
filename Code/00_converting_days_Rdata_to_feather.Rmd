@@ -1,0 +1,34 @@
+---
+title: "Converting days Rdata to feather format"
+author: "Laura Symul"
+date: "4/11/2019"
+output: html_document
+---
+
+```{r subset librairies and stuff, include = FALSE, eval = TRUE, cache = FALSE}
+source("Scripts/00_setup.R")
+```
+
+```{r converting setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+```{r converting}
+Rdata_folder = paste0(IO$output_data, "days/")
+feather_folder = paste0(IO$output_data, "days_feather/")
+if(!dir.exists(feather_folder)){dir.create(feather_folder)}
+
+files = list.files(Rdata_folder)
+for(Rdata_file in files){
+  cat(Rdata_file,"\n")
+  feather_file = gsub("Rdata","feather", Rdata_file)
+  if(!file.exists(paste0(feather_folder,feather_file))){
+    load(paste0(Rdata_folder,Rdata_file), verbose = TRUE)
+    write_feather(days, path = paste0(feather_folder, feather_file))
+  }
+}
+```
+
+
+

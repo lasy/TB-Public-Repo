@@ -129,6 +129,8 @@ par$clara = list()
 par$clara$samples = 50
 par$clara$sampsize = 200
 
+par$nc = 6 # # of cycles considered for the running metrics (CCDT)
+
 
 
 special_pill_user = "6ef947aeb9cfe0468bd1efd26b8a10dca0a1e645"

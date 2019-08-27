@@ -1,0 +1,225 @@
+---
+title: "Checking how many 'pill' cycles had only period and pill tracking"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+
+
+```{r pill_tracking setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+options(scipen=999)
+```
+
+
+```{r pill_tracking librairies and stuff, include = FALSE, eval = TRUE, cache = FALSE}
+source("Scripts/00_setup.R")
+```
+
+
+
+
+## Checking how many pill cycles have only "pill" and "period"-related logs
+
+
+### Collecting data from the tracking tables
+
+```{r pill_tracking counting number of other_logs per cycles from tracking tables}
+
+cycles_agg_folder = paste0(IO$tmp_data, "cycles_agg_feather/")
+if(!dir.exists(cycles_agg_folder)){dir.create(cycles_agg_folder)}
+
+cycles_m_agg_folder = paste0(IO$tmp_data, "cycles_m_agg_feather/")
+if(!dir.exists(cycles_m_agg_folder)){dir.create(cycles_m_agg_folder)}
+
+days_folder = paste0(IO$output_data, "days_feather/")
+days_files = list.files(days_folder)
+
+tic()
+for(file in days_files){
+  cat(file,"\t")
+  cycles_agg_file = gsub("days_","cycles_agg_",file)
+  cycles_m_agg_file = gsub("days_","cycles_m_agg_",file)
+  if(!file.exists(cycles_agg_file)){
+    days = read_feather(path = paste0(days_folder, file))
+    
+    cycles_agg = ddply(days, .(cycle_id), .fun = summarize,
+                       n_logs = sum(number[category == "n_logs"]),
+                       n_pill = sum(category == "pill_hbc"),
+                       n_period = sum(category == "period"),
+                       n_pain = sum(category == "pain")
+    )
+    write_feather(cycles_agg, path = paste0(cycles_agg_folder, cycles_agg_file))
+    
+    
+    j = which((!is.na(days$cycleday_m_D))& (!is.na(days$cycle_id_m)))
+    days = days[j,]
+    cycles_m_agg = ddply(days, .(cycle_id_m), .fun = summarize,
+                         n_logs = sum(number[category == "n_logs"]),
+                         n_pill = sum(category == "pill_hbc"),
+                         n_period = sum(category == "period"),
+                         n_pain = sum(category == "pain")
+    )
+    write_feather(cycles_m_agg, path = paste0(cycles_m_agg_folder, cycles_m_agg_file))
+  }
+}
+toc()
+```
+
+
+
+```{r collecting cycles_agg}
+
+cycles_agg_files = list.files(cycles_agg_folder)
+
+tic()
+cycles_agg = data.frame()
+for(file in cycles_agg_files){
+  cat(file,"\t")
+  this_cycles_agg = read_feather(path = paste0(cycles_agg_folder, file))
+  cycles_agg = rbind(cycles_agg, this_cycles_agg)
+}
+toc()
+
+write_feather(cycles_agg, path = paste0(IO$tmp_data, "cycles_agg_with_n_logs_for_pill_and_period.feather"))
+```
+
+
+
+```{r collecting cycles_m_agg}
+
+cycles_m_agg_files = list.files(cycles_m_agg_folder)
+
+tic()
+cycles_m_agg = data.frame()
+for(file in cycles_m_agg_files){
+  cat(file,"\t")
+  this_cycles_m_agg = read_feather(path = paste0(cycles_m_agg_folder, file))
+  cycles_m_agg = rbind(cycles_m_agg, this_cycles_m_agg)
+}
+toc()
+
+write_feather(cycles_m_agg, path = paste0(IO$tmp_data, "cycles_m_agg_with_n_logs_for_pill_and_period.feather"))
+```
+
+
+
+### Adding these aggregates to the users, cycles and cycles_m tables
+
+
+```{r pill_tracking load users, cycles and cycles_m data}
+
+load(paste0(IO$output_data,"users.Rdata"), verbose = TRUE)
+colnames(users)
+
+load(paste0(IO$output_data,"cycles.Rdata"), verbose = TRUE)
+colnames(cycles)
+
+load(paste0(IO$output_data, "cycles_m.Rdata"), verbose =TRUE)
+colnames(cycles_m)
+```
+
+
+#### Cycles
+
+```{r pill_tracking adding this info to cycles}
+cols_to_add = colnames(cycles_agg)
+cols_to_add = setdiff(cols_to_add, colnames(cycles))
+m = match(cycles$cycle_id, cycles_agg$cycle_id)
+for(this_col in cols_to_add){
+  eval(parse(text = paste0("cycles$",this_col," = cycles_agg$",this_col,"[m]")))
+}
+cycles$n_other_logs = cycles$n_logs - cycles$n_pill - cycles$n_period
+
+save(cycles, file = paste0(IO$output_data,"cycles.Rdata"))
+write_feather(cycles, path = paste0(IO$output_data,"cycles.feather"))
+```
+
+
+#### Users
+
+```{r pill_tracking adding this info to users}
+
+cycles_agg$user_id = cycles$user_id[match(cycles_agg$cycle_id, cycles$cycle_id)]
+
+users_agg = ddply(cycles_agg, .(user_id), .fun = summarize,
+                         n_logs = sum(n_logs),
+                         n_pill = sum(n_pill),
+                         n_period = sum(n_period),
+                         n_pain = sum(n_pain)
+                  )
+                  
+cols_to_add = colnames(users_agg)
+cols_to_add = setdiff(cols_to_add, colnames(users))
+m = match(users$user_id, users_agg$user_id)
+for(this_col in cols_to_add){
+  eval(parse(text = paste0("users$",this_col," = users_agg$",this_col,"[m]")))
+}
+users$n_other_logs = users$n_logs - users$n_pill - users$n_period
+
+save(users, file = paste0(IO$output_data,"users.Rdata"))
+write_feather(users, path = paste0(IO$output_data,"users.feather"))
+
+```
+
+
+#### Cycles_m
+
+
+
+```{r pill_tracking adding this info to cycles_m}
+
+cols_to_add = colnames(cycles_m_agg)
+cols_to_add = setdiff(cols_to_add, c("cycle_id_m"))
+m = match(cycles_m$cycle_id_m, cycles_m_agg$cycle_id_m)
+for(this_col in cols_to_add){
+  eval(parse(text = paste0("cycles_m$",this_col," = cycles_m_agg$",this_col,"[m]")))
+}
+cycles_m$n_other_logs = cycles_m$n_logs - cycles_m$n_pill - cycles_m$n_period
+
+save(cycles_m, file = paste0(IO$output_data,"cycles_m.Rdata"))
+write_feather(cycles_m, path = paste0(IO$output_data,"cycles_m.feather"))
+```
+
+
+### Fraction of users and cycles with other logs than pill and period.
+
+
+
+
+```{r pill_tracking counting number of cycles with BC is pill and regular tracking}
+rt_pill = ((cycles_m$tracking_group == "regular tracking") & (cycles_m$BC == "pill"))
+
+pill_only_tracking = c("other_logs","pill and period only")[(cycles_m$n_other_logs[rt_pill] <= 0)+1]
+
+t = table(pill_only_tracking)
+t
+round(100*t/sum(t),2)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

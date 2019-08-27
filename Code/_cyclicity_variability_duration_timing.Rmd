@@ -1,0 +1,857 @@
+---
+title: "Cyclicity, variability, duration and timing of symptoms"
+author: "Laura Symul"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  bookdown::html_document2: 
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+---
+
+```{r cvdt librairies and stuff, include = FALSE, eval = TRUE, cache = FALSE}
+source("Scripts/00_setup.R")
+```
+
+
+```{r cvdt knitr setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+# Cyclicity, variability, duration and timing of symptoms
+
+## Definitions
+
+These are all definitions that holds for a given number of consecutive cycles of a given user. These metrics can be defined as running metric to reflect the evolutions of the symptoms. Here, we will define these metric over `r par$nc` cycles.
+
+### Duration
+
+The **duration** is defined as the average number of days per cycle in which the symptom is reported.
+
+$$ d = \frac{N}{C} $$
+
+```{r cvdt d_wide toy}
+d_wide = matrix(
+  c(0,0,1,1,0,0,rep(0,20),
+    0,0,0,0,0,0,rep(0,20),
+    0,0,1,1,0,0,rep(0,20),
+    0,0,0,0,0,0,rep(0,20),
+    0,0,1,1,0,0,rep(0,20),
+    0,0,0,0,0,0,rep(0,20)), 
+  nrow = 6, byrow = TRUE)
+```
+
+
+
+```{r cvdt duration function}
+
+cvdt_duration = function(d_wide){
+  j = which(apply(d_wide, 1, sum)>0)
+  if(length(j)>0){
+    duration = sum(d_wide[j,])/length(j)
+  }else{duration = 0}
+  return(duration)
+}
+
+cvdt_duration(d_wide)
+
+```
+
+
+
+where $N$ is the number of reported symptoms and $C$ is the number of cycles.
+
+### Timing
+
+The **timing** is the day in the cycle at which the symptom is reported on average (or the average cycleday at which the symptom are reported).
+
+$$ t = \frac{\sum d^{\tt TB}}{N} $$
+where $d$ is the cycleday (from -`r par$D` to `r par$Df`) and $\tt TB$ is a binary variable whose value is 1 when the symptom is reported and 0 when not.
+
+
+
+```{r cvdt timing function}
+
+cvdt_timing = function(d_wide){
+  cycledays = matrix(rep(c(-par$D:par$Df), nrow(d_wide)), nrow = nrow(d_wide),byrow = TRUE)
+  timing = mean(cycledays[d_wide > 0])
+  return(timing)
+}
+
+cvdt_timing(d_wide)
+
+```
+
+
+### Variability
+
+The **variability** decreases as the standard deviation of the number of symptom per cycle increases.
+
+$$ v = \tt sd(n_c) $$
+where $n_c$ is the number of symptoms reported in cycle $c$.
+
+
+```{r cvdt variability function}
+
+cvdt_variability = function(d_wide){
+  variability = sd(apply(d_wide, 1, sum))
+  return(variability)
+}
+
+cvdt_variability(d_wide)
+
+```
+
+
+### Cyclicity
+
+The **cyclicity** is the probability that the symptom is reported in a predictable window of time with respect to the end of the menstrual cycle.
+
+```{r cvdt cyclicity statistics function}
+
+
+find_window = function(average_profile, nd, timing){
+  D = length(average_profile)
+  d = sort(order(average_profile, decreasing = TRUE)[1:nd]) # we take the days with the highest average profile
+  conditions = (abs(mean(c(-par$D:par$Df)[d]) - timing)>(nd/1.5)) | # window not centered on timing
+    (length(d)>1) & (sum(diff(d)>1)>1) # too many interuptions in d, we take a continuous window of nd around timing
+  if(conditions){ 
+    j = round(timing)+par$D+1; j_start = (j - floor(nd/2));j_end = (j+ceiling(nd/2)-1)
+    if(j_start < 1){j_start = 1; j_end = nd}; if(j_end > D){j_end = D; j_start = D-nd+1}
+    d = j_start:j_end
+  }
+  db = rep(FALSE,D)
+  db[d] = TRUE
+  return(db)
+}
+
+compute_cyclicity_statistics = function(X,  plot = FALSE){
+  j = which(apply(X, 1, sum)>0)
+  if(length(j)>1){
+    N = sum(X); 
+    if(N > 1){
+      C = nrow(X); D = ncol(X);
+      duration = cvdt_duration(X); timing = cvdt_timing(X)
+      # average profile #average_profile = apply(X, 2, mean)
+      average_profile = apply(X, 2, sum); average_profile = average_profile/length(j)
+      # finding the window
+      nd = round(duration+2*(C-duration)/C) # number of days for the window; We give a larger margin for short durations
+      if(nd<D){
+        d = find_window(average_profile, nd, timing)
+        p_d = mean(average_profile[d]); p_o = mean(average_profile[!d])
+        stat = (p_d - p_o)/mean(c(p_d,p_d,1))
+        if(plot){plot(c(-par$D:par$Df), average_profile, type = "b", ylim = c(0,1), col = d+1, pch = c(1,16)[d+1])}
+      }else{stat = 0}
+    }else{stat = 0}
+  }else{stat = 0}
+  return(stat)
+}
+```
+
+
+
+```{r cvdt checking cyclicity values for random symptoms}
+
+D = par$D + par$Df +1
+par$dict_cyclicity_stat = data.frame()
+
+for(d in 0:D){
+  cat(d,"\n")
+  C = 100; N = d*C; S = C*D
+  statistics = c()
+  for(i in 1:200){
+    X = matrix(sample(c(rep(1,N),rep(0,S - N))), nrow = C, ncol = D)
+    compute_cyclicity_statistics(X)
+    statistics = c(statistics,compute_cyclicity_statistics(X))
+  }
+  par$dict_cyclicity_stat = rbind(par$dict_cyclicity_stat, data.frame(d = d, statistics = statistics))
+}
+
+
+plot(aggregate(statistics ~ d, par$dict_cyclicity_stat, median), ylim = c(-0.2,1))
+abline(h = 0)
+
+ggplot(par$dict_cyclicity_stat, aes(x = statistics, fill = factor(d))) +
+  geom_histogram(binwidth = 0.01)+
+  facet_grid(d ~ ., scale = "free_y")+xlim(c(-1,1))
+
+
+ggplot(par$dict_cyclicity_stat, aes(x = statistics, col = factor(d))) +
+  geom_density(bw = 0.1)+xlim(c(-1,1))
+
+
+
+```
+
+
+
+
+```{r cvdt cyclicity function}
+
+cvdt_cyclicity = function(d_wide){
+  cyclicity = max(0,compute_cyclicity_statistics(d_wide))
+  return(cyclicity)
+}
+
+cvdt_cyclicity(d_wide)
+
+#cvdt_cyclicity(X)
+
+```
+
+
+## Implementation
+
+### Data Preparation
+
+Loading data
+
+```{r cvdt load data}
+load(paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
+load(paste0(IO$output_data, "cycles_m.Rdata"), verbose = TRUE)
+colnames(cycles_m)
+head(cycles_m)
+```
+
+
+Selecting stretched of at least 6 consecutive cycles of regular tracking with at least 6 TB in these consecutive cycles.
+
+```{r cvdt identify stretches}
+
+n_consecutive_cycles = 6
+
+o = order(cycles_m$user_id, cycles_m$cycle_nb_m)
+cycles_m = cycles_m[o,]
+
+
+# at least 3 TB in 6 consecutive cycles
+
+running_cumsum = function(x, n = n_consecutive_cycles){
+  X = data.frame()
+  N = length(x)
+  for(i in 1:n){
+    if(i <= N){
+      X = rbind(X, x[i:(N-i+1)])
+    }
+  }
+  y = apply(X, 2, sum)
+  i = min(N,n)
+  if(i > 1){y[1:(i-1)] = y[i]}
+  return(y)
+}
+
+n_TB_running = ave(cycles_m$n_TB, by = cycles_m$user_id, FUN = running_cumsum)
+
+valid = ((cycles_m$tracking_group == "regular tracking") & (n_TB_running >= 6) & (cycles_m$BC %in% par$BC_dict$name))
+valid[is.na(valid)] = FALSE
+
+
+valid_stretches = function(x, n = n_consecutive_cycles){
+  r = rle(x)
+  vs = rep((r$lengths>= n) & (r$values), r$lengths)
+  return(vs)
+}
+
+stretches_number = function(x){
+  r = rle(x)
+  ns = rep(1:length(r$lengths), r$lengths )
+  return(ns)
+}
+
+
+stretches_num = ave(valid, by = cycles_m$user_id, FUN = stretches_number)
+stretches = ave(valid, by = cycles_m$user_id, FUN = valid_stretches)
+sum(stretches)
+
+cycle_ids = cycles_m$cycle_id_m[which(stretches)]
+user_ids = unique(cycles_m$user_id[which(stretches)])
+
+
+cycles_m$stretch_nb = stretches_num * stretches
+
+cycles_m$stretch_id = paste0(cycles_m$user_id, "_s", cycles_m$stretch_nb)
+
+write_feather(cycles_m, path = paste0(IO$output_data, "cycles_m.feather"))
+```
+
+
+Collect tracking data for these cycles
+
+```{r cvdt collect tracking data for these cycles}
+batches = unique(users$batch[which(users$user_id %in% user_ids)])
+days_selected_cycles = data.frame()
+tic()
+for(b in unique(batches)){ # unique(c(190,batches[1:10]))
+  cat(b, "\n")
+  load(paste0(IO$output_data, "days/days_",b,".Rdata"), verbose = TRUE)
+  j = which((days$cycle_id_m %in% cycle_ids) & (days$type %in% c(TB,"n_logs"))  & (!is.na(days$cycleday_m_D)))
+  if(length(j)>0){
+    days_selected_cycles = rbind(days_selected_cycles, days[j,])
+  }
+}
+toc()
+days = days_selected_cycles
+save(days, file = paste0(IO$tmp_data,"days_selected_cycles.Rdata"))
+```
+
+
+Transform these data in wide format
+
+```{r cvdt tranform in wide format}
+
+# load( file = paste0(IO$tmp_data,"days_selected_cycles.Rdata"), verbose = TRUE)
+# dim(days)
+
+d_wide_with_tracking = reshape_and_impute(days)
+d_wide = d_wide_with_tracking
+d_wide[d_wide == -1] = 0
+
+
+m = match(d_wide$cycle_id_m, cycles_m$cycle_id_m)
+d_wide$stretch_id = cycles_m$stretch_id[m]
+d_wide$cycle_nb_m = cycles_m$cycle_nb_m[m]
+
+write_feather(d_wide, path = paste0(IO$tmp_data, "d_wide_without_tracking_for_cvdt.feather"))
+write_feather(d_wide_with_tracking, path = paste0(IO$tmp_data, "d_wide_with_tracking.feather"))
+
+
+```
+
+
+
+### Computing the indicators for the selected data
+
+```{r cvdt compute cvdt for each stretch}
+
+# d_wide = read_feather(path = paste0(IO$tmp_data, "d_wide_without_tracking_for_cvdt.feather"))
+
+
+tic()
+average_profiles_with_cvdt =  data.frame()
+stretch_ids = unique(d_wide$stretch_id)
+
+Nt = length(stretch_ids)
+Ns = round(Nt/100)
+
+for(i in 1:Nt){
+  if((i %% Ns) == 0){cat(i%/%Ns,"\n")}
+  #cat("\t",i,"\n")
+  stretch_id = stretch_ids[i]
+  
+  j = which(d_wide$stretch_id == stretch_id)
+  XX = as.matrix(d_wide[j,grep("n\\.",colnames(d_wide))])
+  average_profiles_this_stretch = data.frame()
+  for(i in 1:(nrow(XX)-n_consecutive_cycles+1)){
+    X = XX[i:(i+n_consecutive_cycles-1),]
+    average_profiles_this_stretch = rbind(average_profiles_this_stretch,
+                                          data.frame(stretch_id = stretch_id, 
+                                                     cycle_nb = d_wide$cycle_nb_m[j[1]+i-1], 
+                                                     duration = cvdt_duration(X), 
+                                                     timing = cvdt_timing(X), 
+                                                     variability = cvdt_variability(X), 
+                                                     cyclicity  = cvdt_cyclicity(X),
+                                                     cycleday_m_D = -par$D:par$Df,
+                                                     average_profile = apply(X,2,mean))
+    )
+  }
+  average_profiles_with_cvdt = rbind(average_profiles_with_cvdt,
+                                     average_profiles_this_stretch)
+}
+toc()
+
+
+average_profiles_with_cvdt$BC = cycles_m$BC[match(average_profiles_with_cvdt$stretch_id,  cycles_m$stretch_id)]
+cvdt_col = c("duration","timing","variability","cyclicity")
+columns_for_unique = c("stretch_id","cycle_nb",cvdt_col,"BC")
+cvdt_stretches = unique(average_profiles_with_cvdt[,columns_for_unique])
+cvdt_stretches$user_id = cycles_m$user_id[match(cvdt_stretches$stretch_id, cycles_m$stretch_id)]
+cvdt_stretches$cycle_id_m = paste0(cvdt_stretches$user_id, "_", cvdt_stretches$cycle_nb)
+
+
+write_feather(average_profiles_with_cvdt, path = paste0(IO$tmp_data, "average_profiles_with_cvdt.feather"))
+write_feather(cvdt_stretches, path = paste0(IO$tmp_data, "cvdt_stretches.feather"))
+
+
+```
+
+
+```{r cvdt relative variability}
+average_profiles_with_cvdt$sd = average_profiles_with_cvdt$variability
+average_profiles_with_cvdt$variability = pmin(1,average_profiles_with_cvdt$sd/average_profiles_with_cvdt$duration)
+cvdt_stretches$sd = cvdt_stretches$variability
+cvdt_stretches$variability = pmin(1,cvdt_stretches$sd/cvdt_stretches$duration)
+
+write_feather(average_profiles_with_cvdt, path = paste0(IO$tmp_data, "average_profiles_with_cvdt.feather"))
+write_feather(cvdt_stretches, path = paste0(IO$tmp_data, "cvdt_stretches.feather"))
+```
+
+
+### Visualisations
+
+
+```{r cvdt visualisations histograms}
+
+ggplot(cvdt_stretches, aes(x = cyclicity, fill = BC))+
+  geom_histogram(aes(y = ..density..),binwidth = 0.05, alpha = 0.5, position = "identity")+
+  scale_fill_manual(values = cols$BC)
+
+ggplot(cvdt_stretches, aes(x = variability, fill = BC))+ 
+  geom_histogram(aes(y = ..density..),binwidth = 0.05, alpha = 0.5, position = "identity")+
+  scale_fill_manual(values = cols$BC)
+
+ggplot(cvdt_stretches, aes(x = duration, fill = BC))+ 
+  geom_histogram(aes(y = ..density..),binwidth = 1, alpha = 0.5, position = "identity")+
+  scale_fill_manual(values = cols$BC)
+
+ggplot(cvdt_stretches, aes(x = timing, fill = BC))+
+  geom_histogram(aes(y = ..density..),binwidth = 0.5, alpha = 0.5, position = "identity")+
+  scale_fill_manual(values = cols$BC)
+
+
+
+for(i in 1:2){
+  if(i == 1){
+    data = cvdt_stretches
+    data$id = data$stretch_id
+  }else{
+    cvdt_users = ddply(cvdt_stretches, 
+                       c("user_id","BC"),  
+                       .fun = summarize,
+                       cyclicity = mean(cyclicity, na.rm = TRUE),
+                       cyclicity_sd = sd(cyclicity, na.rm = TRUE),
+                       variability = mean(variability, na.rm = TRUE),
+                       variability_sd = sd(variability, na.rm = TRUE),
+                       duration = mean(duration, na.rm = TRUE),
+                       duration_sd = sd(duration, na.rm = TRUE),
+                       timing= mean(timing, na.rm = TRUE),
+                       timing_sd = sd(timing, na.rm = TRUE),
+                       n_stretches = length(stretch_id)
+    )
+    data = cvdt_users
+    data$id = data$user_id
+  }
+  
+  
+  
+  by = 0.05
+  data$cyclicity = round(data$cyclicity/by)*by
+  cyclicity_agg = aggregate(id ~  BC + cyclicity , data, length)
+  colnames(cyclicity_agg) = c("BC","value","n")
+  cyclicity_agg$variable = "cyclicity"
+  cyclicity_agg$by = by
+  
+  data$variability = round(data$variability/by)*by
+  variability_agg = aggregate(id ~ BC +  variability, data, length)
+  colnames(variability_agg) = c("BC","value","n")
+  variability_agg$variable = "variability"
+  variability_agg$by = by
+  
+  by = 1
+  data$duration = round(data$duration/by)*by
+  duration_agg = aggregate(id ~ BC +  duration, data, length)
+  colnames(duration_agg) = c("BC","value","n")
+  duration_agg$variable = "duration"
+  duration_agg$by = by
+  
+  by = 0.5
+  data$timing = round(data$timing/by)*by
+  timing_agg = aggregate(id ~ BC +  timing, data, length)
+  colnames(timing_agg) = c("BC","value","n")
+  timing_agg$variable = "timing"
+  timing_agg$by = by
+  
+  
+  data_agg = rbind(
+    cyclicity_agg,
+    variability_agg,
+    duration_agg,
+    timing_agg
+  )
+  
+  BC_agg = aggregate(id ~ BC, data, length)
+  
+  data_agg$tot_n = BC_agg$id[match(data_agg$BC, BC_agg$BC)]
+  data_agg$perc_stretches = 100*data_agg$n / data_agg$tot_n
+  data_agg$variable = factor(data_agg$variable, levels = rev(cvdt_col))
+  
+  
+  
+  g = ggplot(data_agg, aes(x = value, y = perc_stretches, fill = BC))+
+    geom_bar(aes(width = by),stat = "identity", position = "identity", alpha = 0.5)+
+    #geom_area(position = "identity", alpha = 0.5)+
+    facet_wrap("variable", scales = "free")+
+    ylab(ifelse(i == 1,"% of stretches of 6 consecutive cycles","% of users"))+xlab("")
+  print(g)
+  
+  save(data_agg, file = paste0(IO$out_Rdata, "CVDT_histograms_",i,".Rdata"))
+}
+
+```
+
+
+```{r cvdt correlation visualisations}
+
+ggplot(cvdt_stretches, aes(y =  cyclicity, x = duration, col = BC))+
+  geom_point(alpha = 0.1)+
+  scale_color_manual(values = cols$BC)
+
+ggplot(cvdt_stretches, aes(y = variability, x = cyclicity, col = BC))+
+  geom_point(alpha = 0.1)+
+  scale_color_manual(values = cols$BC)
+
+ggplot(cvdt_stretches, aes(y = variability, x = duration, col = BC))+
+  geom_point(alpha = 0.1)+
+  scale_color_manual(values = cols$BC)
+
+ggplot(cvdt_stretches, aes(y = timing, x = cyclicity, col = BC))+
+  geom_point(alpha = 0.1)+
+  scale_color_manual(values = cols$BC)
+
+plot_ly(cvdt_stretches, x = ~cyclicity, y = ~duration, z = ~timing,
+        color = ~variability,
+        type = "scatter3d", mode = "markers",
+        marker = list(size = 2))
+```
+
+
+
+```{r cvdt correlations and pca}
+
+j = which(!is.na(cvdt_stretches$timing))
+
+cor(cvdt_stretches[j,cvdt_col ])
+
+pca = prcomp(cvdt_stretches[j,cvdt_col],
+             scale = TRUE, center = TRUE)
+
+ggplot(data.frame(dim = 1:4, sdev = pca$sdev), aes(x = dim, y = sdev))+
+  geom_bar(stat = "identity")
+
+pca_points = as.data.frame(pca$x)
+
+pca_points$BC = cvdt_stretches$BC[j]
+pca_points$duration = cvdt_stretches$duration[j]
+pca_points$timing = cvdt_stretches$timing[j]
+
+pca_vec = as.data.frame(pca$rotation)
+pca_vec$attr = rownames(pca_vec)
+
+
+S = 5
+ggplot(pca_points, aes(x = PC1, y = PC2))+ coord_fixed()+
+  geom_point( alpha = 0.3, size = 0.5)+
+  geom_segment(data = pca_vec, aes(x = 0, y = 0, xend = S*PC1, yend = S*PC2, col = attr), size = 1)+
+  facet_grid(BC ~ .)
+
+
+
+plot_ly(pca_points, x = ~PC1, y = ~PC2, z = ~PC3,
+        color = ~BC,
+        type = "scatter3d", mode = "markers",
+        marker = list(size = 2))
+
+
+
+
+```
+
+```{r cvdt viz tests}
+
+o = order(cvdt_stretches$cyclicity, decreasing = TRUE)
+cvdt_stretches = cvdt_stretches[o,]
+cvdt_stretches = cvdt_stretches[sample(1:nrow(cvdt_stretches)),]
+
+ggplot(cvdt_stretches[cvdt_stretches$BC %in% par$BC_dict$name,], aes(x = timing, y = duration,  col = cyclicity))+ # alpha = variability,
+  geom_vline(xintercept = 0, col = "gray80", size = 2)+
+  geom_hline(yintercept = 0, col = "gray40")+
+  geom_segment(aes(x = timing - duration/2, xend = timing + duration/2, yend = duration, alpha = cyclicity), size = 1.2)+
+  geom_point(aes(size = variability), alpha = 0.7)+
+  scale_color_gradient(low = "gray80", high = "mediumslateblue")+
+  scale_x_continuous(breaks = par$x.axis)+
+  scale_alpha(range = c(0,0.2))+
+  facet_grid(BC ~ .)
+
+
+
+
+
+
+o = order(average_profiles_with_cvdt$cyclicity, average_profiles_with_cvdt$duration, decreasing = TRUE)
+average_profiles_with_cvdt = average_profiles_with_cvdt[o,]
+
+ggplot(average_profiles_with_cvdt, aes(x = cycleday_m_D, y = stretch_id,  col = BC, alpha = average_profile))+ # alpha = variability,
+  geom_vline(xintercept = 0, col = "gray80", size = 2)+
+  geom_point()+
+  scale_color_manual(values = cols$BC)+
+  scale_x_continuous(breaks = par$x.axis)+
+  scale_alpha(range = c(0,1))+
+  facet_grid( . ~ BC , scale = "free_y")
+
+
+
+```
+
+
+
+### Examples
+
+```{r cvdt selecting examples}
+
+# average_profiles_with_cvdt = read_feather(path = paste0(IO$tmp_data, "average_profiles_with_cvdt.feather"))
+# cvdt_stretches = read_feather(path = paste0(IO$tmp_data, "cvdt_stretches.feather"))
+# d_wide_with_tracking = read_feather( path = paste0(IO$tmp_data, "d_wide_with_tracking.feather"))
+# #d_wide = read_feather( path = paste0(IO$tmp_data, "d_wide_without_tracking_for_cvdt.feather"))
+
+breaks$duration = c(-Inf,2.5,10, Inf)
+breaks$cyclicity = c(-Inf,0.1,0.3,0.75, Inf)
+breaks$variability = c(-Inf,0.3,2/3,0.85, Inf)
+breaks$timing = c(-par$D,-7,0,par$D)
+
+cvdt_stretches$duration_cat = cut(cvdt_stretches$duration, breaks = breaks$duration)
+cvdt_stretches$cyclicity_cat = cut(cvdt_stretches$cyclicity, breaks = breaks$cyclicity)
+cvdt_stretches$variability_cat = cut(cvdt_stretches$variability, breaks = breaks$variability)
+cvdt_stretches$timing_cat = cut(cvdt_stretches$timing, breaks = breaks$timing)
+
+duration_levels = levels(cvdt_stretches$duration_cat)
+cyclicity_levels = levels(cvdt_stretches$cyclicity_cat)
+variability_levels = levels(cvdt_stretches$variability_cat)
+timing_levels = levels(cvdt_stretches$timing_cat)
+
+df = data.frame()
+
+for(BC in par$BC_dict$name){
+  bc = (cvdt_stretches$BC == BC)
+  
+  #1 : non-cyclic, short duration
+  gr1 = bc & 
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[1]) & # non-cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[1:2]) & # low variability
+    (cvdt_stretches$duration_cat == duration_levels[1]) # short duration
+  ex1 = gr1 &  
+    (cvdt_stretches$variability_cat == variability_levels[1]) # low variability
+  
+  #2 : non-cyclic, medium duration
+  gr2 = bc & 
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[1]) & # non-cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[1:2]) & # low variability
+    (cvdt_stretches$duration_cat == duration_levels[2]) # medium duration
+  ex2 = gr2 &
+    (cvdt_stretches$variability_cat == variability_levels[1]) # low variability
+  
+  #3 : non-cyclic, long duration
+  gr3 = bc & 
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[1]) & # non-cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[1:2]) & # low variability
+    (cvdt_stretches$duration_cat == duration_levels[length(duration_levels)]) # long duration
+  ex3 = gr3
+  
+  #4 : cyclic, long duration
+  gr4 = bc & 
+    (!(cvdt_stretches$cyclicity_cat %in% cyclicity_levels[1:2])) & # cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[1:2]) & # low-med variability
+    (cvdt_stretches$duration_cat == duration_levels[length(duration_levels)]) # long duration
+  ex4 = gr4 &  # more cyclic
+    (cvdt_stretches$duration >= 15) # very long duration
+  
+  #5 : cyclic, medium-duration, pre-menstrual
+  gr5 =  bc & 
+    (!(cvdt_stretches$cyclicity_cat %in% cyclicity_levels[1:2])) & # cyclic
+    (cvdt_stretches$variability_cat  %in% variability_levels[1:2])  & # low variability
+    (cvdt_stretches$duration_cat == duration_levels[2]) & # medium duration
+    (cvdt_stretches$timing_cat == timing_levels[2]) # pre-menstrual
+  ex5 = gr5 &
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[length(cyclicity_levels)]) & # cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[1]) # low variability
+  
+  #6 : cyclic, medium-duration, menstrual
+  gr6 = bc & 
+    (!(cvdt_stretches$cyclicity_cat %in% cyclicity_levels[1:2])) & # cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[1:2])  & # low variability
+    (cvdt_stretches$duration_cat == duration_levels[2]) & # medium duration
+    (cvdt_stretches$timing_cat == timing_levels[3]) # menstrual
+  ex6 = gr6 & 
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[length(cyclicity_levels)]) & # cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[1])  # low variability
+  
+  #7 : cyclic, medium-duration, pre-menstrual
+  gr7 = bc & 
+    (!(cvdt_stretches$cyclicity_cat %in% cyclicity_levels[1:2])) & # cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[(length(variability_levels)-1):length(variability_levels)]) & # high variability
+    (cvdt_stretches$duration_cat == duration_levels[2]) # medium duration
+  ex7= gr7 & 
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[length(cyclicity_levels)]) & # cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[length(variability_levels)]) # low variability
+  
+  
+  gr8 = bc & !(gr4 | gr5 | gr6 | gr7) & 
+    (!(cvdt_stretches$cyclicity_cat %in% cyclicity_levels[1:2])) # other cyclic
+  ex8 = gr8 &
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[length(cyclicity_levels)]) # cyclic
+  
+  gr9 = bc & 
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[2]) # little cyclic
+  ex9 = gr9
+  
+  
+  gr10 = bc & !(gr1 | gr2| gr3) &
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[1]) # other non-cyclic
+  ex10 = gr10
+  
+  
+  
+  i = c()
+  for(k in 1:10){eval(parse(text = paste0("i",k,"= which(ex",k,")[sample(1:sum(ex",k,", na.rm = TRUE),1)]; i = c(i, i",k,")")))} # cat(k,"\n");
+  
+  df = rbind(df, 
+             data.frame(BC = BC,
+                        cat = 1:10, 
+                        names = c(
+                          "non-cyclic, short duration, low variability",
+                          "non-cyclic, medium duration, low variability",
+                          "non-cyclic, long duration",
+                          "cyclic, long duration",
+                          "cyclic, medium duration, low variability, pre-menstrual",
+                          "cyclic, medium duration, medium variability, menstrual",
+                          "cyclic, medium duration, high variability",
+                          "other cyclic",
+                          "mild cyclicity",
+                          "other non-cyclic"
+                        ),
+                        n_users = c(lu(cvdt_stretches$user_id[gr1]),
+                                    lu(cvdt_stretches$user_id[gr2]),
+                                    lu(cvdt_stretches$user_id[gr3]),
+                                    lu(cvdt_stretches$user_id[gr4]),
+                                    lu(cvdt_stretches$user_id[gr5]),
+                                    lu(cvdt_stretches$user_id[gr6]),
+                                    lu(cvdt_stretches$user_id[gr7]),
+                                    lu(cvdt_stretches$user_id[gr8]),
+                                    lu(cvdt_stretches$user_id[gr9]),
+                                    lu(cvdt_stretches$user_id[gr10])),
+                        n_stretches = c(sum(gr1, na.rm = TRUE),
+                                        sum(gr2, na.rm = TRUE),
+                                        sum(gr3, na.rm = TRUE),
+                                        sum(gr4, na.rm = TRUE),
+                                        sum(gr5, na.rm = TRUE),
+                                        sum(gr6, na.rm = TRUE),
+                                        sum(gr7, na.rm = TRUE),
+                                        sum(gr8, na.rm = TRUE), 
+                                        sum(gr9, na.rm = TRUE), 
+                                        sum(gr10, na.rm = TRUE)),
+                        tot_stretches = sum(bc),
+                        i = i,
+                        stretch_id = cvdt_stretches$stretch_id[i],
+                        user_id = cvdt_stretches$user_id[i],
+                        first_cycle_nb_m = cvdt_stretches$cycle_nb[i] )
+  )
+}
+
+df$perc_stretches = 100 * df$n_stretches/df$tot_stretches
+agg = aggregate(n_users ~ BC, df, sum)
+df$tot_users = agg$n_users[match(df$BC, agg$BC)]
+df$perc_users = 100 * df$n_users/df$tot_users
+
+df[,c("BC","names","perc_stretches","perc_users")]
+
+df$r_stretch_id = df$stretch_id
+df$r_first_cycle_nb_m = df$first_cycle_nb_m
+df$r_user_id = df$user_id
+sel_stretch_ids = c( "c352e33efb42cf9ca95dc325956273b6f5c9eb7a_s1", #1
+                     "14c57979ce182fcfa77f4a1668717a6e26cb984a_s1", #2
+                     "cb101d3ed720edafb4fd9ba9f2d240021bcb7226_s4", #3 "e8a1b5fbf5fad5b1f0f89cbd1c0051b57eddf4e1_s2"
+                     "af33d45b21b5cb5e49e5d82f31b4b93c0d9d963f_s6", #4 
+                     "d3555185f2b97a22e94aa545fbd494caa6201c0b_s2", #5  "c61af6c747f6e8e9ad95bcaff9de3eb377c7668d_s1"
+                     "2d4d71ed5b6cdc4719c2399e117527722b113179_s4", #6
+                     "04a81d7bf7e9ac1a7ef8a69b1afcac35263dbace_s1", #7
+                     "57945d2b174fc9593f848a2ccfd86d943e4c6577_s1", #8
+                     "f33152aa3cdb104b418fa931e367c73528d902fc_s4", #9 "b0dab827a71eefaa2e1962d3a5f4ce6174e7e2eb_s2", #9
+                     "4f441d56d0540c6d2406a158315cdc0c4c813934_s2", #10
+                     "939ed23499de861e6ad9b8185d86b8f37cd3af3b_s10", #1
+                     "230ceb24fe4a27283898f941da648c90c9b6164d_s1", #2
+                     "c1bb30485db6e05ebe56b1f6cfc68c9c4b5feaa3_s6", #3
+                     "1aaa3fb10f68733ca0d8bca2fdd1ee03e6dbe42f_s2", #4
+                     "9d184b70d132b823801db15906e5f2f772263f00_s1", #5
+                     "39cd0f53570b53f5087312212c3d6a60754d2826_s1", #6
+                     "37c55ec2d00e2453189267d3b03bfb76abb6feb1_s2", #7
+                     "096f59b43b8894a2a9ee90aae26701a7a9415fe2_s2", #8
+                     "94792dd88d1324fe485b35c3953a1b1db6a654ea_s2", #9
+                     "4748c7f0f819773dfbb38c311f3886800405e2e6_s2" #10
+)
+df$stretch_id = sel_stretch_ids
+m = match(df$stretch_id, cvdt_stretches$stretch_id)
+df$first_cycle_nb_m = cvdt_stretches$cycle_nb[m]
+df$user_id = cvdt_stretches$user_id[m]
+
+# selecting tracking data from these selected examples
+
+cycle_ids_ex = paste0(rep(df$user_id,each = n_consecutive_cycles),"_",
+                      rep(df$first_cycle_nb_m, each = n_consecutive_cycles) + rep(0:(n_consecutive_cycles-1), nrow(df))) 
+
+k = which(d_wide_with_tracking$cycle_id_m %in% cycle_ids_ex )
+
+d = melt(as.data.frame(d_wide_with_tracking[k,]), id.vars = c("user_id","cycle_id_m"))
+colnames(d)[match(c("variable","value"),colnames(d))] = c("cycleday_m_D","tender_breasts")
+d$cycleday_m_D = as.numeric(gsub("\\.","-",gsub("n\\.","",d$cycleday_m_D)))
+d$cycle_nb_m = cycles_m$cycle_nb_m[match(d$cycle_id_m, cycles_m$cycle_id_m)]
+d$user_id = factor(d$user_id,levels = unique(df$user_id))
+d$stretch_id = df$stretch_id[match(d$user_id, df$user_id)]
+d$BC = df$BC[match(d$stretch_id, df$stretch_id)]
+
+# selecting the average profiles
+
+average_profiles_with_cvdt$s_id = paste0(average_profiles_with_cvdt$stretch_id,"_",average_profiles_with_cvdt$cycle_nb)
+k = which(average_profiles_with_cvdt$s_id %in% paste0(df$stretch_id,"_", df$first_cycle_nb_m))
+
+selected_average_profiles_with_cvdt = average_profiles_with_cvdt[k,]
+selected_average_profiles_with_cvdt$stretch_id = 
+  factor(selected_average_profiles_with_cvdt$stretch_id, levels = unique(df$stretch_id))
+selected_average_profiles_with_cvdt$cat = df$cat[match(selected_average_profiles_with_cvdt$stretch_id, df$stretch_id)]
+
+# selecting cvdt_stretches
+
+cvdt_stretches$s_id = paste0(cvdt_stretches$stretch_id,"_",cvdt_stretches$cycle_nb)
+selected_cvdt_stretches = cvdt_stretches[match(paste0(df$stretch_id,"_", df$first_cycle_nb_m), cvdt_stretches$s_id ),]
+
+# saving the data for the FIGURES
+
+save(df, d, selected_average_profiles_with_cvdt, selected_cvdt_stretches, 
+     file = paste0(IO$out_Rdata,"selected_examples_cvdt.Rdata"))
+
+```
+
+
+```{r cvdt visualizing examples}
+
+
+d$stretch_id = factor(d$stretch_id, levels = df$stretch_id)
+
+m = match(d$stretch_id, df$stretch_id)
+d$cat = df$cat[m]
+
+agg = aggregate(cycle_nb_m ~ stretch_id, d, min)
+d$min_cycle_number = agg$cycle_nb_m[match(d$stretch_id, agg$stretch_id)]
+d$cycle_nb_m_rel = d$cycle_nb_m - d$min_cycle_number
+d$cycle_nb_m_o = d$cycle_nb_m
+d$cycle_nb_m = d$cycle_nb_m_rel
+
+ggplot_imputed_TB(sel_d = d, facet_grid_y = "cat", facet_grid_x = "BC", col = "BC", cycle_id = FALSE)+
+  scale_color_manual(values = cols$BC)+scale_fill_manual(values = cols$BC)
+
+
+
+ggplot(selected_average_profiles_with_cvdt, aes(x = cycleday_m_D, y = average_profile, col = BC, fill = BC) )+
+  geom_point()+
+  geom_line()+
+  geom_area(alpha = 0.3, col = NA)+
+  guides(col = FALSE, fill = FALSE)+
+  facet_grid(cat ~ BC)
+
+cvdt_col = c("duration","timing","variability","cyclicity")
+data.frame(selected_cvdt_stretches$stretch_id, selected_cvdt_stretches$BC,round(selected_cvdt_stretches[,cvdt_col],2))
+
+```
+
+

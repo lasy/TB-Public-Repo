@@ -22,8 +22,8 @@ source("Scripts/00_setup.R")
 
 # Average profiles
 
-We saw that cycles can be classified into 3 groups depending on the tracking behavior.
-Here we will describe the average tracking and symptoms profiles for these 3 groups and by BC.
+We saw that cycles can be classified into groups depending on the tracking behavior.
+Here we will describe the average tracking and symptoms profiles for these groups and by BC.
 
 ```{r profiles load cycles_m}
 
@@ -177,8 +177,6 @@ rm(a, days_file_list)
 
 
 ```
-
-
 
 
 ## Breast Tenderness symptoms per BC and age_cat for cycles in "regular tracking"

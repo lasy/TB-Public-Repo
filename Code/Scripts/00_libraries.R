@@ -3,7 +3,7 @@ package_list = c('knitr',
                  'tidyverse','readr',
                  'data.table',
                  'MASS',
-                 'hexbin','ggthemes','ggplot2','mapdata','gridExtra','quantreg',
+                 'hexbin','ggthemes','ggplot2','mapdata','gridExtra','quantreg','grid',
                  'stringr',
                  'plotly',
                  'scales','reshape',
@@ -19,7 +19,8 @@ package_list = c('knitr',
                  'Rtsne',
                  'Rcpp',
                  'e1071', 'parallelSVM', 'randomForest','SwarmSVM',
-                 'ggalluvial'
+                 'ggalluvial',
+                 'feather'
 )
 
 pckgs = installed.packages()

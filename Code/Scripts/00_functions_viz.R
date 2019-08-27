@@ -53,9 +53,7 @@ ggplot_imputed_TB = function(sel_d, facet_grid = NULL, facet_grid_x = NULL, face
   sel_d$short_user_id = paste0(substr(sel_d$user_id,1,4),"...",substr(sel_d$user_id ,37,40))
   short_user_id_levels = paste0(substr(levels(sel_d$user_id),1,4),"...",substr(levels(sel_d$user_id) ,37,40))
   sel_d$short_user_id = factor(sel_d$short_user_id, levels = short_user_id_levels)
-  
-  
-  
+ 
   #y axis (cycle_id or cycle_nb)
   if(cycle_id){
     ylab = ""
@@ -67,9 +65,11 @@ ggplot_imputed_TB = function(sel_d, facet_grid = NULL, facet_grid_x = NULL, face
       levels_short = paste0(substr(levels,1,4),"...",substr(levels ,nchar(levels)-4,nchar(levels)))
       cycle_ids = as.character(sel_d$cycle_id_m)
       sel_d$short_cycle_ids =paste0(substr(cycle_ids,1,4),"...",substr(cycle_ids ,nchar(cycle_ids)-4,nchar(cycle_ids)))
-      sel_d$y = factor(sel_d$short_cycle_ids, levels = levels_short)
+      sel_d$y = factor(sel_d$short_cycle_ids, levels = unique(levels_short))
     }
   }else{sel_d$y = factor(sel_d$cycle_nb_m, levels = sort(unique(as.numeric(sel_d$cycle_nb_m)), decreasing = TRUE)); ylab = "cycle number"}
+  
+
   
   g = ggplot(sel_d, 
              aes(x = cycleday_m_D, y = y, col = color, size = 1))+
@@ -87,7 +87,11 @@ ggplot_imputed_TB = function(sel_d, facet_grid = NULL, facet_grid_x = NULL, face
   if(length(facet_grid)>0){
     if(typeof(facet_grid) != "character"){stop("facet_grid must be NULL or a character vector \n")}
     if(!all(facet_grid %in% colnames(sel_d))){stop("facet_grid must be colnames of sel_d \n")}
-    if("user_id" %in% facet_grid){facet_grid[facet_grid == "user_id"] = "short_user_id"}
+    if("user_id" %in% facet_grid){
+      facet_grid[facet_grid == "user_id"] = "short_user_id"; 
+      facet_grid_x[facet_grid_x == "user_id"] = "short_user_id";
+      facet_grid_y[facet_grid_y == "user_id"] = "short_user_id"
+    }
     if((length(facet_grid_x)==0) & (length(facet_grid_y)==0)){facet_grid_y = facet_grid}
     if((length(facet_grid_x)>0) & (length(facet_grid_y)==0)){facet_grid_y = "."}
     if(length(facet_grid_x) == 0){facet_grid_x = "."}

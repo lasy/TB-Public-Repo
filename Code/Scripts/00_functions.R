@@ -62,8 +62,45 @@ replace_NAs_with_latest_value = function(x) {   # repeats the last non NA value.
   rep(x[ind], times = diff(   # repeat the values at these indices
     c(ind, length(x) + 1) ))  # diffing the indices + length yields how often 
 }                               # they need to be repeated
-
 # copied from: https://stackoverflow.com/questions/7735647/replacing-nas-with-latest-non-na-value
+
+
+running_mean = function(x, n){
+  X = data.frame()
+  for(i in 1:n){
+    X = rbind(X, c(rep(NA,i-1),x,rep(NA,n-i)))
+  }
+  rm = as.numeric(apply(X, 2, mean, na.rm = TRUE))
+  rm = rm[(floor(n/2)+1): (length(rm)-ceiling(n/2)+1)]
+  return(rm)
+}
+
+
+optimize_cross_correlation = function(X){
+  C = nrow(X); D = ncol(X)
+  val = matrix(0,C,C); lag = matrix(0,C,C)
+  for(i in 1:(C-1)){
+    for(j in (i+1):C){
+      ccf_ij = ccf(X[i,],X[j,],lag.max = 1, plot = FALSE)
+      k = which.max(ccf_ij$acf)
+      if(length(k)>0){
+      val[i,j] = val[j,i] = ccf_ij$acf[k]
+      lag[i,j] = lag[j,i] = ccf_ij$lag[k]
+      }
+    }
+  }
+  vlsum = apply(val * lag,1,sum)
+  n = min(round(C/3),sum(abs(vlsum)>0.5))
+  if(n>0){
+    k = order(abs(vlsum), decreasing = TRUE)[1:n]
+    for(ik in k){
+      if(sign(vlsum[ik]) == 1){X[ik,] = c(X[ik,2:D],X[ik,1])
+      }else{X[ik,] = c(X[ik,D],X[ik,1:(D-1)])}
+    }
+  }
+  return(X)
+}
+
 
 find_on_off_pill_transitions = function(x, n_cycles = 4){
   x = as.character(x)
