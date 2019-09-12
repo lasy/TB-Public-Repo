@@ -8,9 +8,9 @@ ggplot_user_example = function(d = days[1:10,], title = TRUE,size_factor = 1){
   d$number[d$type == "tender_breasts"] = 2
   d$number[d$category == "period"] = match(d$type[d$category == "period"], c("spotting","light","medium","heavy"))
   d$label = d$category
-  d$label[d$label == "pain"] = "TB"
+  d$label[d$label == "pain"] = "BT"
   d$label[d$label == "n_logs"] = "# logs"
-  d$label = factor(d$label, levels = c("period","TB","# logs"))
+  d$label = factor(d$label, levels = c("period","BT","# logs"))
   
   d$type = factor(d$type, levels = c("tender_breasts","spotting","light","medium","heavy","n_logs"))
   d$category = factor(d$category, levels = c("period","pain","n_logs"))
