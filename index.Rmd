@@ -78,13 +78,13 @@ The current version of the paper can be downloaded on !! [medRxiv](XXX) !!
 # Peer-reviewed published article
 Coming soon
 
-# Figures, Code and Data
+# Code and Data
 
-Code and aggregated data to reproduce the figures can be found and downloaded on the github repo !! [TB-Public-Repo](https://github.com/lasy/TB-Public-Repo) !! .
+Code and aggregated data to reproduce the figures can be found and downloaded on the github repo [TB-Public-Repo](https://github.com/lasy/TB-Public-Repo) .
 
-Specifically, click !! [here](https://lasy.github.io/TB-Public-Repo/Code/Tender_Breasts_FIGURES.html) !! for the rendered  !! [Rmd](https://github.com/lasy/TB-Public-Repo/blob/master/Code/Tender_Breasts_FIGURES.Rmd) !! (R code // R markdown) used to generate the Figures.
+Specifically, click [here](https://lasy.github.io/TB-Public-Repo/Code/Tender_breasts_FIGURES.html)  for the rendered  [Rmd](https://github.com/lasy/TB-Public-Repo/blob/master/Code/Tender_Breasts_FIGURES.Rmd) (R code // R markdown) used to generate the Figures.
 
-This link will bring you to the rendered R markdown for the full analysis of the data: [Analysis](https://github.com/lasy/TB-Public-Repo/blob/master/Code/Tender_Breasts_ANALYSIS.html)
+This link will bring you to the rendered R markdown for the full analysis of the data: [Analysis](https://lasy.github.io/TB-Public-Repo/Code/Tender_breasts_ANALYSIS.html)
 
 
 # Contact
