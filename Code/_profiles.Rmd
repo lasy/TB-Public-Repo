@@ -268,3 +268,22 @@ g
 
 ```
 
+
+```{r profiles symptoms patterns by age_cat and BC categories for regular tracking - difference between pill vs no-pill}
+
+agg_diff = agg %>% mutate(bc = str_replace(BC," / ","_or_")) %>% 
+  dplyr::select(cycleday_m_D, bc, age_cat, tracking_group, perc_cycles_with_TB) %>% 
+  tidyr::pivot_wider(id_cols = c(cycleday_m_D, age_cat, tracking_group), names_from = bc, values_from = perc_cycles_with_TB, 
+                     names_prefix = "perc_cycles_with_TB_") %>% 
+  mutate(ratio_perc_cycles_with_TB = perc_cycles_with_TB_none_or_condoms / perc_cycles_with_TB_pill)
+
+
+g = ggplot(agg_diff, aes(x = cycleday_m_D, y = ratio_perc_cycles_with_TB, col = age_cat))
+g + geom_line()+
+  facet_wrap(tracking_group ~ .)+
+  scale_colour_viridis_d(direction = -1)
+
+
+```
+
+

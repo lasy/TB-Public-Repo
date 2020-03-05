@@ -348,13 +348,13 @@ average_profiles_with_cvdt = foreach(i = 1:Nt, .combine = rbind) %do%{
   average_profiles_this_stretch = foreach(i = 1:NXX, .combine = rbind) %do%{
     X = XX[i:(i+n_consecutive_cycles-1),]
     average_profiles_this_stretch_i = data.frame(stretch_id = stretch_id, 
-                                                 cycle_nb = d_wide$cycle_nb_m[j[1]+i-1], 
-                                                 duration = cvdt_duration(X), 
-                                                 timing = cvdt_timing(X), 
-                                                 variability = cvdt_variability(X), 
-                                                 cyclicity  = cvdt_cyclicity(X),
-                                                 cycleday_m_D = -par$D:par$Df,
-                                                 average_profile = apply(X,2,mean)
+                                                     cycle_nb = d_wide$cycle_nb_m[j[1]+i-1], 
+                                                     duration = cvdt_duration(X), 
+                                                     timing = cvdt_timing(X), 
+                                                     variability = cvdt_variability(X), 
+                                                     cyclicity  = cvdt_cyclicity(X),
+                                                     cycleday_m_D = -par$D:par$Df,
+                                                     average_profile = apply(X,2,mean)
     )
     return(average_profiles_this_stretch_i)
   }
@@ -622,91 +622,102 @@ timing_levels = levels(cvdt_stretches$timing_cat)
 df = data.frame()
 
 for(BC in par$BC_dict$name){
-  bc = (as.character(cvdt_stretches$BC) == as.character(BC))
+  bc = (cvdt_stretches$BC == BC)
   
-  #1 : non-cyclic, short & medium duration
+  #1 : non-cyclic, short duration
   gr1 = bc & 
     (cvdt_stretches$cyclicity_cat == cyclicity_levels[1]) & # non-cyclic
-    (cvdt_stretches$duration_cat %in% duration_levels[1:2]) # short and medium duration
+    (cvdt_stretches$variability_cat %in% variability_levels[1:2]) & # low variability
+    (cvdt_stretches$duration_cat == duration_levels[1]) # short duration
   ex1 = gr1 &  
     (cvdt_stretches$variability_cat == variability_levels[1]) # low variability
   
-  #2 : non-cyclic, long duration
+  #2 : non-cyclic, medium duration
   gr2 = bc & 
     (cvdt_stretches$cyclicity_cat == cyclicity_levels[1]) & # non-cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[1:2]) & # low variability
+    (cvdt_stretches$duration_cat == duration_levels[2]) # medium duration
+  ex2 = gr2 &
+    (cvdt_stretches$variability_cat == variability_levels[1]) # low variability
+  
+  #3 : non-cyclic, long duration
+  gr3 = bc & 
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[1]) & # non-cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[1:2]) & # low variability
     (cvdt_stretches$duration_cat == duration_levels[length(duration_levels)]) # long duration
-  ex2 = gr2 & 
-    (cvdt_stretches$variability_cat == variability_levels[1]) # low variability
-  
-  
-  
-  # 3 : mildly cyclic
-  gr3 = bc &
-    (cvdt_stretches$cyclicity_cat == cyclicity_levels[2])  # non-cyclic
-  ex3 = gr3 &
-    (cvdt_stretches$duration_cat == duration_levels[2]) & # medium duration
-    (cvdt_stretches$variability_cat == variability_levels[1]) # low variability
-  
-  
+  ex3 = gr3
   
   #4 : cyclic, long duration
   gr4 = bc & 
-    (cvdt_stretches$cyclicity_cat %in% cyclicity_levels[-(1:2)]) & # cyclic
+    (!(cvdt_stretches$cyclicity_cat %in% cyclicity_levels[1:2])) & # cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[1:2]) & # low-med variability
     (cvdt_stretches$duration_cat == duration_levels[length(duration_levels)]) # long duration
   ex4 = gr4 &  # more cyclic
-    (cvdt_stretches$duration >= 15) & # very long duration
-    (cvdt_stretches$variability_cat %in% variability_levels[1:2]) # low-med variability
+    (cvdt_stretches$duration >= 15) # very long duration
   
-  
-  #5 : cyclic, pre-menstrual
+  #5 : cyclic, medium-duration, pre-menstrual
   gr5 =  bc & 
-    (cvdt_stretches$cyclicity_cat %in% cyclicity_levels[-(1:2)]) & # cyclic
-    (cvdt_stretches$variability_cat %in% variability_levels[1:2])  & # low variability
-    (cvdt_stretches$duration_cat %in% duration_levels[1:2]) & # short and medium duration
-    (cvdt_stretches$timing_cat %in% timing_levels[1:2]) # pre-menstrual
+    (!(cvdt_stretches$cyclicity_cat %in% cyclicity_levels[1:2])) & # cyclic
+    (cvdt_stretches$variability_cat  %in% variability_levels[1:2])  & # low variability
+    (cvdt_stretches$duration_cat == duration_levels[2]) & # medium duration
+    (cvdt_stretches$timing_cat == timing_levels[2]) # pre-menstrual
   ex5 = gr5 &
     (cvdt_stretches$cyclicity_cat == cyclicity_levels[length(cyclicity_levels)]) & # cyclic
-    (cvdt_stretches$duration_cat %in% duration_levels[2]) & # medium duration
-    (cvdt_stretches$timing_cat == timing_levels[2]) & # pre-menstrual
     (cvdt_stretches$variability_cat %in% variability_levels[1]) # low variability
   
-  #6 : cyclic, menstrual
+  #6 : cyclic, medium-duration, menstrual
   gr6 = bc & 
-    (cvdt_stretches$cyclicity_cat %in% cyclicity_levels[-(1:2)]) & # cyclic
+    (!(cvdt_stretches$cyclicity_cat %in% cyclicity_levels[1:2])) & # cyclic
     (cvdt_stretches$variability_cat %in% variability_levels[1:2])  & # low variability
-    (cvdt_stretches$duration_cat %in% duration_levels[1:2]) & # short and medium duration
+    (cvdt_stretches$duration_cat == duration_levels[2]) & # medium duration
     (cvdt_stretches$timing_cat == timing_levels[3]) # menstrual
   ex6 = gr6 & 
     (cvdt_stretches$cyclicity_cat == cyclicity_levels[length(cyclicity_levels)]) & # cyclic
-    (cvdt_stretches$duration_cat %in% duration_levels[2]) & # medium duration
     (cvdt_stretches$variability_cat %in% variability_levels[1])  # low variability
   
-  #7 : cyclic, non-consistent
+  #7 : cyclic, medium-duration, pre-menstrual
   gr7 = bc & 
-    (cvdt_stretches$cyclicity_cat %in% cyclicity_levels[-(1:2)]) & # cyclic
-    (cvdt_stretches$duration_cat %in% duration_levels[1:2]) & # short and medium duration
-    (cvdt_stretches$variability_cat %in% variability_levels[(length(variability_levels)-1):length(variability_levels)]) # high variability
+    (!(cvdt_stretches$cyclicity_cat %in% cyclicity_levels[1:2])) & # cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[(length(variability_levels)-1):length(variability_levels)]) & # high variability
+    (cvdt_stretches$duration_cat == duration_levels[2]) # medium duration
   ex7= gr7 & 
-    (cvdt_stretches$cyclicity_cat %in% cyclicity_levels[-(1:2)]) & # cyclic
-    (cvdt_stretches$duration_cat == duration_levels[2]) & # medium duration
-    (cvdt_stretches$variability_cat %in% variability_levels[length(variability_levels)]) # high variability
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[length(cyclicity_levels)]) & # cyclic
+    (cvdt_stretches$variability_cat %in% variability_levels[length(variability_levels)]) # low variability
+  
+  
+  gr8 = bc & !(gr4 | gr5 | gr6 | gr7) & 
+    (!(cvdt_stretches$cyclicity_cat %in% cyclicity_levels[1:2])) # other cyclic
+  ex8 = gr8 &
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[length(cyclicity_levels)]) # cyclic
+  
+  gr9 = bc & 
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[2]) # little cyclic
+  ex9 = gr9
+  
+  
+  gr10 = bc & !(gr1 | gr2| gr3) &
+    (cvdt_stretches$cyclicity_cat == cyclicity_levels[1]) # other non-cyclic
+  ex10 = gr10
   
   
   
   i = c()
-  for(k in 1:7){eval(parse(text = paste0("i",k,"= which(ex",k,")[sample(1:sum(ex",k,", na.rm = TRUE),1)]; i = c(i, i",k,")")))} # cat(k,"\n");
+  for(k in 1:10){eval(parse(text = paste0("i",k,"= which(ex",k,")[sample(1:sum(ex",k,", na.rm = TRUE),1)]; i = c(i, i",k,")")))} # cat(k,"\n");
   
   df = rbind(df, 
              data.frame(BC = BC,
-                        cat = 1:7, 
+                        cat = 1:10, 
                         names = c(
-                          "non-cyclic, non-permanent",
-                          "non-cyclic, permanent",
-                          "mildly cyclic",
+                          "non-cyclic, short duration, low variability",
+                          "non-cyclic, medium duration, low variability",
+                          "non-cyclic, long duration",
                           "cyclic, long duration",
-                          "cyclic, pre-menstrual",
-                          "cyclic, menstrual",
-                          "cyclic, high variability"
+                          "cyclic, medium duration, low variability, pre-menstrual",
+                          "cyclic, medium duration, medium variability, menstrual",
+                          "cyclic, medium duration, high variability",
+                          "other cyclic",
+                          "mild cyclicity",
+                          "other non-cyclic"
                         ),
                         n_users = c(lu(cvdt_stretches$user_id[gr1]),
                                     lu(cvdt_stretches$user_id[gr2]),
@@ -714,14 +725,20 @@ for(BC in par$BC_dict$name){
                                     lu(cvdt_stretches$user_id[gr4]),
                                     lu(cvdt_stretches$user_id[gr5]),
                                     lu(cvdt_stretches$user_id[gr6]),
-                                    lu(cvdt_stretches$user_id[gr7])),
+                                    lu(cvdt_stretches$user_id[gr7]),
+                                    lu(cvdt_stretches$user_id[gr8]),
+                                    lu(cvdt_stretches$user_id[gr9]),
+                                    lu(cvdt_stretches$user_id[gr10])),
                         n_stretches = c(sum(gr1, na.rm = TRUE),
                                         sum(gr2, na.rm = TRUE),
                                         sum(gr3, na.rm = TRUE),
                                         sum(gr4, na.rm = TRUE),
                                         sum(gr5, na.rm = TRUE),
                                         sum(gr6, na.rm = TRUE),
-                                        sum(gr7, na.rm = TRUE)),
+                                        sum(gr7, na.rm = TRUE),
+                                        sum(gr8, na.rm = TRUE), 
+                                        sum(gr9, na.rm = TRUE), 
+                                        sum(gr10, na.rm = TRUE)),
                         tot_stretches = sum(bc),
                         i = i,
                         stretch_id = cvdt_stretches$stretch_id[i],
@@ -740,24 +757,26 @@ df[,c("BC","names","perc_stretches","perc_users")]
 df$r_stretch_id = df$stretch_id
 df$r_first_cycle_nb_m = df$first_cycle_nb_m
 df$r_user_id = df$user_id
-sel_stretch_ids = c(
-  "14c57979ce182fcfa77f4a1668717a6e26cb984a_s1", #2
-  "cb101d3ed720edafb4fd9ba9f2d240021bcb7226_s4", #3 "e8a1b5fbf5fad5b1f0f89cbd1c0051b57eddf4e1_s2"
-  "f33152aa3cdb104b418fa931e367c73528d902fc_s4", #9 "b0dab827a71eefaa2e1962d3a5f4ce6174e7e2eb_s2", #9
-  
-  "af33d45b21b5cb5e49e5d82f31b4b93c0d9d963f_s6", #4 
-  "d3555185f2b97a22e94aa545fbd494caa6201c0b_s2", #5  "c61af6c747f6e8e9ad95bcaff9de3eb377c7668d_s1"
-  "2d4d71ed5b6cdc4719c2399e117527722b113179_s4", #6
-  "04a81d7bf7e9ac1a7ef8a69b1afcac35263dbace_s1", #7
-  
-  "230ceb24fe4a27283898f941da648c90c9b6164d_s1", #2
-  "c1bb30485db6e05ebe56b1f6cfc68c9c4b5feaa3_s6", #3
-  "94792dd88d1324fe485b35c3953a1b1db6a654ea_s2", #9
-  
-  "1aaa3fb10f68733ca0d8bca2fdd1ee03e6dbe42f_s2", #4
-  "9d184b70d132b823801db15906e5f2f772263f00_s1", #5
-  "39cd0f53570b53f5087312212c3d6a60754d2826_s1", #6
-  "37c55ec2d00e2453189267d3b03bfb76abb6feb1_s2" #7
+sel_stretch_ids = c( "c352e33efb42cf9ca95dc325956273b6f5c9eb7a_s1", #1
+                     "14c57979ce182fcfa77f4a1668717a6e26cb984a_s1", #2
+                     "cb101d3ed720edafb4fd9ba9f2d240021bcb7226_s4", #3 "e8a1b5fbf5fad5b1f0f89cbd1c0051b57eddf4e1_s2"
+                     "af33d45b21b5cb5e49e5d82f31b4b93c0d9d963f_s6", #4 
+                     "d3555185f2b97a22e94aa545fbd494caa6201c0b_s2", #5  "c61af6c747f6e8e9ad95bcaff9de3eb377c7668d_s1"
+                     "2d4d71ed5b6cdc4719c2399e117527722b113179_s4", #6
+                     "04a81d7bf7e9ac1a7ef8a69b1afcac35263dbace_s1", #7
+                     "57945d2b174fc9593f848a2ccfd86d943e4c6577_s1", #8
+                     "f33152aa3cdb104b418fa931e367c73528d902fc_s4", #9 "b0dab827a71eefaa2e1962d3a5f4ce6174e7e2eb_s2", #9
+                     "4f441d56d0540c6d2406a158315cdc0c4c813934_s2", #10
+                     "939ed23499de861e6ad9b8185d86b8f37cd3af3b_s10", #1
+                     "230ceb24fe4a27283898f941da648c90c9b6164d_s1", #2
+                     "c1bb30485db6e05ebe56b1f6cfc68c9c4b5feaa3_s6", #3
+                     "1aaa3fb10f68733ca0d8bca2fdd1ee03e6dbe42f_s2", #4
+                     "9d184b70d132b823801db15906e5f2f772263f00_s1", #5
+                     "39cd0f53570b53f5087312212c3d6a60754d2826_s1", #6
+                     "37c55ec2d00e2453189267d3b03bfb76abb6feb1_s2", #7
+                     "096f59b43b8894a2a9ee90aae26701a7a9415fe2_s2", #8
+                     "94792dd88d1324fe485b35c3953a1b1db6a654ea_s2", #9
+                     "4748c7f0f819773dfbb38c311f3886800405e2e6_s2" #10
 )
 df$stretch_id = sel_stretch_ids
 m = match(df$stretch_id, cvdt_stretches$stretch_id)
@@ -834,141 +853,3 @@ data.frame(selected_cvdt_stretches$stretch_id, selected_cvdt_stretches$BC,round(
 ```
 
 
-
-Below, we look at the intra-individual consistency of reported symptoms patterns
-
-```{r cvdt consistency of patterns for cyclic users}
-
-agg = cvdt_stretches %>%  dplyr::select(stretch_id, user_id, cyclicity, variability) %>% 
-  group_by(user_id) %>% dplyr::summarise(n = n(), min_cyclicity = min(cyclicity), min_variability = min(variability))
-
-user_ids = agg$user_id[(agg$min_cyclicity >= 0.3) & (agg$min_variability >= 0.3)]
-
-dd = d_wide_with_tracking %>% dplyr::filter(user_id %in% user_ids)
-mm = as.matrix(dd %>% dplyr::select(-user_id, -cycle_id_m))
-mm[mm<0] = 0
-
-patterns = dd %>% dplyr::select(user_id, cycle_id_m) %>% 
-  mutate(onset = (-par$D:par$Df)[apply(mm, 1, function(x) suppressWarnings(min(which(x == 1))))],
-         offset = (-par$D:par$Df)[apply(mm, 1, function(x) suppressWarnings(max(which(x == 1))))],
-         timing = apply(mm, 1, function(x) weighted.mean(-par$D:par$Df,x)),
-         duration = rowSums(mm)
-  )
-
-sd_no_na = function(x){sd(x, na.rm = TRUE)}
-
-agg_a = patterns %>% group_by(user_id) %>% summarize_each(funs = "sd_no_na", onset, offset, timing, duration) %>% 
-  mutate(label =  "actual users")
-av_profile_a = sapply(1:ncol(mm),function(i) aggregate(mm[,i],by = list(user_id = dd$user_id), FUN = mean)$x)
-agg_a$consistency = apply(av_profile_a, 1, function(x) weighted.mean(x, x))
-
-
-patterns$random_user = sample(patterns$user_id)
-agg_r = patterns %>% dplyr::select(-user_id) %>% dplyr::rename(user_id = random_user) %>% 
-  group_by(user_id) %>% summarize_each(funs = "sd_no_na", onset, offset, timing, duration) %>% 
-  mutate(label =  "randomized users")
-av_profile_r = sapply(1:ncol(mm),function(i) aggregate(mm[,i],by = list(user_id = patterns$random_user), FUN = mean)$x)
-agg_r$consistency = apply(av_profile_r, 1, function(x) weighted.mean(x, x))
-
-agg = rbind(agg_a, agg_r)
-
-
-agg_long = agg %>%  tidyr::pivot_longer(-c(user_id, label), names_to = "metric")
-
-g = ggplot(agg_long, aes(x = value, col = label))
-g + geom_freqpoly(position = "identity", alpha = 1, bins = 30)+
-  facet_wrap(metric ~ . , scales = "free")
-
-
-# bootstrap
-tic()
-df = data.frame()
-for(i in 1:100){
-  cat(i,"\t")
-  patterns$random_user = sample(patterns$user_id)
-  agg_r = patterns %>% dplyr::select(-user_id) %>% dplyr::rename(user_id = random_user) %>% 
-    group_by(user_id) %>% summarize_each(funs = "sd_no_na", onset, offset, timing, duration) %>% 
-    mutate(label =  "randomized users")
-  
-  df = rbind(df, data.frame(
-    f_offset = mean(agg_r$offset, na.rm = TRUE)/mean(agg_a$offset, na.rm = TRUE),
-    f_onset = mean(agg_r$onset, na.rm = TRUE)/mean(agg_a$onset, na.rm = TRUE),
-    f_duration = mean(agg_r$duration, na.rm = TRUE)/mean(agg_a$duration, na.rm = TRUE),
-    f_timing = mean(agg_r$timing, na.rm = TRUE)/mean(agg_a$timing, na.rm = TRUE)
-  ))
-}
-toc()
-
-
-apply(1/df,2,quantile, probs = c(0.025,0.5,0.975))
-
-quantile(as.matrix(1/df), probs = c(0.025,0.5,0.975))
-
-```
-
-
-And check the correlation between (consistency in) onset, offset, duration and cycle length (regularity).
-
-```{r cvdt correlation with cycle length and regularity}
-
-load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
-
-patterns$cycle_length = cycles$cycle_length[match(patterns$cycle_id_m, cycles$cycle_id)]
-
-mat = patterns %>% dplyr::select(onset, offset, duration, timing, cycle_length)
-cor_mat = cor(mat,use = "complete.obs")
-p.mat =  cor_pmat(mat,use = "complete.obs")
-
-ggcorrplot(cor_mat,  method = "circle", p.mat = p.mat)
-
-
-agg_tmp = patterns %>% group_by(user_id) %>% dplyr::summarize(cycle_length_sd = sd(cycle_length))
-
-A = merge(agg_a, agg_tmp, by = "user_id")
-
-cor_mat = A %>% dplyr::select(-user_id, -label) %>% cor()
-p.mat =  A %>% dplyr::select(-user_id, -label) %>% cor_pmat()
-
-ggcorrplot(cor_mat, hc.order = TRUE, method = "circle", p.mat = p.mat)
-
-
-```
-
-
-
-
-
-
-
-
-
-
-```{r cvdt consistency of patterns for cyclic users - draft}
-
-agg = cvdt_stretches %>%  dplyr::select(stretch_id, user_id, cyclicity) %>% 
-  group_by(user_id) %>% dplyr::summarise(n = n(), min_cyclicity = min(cyclicity))
-
-user_ids = agg$user_id[(agg$n >= 5) & (agg$min_cyclicity >= 0.3)]
-
-agg = cvdt_stretches %>% dplyr::filter(user_id %in% user_ids) %>% 
-  group_by(user_id) %>% dplyr::summarize_each(funs = c("mean","sd"), duration, timing, variability, cyclicity)
-
-cvdt_stretches$random_users = sample(cvdt_stretches$user_id)
-
-agg_r = cvdt_stretches %>% dplyr::filter(user_id %in% user_ids) %>% 
-  mutate(random_users = sample(user_id)) %>% 
-  group_by(random_users) %>% dplyr::summarize_each(funs = c("mean","sd"), duration, timing, variability, cyclicity)
-
-agg$label = "actual users"
-agg_r$label = "randomized users"
-agg_r$user_id = agg_r$random_users
-
-agg = rbind(agg, agg_r %>%  dplyr::select(-random_users))
-
-agg_long = agg %>% dplyr::select(user_id, label, duration_sd, timing_sd) %>%  tidyr::pivot_longer(contains("_sd"), names_to = "metric")
-
-g = ggplot(agg_long, aes(x = value, col = label))
-g + geom_freqpoly(position = "identity", alpha = 1)+
-  facet_wrap(metric ~ . , scales = "free")
-
-```

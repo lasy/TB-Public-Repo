@@ -1,5 +1,5 @@
 ---
-title: "Phenotyping menstrual breast tenderness from large-scale self-tracked data"
+title: "Phenotyping menstrual breast pain from large-scale self-tracked data"
 author: "Laura Symul, Paula Hillard and Susan Holmes"
 date: "2019"
 output: 
@@ -23,19 +23,19 @@ Millions of women are now using smartphone apps to track their menstrual cycles 
 
 **Objectives**
 
-The aims of the study were to describe how and when this symptom is reported by users of such apps, and to evaluate the predictive power of users’ demographic and birth control choices for the occurrence and reporting frequency of this symptom. We also wished to investigate if there were distinct patterns of symptoms reported by different users and, finally, to evaluate the changes in symptom reporting for users going on or off the contraceptive pill.
+To describe the prevalence, timing and duration of breast pain symptoms as reported by users of a menstrual cycle tracking app, and to evaluate changes in reported symptoms at birth control transitions.
 
-**Study Design**
+**Methods**
 
-Here, we leveraged the self-reports of smartphone app users and analyzed a retrospective large dataset of over 200,000 users of the Clue app with over 4.5 million reported symptoms of breast tenderness. 
+We analyzed a retrospective dataset of 216,484 ¬users of the Clue app with over 4.5 million self-reports of “tender breasts”. Tracking behavior of users was characterized on a per-cycle basis and clustered into typical app usages. Symptoms reported by regular app users were further characterized with four distinct metrics, i.e. symptom timing, duration, cyclicity and variability from one cycle to the next. Birth control method was determined based on the users self-declared report, on their menstrual characteristics and on their pill-intake logs if any.
 
 **Results**
 
-We found that contraceptive pill users report fewer symptoms of breast tenderness on average than non-pill users.  The oral contraceptive pill decreased the symptom of mastalgia for 48% of users who switched birth control but increased symptoms for 32% of users (with the remaining 20% experiencing no change). The user’s age is the second most powerful predictor for the symptom prevalence: older users reported symptoms earlier in the pre-menstrual phase and for longer durations. It was also found that 15-18% of users reported symptoms that could not be clearly differentiated as cyclic vs non-cyclic mastalgia; rather there are a wide variety of patterns of duration, consistency and phases in relationship to the menstrual cycle. We discuss how this categorization may have emerged in early studies on small cohorts of older women and was then perpetuated in the subsequent literature.    
+Contraceptive pill users report, on average, fewer breast pain symptoms than non-pill users [3-6 times lower prevalence depending on age].  The oral contraceptive pill decreased reported breast pain for 48% of users who switched to oral contraceptives but increased this symptom for 32% of users (with the remaining 20% experiencing no change). Most users (62%) reported cyclic breast symptoms; 21% reported non-cyclic ones; symptoms of the remaining users could not be classified as cyclic or non-cyclic. There is overall a large inter-individual diversity in the reported patterns, as indicated by the distribution of our four metrics. Even within cyclic mastalgia, the temporal patterns (i.e. onset, offset and duration) of reported symptoms show less variability (sd is 80% smaller, 95CI: 79.7-80.7) within than between users.    
 
 **Conclusion(s)**
 
-While this study confirms associations between steroid hormonal use and breast tenderness symptoms at the population and at the individual level, it also shows that the most affected users experience specific and consistent patterns in terms of timing and duration of their symptoms, which may reflect their underlying hormonal profiles.  
+This study confirms associations between steroid hormonal use and breast pain symptoms. It also shows that most affected users experience specific and consistent symptom patterns, which may reflect their underlying hormonal profiles or tissue-specific response. These woman-specific patterns have yet to be correlated with temporal bio-markers profiles or breast exam results to further advance our understanding of the mastalgia causes. 
 
 
 # Figures
@@ -69,14 +69,6 @@ Breast Tenderness at pill transitions
 
 
 
-
-# Pre-print
-
-The current version of the paper can be downloaded on !! [medRxiv](XXX) !!
-
-
-# Peer-reviewed published article
-Coming soon
 
 # Code and Data
 

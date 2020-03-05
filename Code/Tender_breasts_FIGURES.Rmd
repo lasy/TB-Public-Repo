@@ -31,8 +31,8 @@ source("Scripts/00_setup.R")
 
 ```{r load users and cycles, cache = TRUE, eval = TRUE}
 
-load(file = paste0(IO$output_data, "users.Rdata"), verbose = TRUE)
-load(file = paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+users = read_feather(paste0(IO$output_data, "users.feather"))
+cycles = read_feather(paste0(IO$output_data, "cycles.feather"))
 
 ```
 
@@ -453,6 +453,7 @@ load(file = paste0(IO$out_Rdata,"tracking_behavior_overal_pattern_by_tracking_gr
 
 unique(agg[,c("BC","tracking_group","tot_n_cycles")])
 
+agg = agg %>% mutate(tracking_group = recode(tracking_group, `pre-menstrual tracking` = "peri-menstrual tracking"))
 
 agg$SE = agg$fraction_cycles_with_logs_SE
 
@@ -470,11 +471,6 @@ g = ggplot(agg, aes(x = cycleday_m_D, y = fraction_cycles_with_logs, col = BC, s
   facet_grid( . ~ tracking_group)
 g
 
-ggsave(file = paste0(IO$panels, "tracking_profile_perc_cycles_with_logs_per_tracking_group_and_BC.pdf"),
-       plot = g, 
-       width = viz$full_width/2,
-       height = 0.3*viz$full_width/2,
-       scale = viz$scale*1.2)
 
 
 g_n = ggplot(agg, aes(x = cycleday_m_D, y = avg_n_logs, col = BC, shape = BC)) + 
@@ -492,6 +488,11 @@ g_n = ggplot(agg, aes(x = cycleday_m_D, y = avg_n_logs, col = BC, shape = BC)) +
 g_n
 
 
+ggsave(file = paste0(IO$panels, "tracking_profile_perc_cycles_with_logs_per_tracking_group_and_BC.pdf"),
+       plot = g, 
+       width = viz$full_width/2,
+       height = 0.3*viz$full_width/2,
+       scale = viz$scale*1.2)
 
 
 ggsave(file = paste0(IO$panels, "tracking_profile_avg_log_per_tracking_group_and_BC.pdf"),
@@ -582,6 +583,20 @@ ggsave(filename = paste0(IO$panels, "symptoms_profile_by_BC_and_age_cat_for_regu
 ```
 
 
+```{r profiles symptoms patterns by age_cat and BC categories for regular tracking - difference between pill vs no-pill}
+
+agg_diff = agg %>% mutate(bc = str_replace(BC," / ","_or_")) %>% 
+  dplyr::select(cycleday_m_D, bc, age_cat, tracking_group, perc_cycles_with_TB) %>% 
+  tidyr::pivot_wider(id_cols = c(cycleday_m_D, age_cat, tracking_group), names_from = bc, values_from = perc_cycles_with_TB, 
+                     names_prefix = "perc_cycles_with_TB_") %>% 
+  mutate(ratio_perc_cycles_with_TB = perc_cycles_with_TB_none_or_condoms / perc_cycles_with_TB_pill)
+
+
+g = ggplot(agg_diff, aes(x = cycleday_m_D, y = ratio_perc_cycles_with_TB, col = age_cat))
+g + geom_line()+
+  facet_wrap(tracking_group ~ .)+
+  scale_colour_viridis_d(direction = -1)
+```
 
 
 
@@ -797,6 +812,9 @@ ggsave(filename = paste0(IO$panels, "CVDT_",ifelse(i == 1,"stretches","users"),"
 
 load(file = paste0(IO$out_Rdata,"selected_examples_cvdt.Rdata"), verbose = TRUE)
 
+  
+
+
 
 df$wrapped_names = gsub(", ","\n",df$names)
 
@@ -840,10 +858,29 @@ g_profiles = ggplot(selected_average_profiles_with_cvdt, aes(x = cycleday_m_D, y
 g_profiles
 
 
-g_stat= ggplot(df, aes(x = as.factor(cat), y = perc_stretches/100, fill = BC))+
+
+
+agg = df %>% dplyr::select(BC, cat, names, n_users, n_stretches, tot_stretches, tot_users) %>% 
+  group_by(cat, names) %>% 
+  summarize_each(funs = sum,  n_users, n_stretches, tot_stretches, tot_users) %>% 
+  mutate(perc_stretches = n_stretches/tot_stretches * 100,
+         perc_users = n_users/ tot_users *100,
+         BC = "all")
+
+df$BC = as.character(df$BC)
+
+df_stat = rbind(
+  df %>% dplyr::select(BC, cat, names, n_users, tot_users, perc_users, n_stretches, tot_stretches, perc_stretches) %>% as.data.frame(),
+  agg %>% dplyr::select(BC, cat, names, n_users, tot_users, perc_users, n_stretches, tot_stretches, perc_stretches) %>% as.data.frame()
+)
+
+
+df_stat$BC = factor(df_stat$BC, levels = c(as.character(par$BC_dict$name), "all"))
+
+g_stat= ggplot(df_stat, aes(x = as.factor(cat), y = perc_stretches/100, fill = BC))+
   coord_flip()+
   geom_bar(stat = "identity", position = "dodge")+
-  scale_fill_manual(values = cols$BC)+
+  scale_fill_manual(values = cols$BC3)+
   guides(fill = FALSE)+
   scale_y_continuous(labels = scales::percent)+
   scale_x_discrete(labels = NULL)+
@@ -855,8 +892,25 @@ g_stat
 g_stat= ggplot(df, aes(x = factor(cat, levels = rev(sort(unique(cat)))), y = perc_users/100, fill = BC))+
   coord_flip()+
   geom_bar(stat = "identity", position = "dodge", width = 0.8)+
+  geom_text(aes(label = round(perc_users,2), col = BC, vjust = ifelse(BC == "pill",-1.5,2.5)), hjust = 0, nudge_y = 0.005 * 1)+
+  scale_color_manual(values = cols$BC)+
   scale_fill_manual(values = cols$BC)+
-  guides(fill = FALSE)+
+  guides(fill = FALSE, col = FALSE)+
+  scale_y_continuous(labels = scales::percent)+
+  scale_x_discrete(labels = NULL, breaks = NULL)+
+  ylab("% of users")+
+  xlab("")
+g_stat
+
+
+
+g_stat= ggplot(df_stat, aes(x = factor(cat, levels = rev(sort(unique(cat)))), y = perc_users/100, fill = BC))+
+  coord_flip()+
+  geom_bar(stat = "identity", position = "dodge", width = 0.8)+
+  geom_text(aes(label = round(perc_users,2), col = BC, vjust = (2.25-match(BC, levels(df_stat$BC)))*2.5 ), hjust = 0, nudge_y = 0.005 * 1)+
+  scale_color_manual(values = cols$BC3)+
+  scale_fill_manual(values = cols$BC3)+
+  guides(fill = FALSE, col = FALSE)+
   scale_y_continuous(labels = scales::percent)+
   scale_x_discrete(labels = NULL, breaks = NULL)+
   ylab("% of users")+
@@ -1198,6 +1252,80 @@ for(bc in c("NC","pill")){
 ```
 
 
+
+
+
+# Clinical significance of age on the symptoms prevalence
+
+```{r}
+
+load(paste0(IO$output_data,"stretches.Rdata"), verbose = TRUE)
+dim(stretches)
+
+average_profiles_with_cvdt = read_feather(path = paste0(IO$tmp_data, "average_profiles_with_cvdt.feather"))
+cvdt_stretches = read_feather(path = paste0(IO$tmp_data, "cvdt_stretches.feather"))
+
+
+cvdt_stretches$age_cat = users$age_cat[match(cvdt_stretches$user_id, users$user_id)]
+
+
+ggplot(cvdt_stretches, aes(x = age_cat, y = duration, fill = age_cat)) +
+  geom_boxplot()+
+  facet_grid(. ~ BC, scale = "free")
+
+ggplot(cvdt_stretches, aes(x = age_cat, y = timing, fill = age_cat)) +
+  geom_boxplot()+
+  facet_grid(. ~ BC, scale = "free")
+
+ggplot(cvdt_stretches, aes(x = age_cat, y = variability, fill = age_cat)) +
+  geom_boxplot()+
+  facet_grid(. ~ BC, scale = "free")
+
+
+ggplot(cvdt_stretches, aes(x = age_cat, y = cyclicity, fill = age_cat)) +
+  geom_boxplot()+
+  facet_grid(. ~ BC, scale = "free")
+
+
+aggregate(duration ~ age_cat + BC,  cvdt_stretches, mean)
+
+aggregate(timing ~ age_cat + BC,  cvdt_stretches, mean)
+
+
+aggregate(variability ~ age_cat + BC,  cvdt_stretches, mean)
+
+aggregate(cyclicity ~ age_cat + BC,  cvdt_stretches, mean)
+
+
+
+cvdt_stretches$severe = (cvdt_stretches$duration >= 20)
+severity = ddply(cvdt_stretches,
+                 .(age_cat, BC),
+                 summarize,
+                 n_severe = sum(severe),
+                 n = length(severe),
+                 f_severe = n_severe/n)
+
+
+ggplot(severity, aes(x = age_cat, y = f_severe, col = age_cat ))+
+  geom_point()+
+  facet_grid(. ~ BC)
+
+cycles1 = cycles
+
+
+load(paste0(IO$output_data, "cycles.Rdata"), verbose = TRUE)
+load(paste0(IO$output_data, "cycles_m.Rdata"), verbose = TRUE)
+
+
+cycles_m$age_cat = cut(cycles_m$age, breaks = breaks$age)
+ggplot(cycles_m %>%  filter((tracking_group == "regular tracking") & (BC == "none / condoms")),
+       aes(x = n_TB, fill = age_cat))+
+  geom_histogram(binwidth = 1)+
+  facet_grid(age_cat ~ BC, scale = "free")
+
+
+```
 
 
 

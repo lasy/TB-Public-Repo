@@ -23,9 +23,13 @@ source("Scripts/00_setup.R")
 
 
 ```{r symtoms_pred load d_wide, cycles_m and cycles}
-load(paste0(IO$tmp_data,"d_wide_imputed.Rdata"), verbose = TRUE)
+#load(paste0(IO$tmp_data,"d_wide_imputed.Rdata"), verbose = TRUE)
+d_wide = read_feather(path = paste0(IO$tmp_data, "d_wide_with_tracking.feather"))
 colnames(d_wide)
 dim(d_wide)
+
+colnames(d_wide) = colnames(d_wide) %>% str_replace_all(.,"n\\.","day_") %>%  str_replace_all(.,"\\.","m")
+
 
 load(paste0(IO$output_data,"cycles_m.Rdata"), verbose = TRUE)
 colnames(cycles_m)
@@ -48,14 +52,16 @@ d_wide[d_wide == -1] = 0
 
 j = which(!(cycles_m$cycle_id_m %in% d_wide$cycle_id_m))
 
-d_wide_empty = data.frame(cycle_id_m = cycles_m$cycle_id_m[j])
-for(column in colnames(d_wide[,-1])){
+d_wide_empty = data.frame(user_id = cycles_m$user_id[j],cycle_id_m = cycles_m$cycle_id_m[j])
+for(column in colnames(d_wide[,-(1:2)])){
   eval(parse(text = paste0("d_wide_empty$",column," = 0")))
 }
 
 d_wide_full = rbind(d_wide, d_wide_empty)
-
+dim(d_wide)
 dim(d_wide_empty)
+dim(d_wide_full)
+
 ```
 
 
@@ -74,17 +80,25 @@ cycles_m$bmi_cat = cut(cycles_m$bmi, breaks = c(-Inf, 18.5, 25, 30, Inf), labels
 cycles_m$bmi_cat = factor(cycles_m$bmi_cat, levels =  c("normal","underweight","overweight","obese"))
 
 cycles_m$age_cat = cut(cycles_m$age, breaks = breaks$age)
+cycles_m$age_cat = relevel(cycles_m$age_cat, "(20,25]") # reference level
+levels(cycles_m$age_cat)
 
 ```
 
 
 
 ```{r symtoms_pred add user and cycle info to d_wide}
-inputs = c("tracking_group","cycle_length","period_length","diff_cl_median_3c","BC","age","bmi_cat", "country") #"height","weight",
+inputs = c("tracking_group","cycle_length","period_length","diff_cl_median_3c","BC","age_cat","bmi_cat", "country") #"height","weight", "age"
 m = match(d_wide_full$cycle_id_m, cycles_m$cycle_id_m)
 
 for(input in inputs){
   eval(parse(text = paste0("d_wide_full$",input," = cycles_m$",input,"[m]")))
+  isnumeric = d_wide_full %>%  select(input) %>% head(1) %>%  unlist() %>%  is.numeric()
+  if(isnumeric){
+      eval(parse(text = paste0("d_wide_full$",input,"_scaled = scale(d_wide_full$",input,")")))
+  }else{
+      eval(parse(text = paste0("d_wide_full$",input,"_scaled = d_wide_full$",input)))
+  }
 }
 
 d_wide_full = d_wide_full[which(d_wide_full$BC %in% par$BC_dict$name),]
@@ -97,19 +111,24 @@ d_wide_full = d_wide_full[which(d_wide_full$BC %in% par$BC_dict$name),]
 
 pred = data.frame()
 
-for(tracking_group in c("regular tracking","pre-menstrual tracking","menstrual tracking")){
+for(tracking_group in c("regular tracking")){ #,"pre-menstrual tracking","menstrual tracking")){
   
   for(d in (-par$D):(par$Df) ){
     cat(d,"\n")
     eval(parse(text = paste0("d_wide_full$y = d_wide_full$day_",ifelse(d<0,"m",""),abs(d))))
-    eval(parse(text = paste0("mod_d = glm( round(y) ~ ",paste(inputs[-1], collapse = " + ")," ,
+    eval(parse(text = paste0("mod_d = glm( round(y) ~ ",paste(paste0(inputs[-1],"_scaled"), collapse = " + ")," ,
                             data = d_wide_full[which(d_wide_full$tracking_group == tracking_group),],
                             family = 'binomial')")))
+    
+    # eval(parse(text = paste0("mod_d_not_scaled = glm( round(y) ~ ",paste(inputs[-1], collapse = " + ")," ,
+    #                         data = d_wide_full[which(d_wide_full$tracking_group == tracking_group),],
+    #                         family = 'binomial')")))
     
     this_day_pred = data.frame(tracking_cluster = tracking_group,
                                cycleday_m_D = d,
                                input = names(coef(summary(mod_d))[,1]),
                                est = coef(summary(mod_d))[,1],
+                               st.err = coef(summary(mod_d))[,2],
                                z_value = coef(summary(mod_d))[,3],
                                p_value = coef(summary(mod_d))[,4]
     )
@@ -158,6 +177,46 @@ g = ggplot(pred[!grepl("country",pred$input),], aes(x = cycleday_m_D, y = -log10
   guides(col = FALSE)
 g
 
+
+g = ggplot(pred[(!grepl("country",pred$input)) & (pred$tracking_cluster == "regular tracking"),], 
+           aes(x = cycleday_m_D, y = exp(est), col = input, linetype = tracking_cluster)) + 
+  geom_vline(xintercept = 0, size = 2, col = "gray90")+
+  geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
+  geom_hline(yintercept = 1, size = 0.1)+
+  geom_line() + 
+  geom_ribbon(aes(ymin = exp(est - st.err), ymax = exp(est + st.err), fill = input), col = NA,  alpha = 0.3)+
+  scale_x_continuous(breaks = par$x.axis)+
+  facet_wrap(input ~ .)+
+  guides(col = FALSE)
+g
+
+
+g = ggplot(pred[(!grepl("country",pred$input)) & (pred$tracking_cluster == "regular tracking"),], 
+           aes(x = cycleday_m_D, y = est, col = input, linetype = tracking_cluster)) + 
+  geom_vline(xintercept = 0, size = 2, col = "gray90")+
+  geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
+  geom_hline(yintercept = 0, size = 0.1)+
+  geom_line() + 
+  geom_ribbon(aes(ymin = est - st.err, ymax = est + st.err, fill = input), col = NA,  alpha = 0.3)+
+  scale_x_continuous(breaks = par$x.axis)+
+  ylim(c(-4,4))+
+  facet_wrap(input ~ .)+
+  guides(col = FALSE)
+g
+
+
+g = ggplot(pred[(grepl("country",pred$input)) & (pred$tracking_cluster == "regular tracking"),], 
+           aes(x = cycleday_m_D, y = est, col = input, linetype = tracking_cluster)) + 
+  geom_vline(xintercept = 0, size = 2, col = "gray90")+
+  geom_vline(xintercept = -14, size = 4, col = "gray90", alpha = 0.5)+
+  geom_hline(yintercept = 0, size = 0.1)+
+  geom_line() + 
+  geom_ribbon(aes(ymin = est - st.err, ymax = est + st.err, fill = input), col = NA,  alpha = 0.3)+
+  scale_x_continuous(breaks = par$x.axis)+
+  ylim(c(-3,3))+
+  facet_wrap(input ~ .)+
+  guides(col = FALSE)
+g
 
 
 g = ggplot(pred[grep("country",pred$input),], aes(x = cycleday_m_D, y = z_value, col = input, linetype = tracking_cluster)) + 

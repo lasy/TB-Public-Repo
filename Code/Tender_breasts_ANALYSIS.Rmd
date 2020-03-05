@@ -14,7 +14,7 @@ output:
 
 ---
 
-This document presents the data analyses that were performed for the manuscript "Phenotyping menstrual breast tenderness from large-scale self-tracked data: data analysis" by L. Symul, P. Hillard and S Holmes.
+This document presents the data analyses that were performed for the manuscript "Phenotyping menstrual breast tenderness from large-scale self-tracked data" by L. Symul, P. Hillard and S Holmes.
 
 It can be navigated using the floating table of content located on the upper left corner of this document.
 
